@@ -1,2 +1,2 @@
-# src
-Source code
+# pyPM
+python Population Modeler
