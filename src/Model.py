@@ -8,8 +8,10 @@ either by updating expectations or simulated data.
 @author: karlen
 """
 from datetime import date
+import pickle
 
 from Connector import Connector
+from Population import Population
 from Transition import Transition
 
 class Model:
@@ -27,6 +29,7 @@ class Model:
         self.connectors = {}
         self.connector_list = []
         self.transitions = {}
+        self.parameters = {}
 
         self.boot_pars = {}
         self.boot_needed = True
@@ -69,6 +72,13 @@ class Model:
 
         """
         return self.__time_step
+    
+    def get_history(self, population_name):
+        if not isinstance(population_name, str):
+            raise TypeError('model.get_history argument must be a str')
+            
+        pop = self.populations[population_name]
+        return pop.history
 
     def boot_setup(self, boot_population, boot_value, exclusion_populations=None):
         """
@@ -244,6 +254,8 @@ class Model:
                              str(transition)+') to model ('+self.name+
                              '). Transition with that name already present in model.')
         self.transitions[str(transition)] = transition
+        
+        self.__update_parameter_list(transition)
 
     def add_connector(self, connector, before_connector=None, after_connector=None):
         """
@@ -288,6 +300,7 @@ class Model:
         self.connectors[str(connector)] = connector
 
         self.__update_population_list(connector)
+        self.__update_parameter_list(connector)
 
     def remove_connector(self, connector):
         """
@@ -318,8 +331,48 @@ class Model:
         for con_name in self.connector_list:
             con = self.connectors[con_name]
             self.__update_population_list(con)
+            
+        # remake list of active parameters
+        self.parameters = {}
+        for con_name in self.connectors:
+            con = self.connectors[con_name]
+            self.__update_parameter_list(con)
+        for pop_name in self.populations:
+            pop = self.populations[con_name]
+            self.__update_parameter_list(pop)
+        for trans_name in self.transitions:
+            trans = self.transitions[trans_name]
+            self.__update_parameter_list(trans)
 
         return removed_connector
+
+    def __update_parameter_list(self, obj):
+
+        if type(obj).__name__ == 'Injector':
+            self.parameters[str(obj.transition_time)] = obj.transition_time
+            self.parameters[str(obj.injection)] = obj.injection
+   
+        elif type(obj).__name__ == 'Modifier':
+            self.parameters[str(obj.transition_time)] = obj.transition_time
+            self.parameters[str(obj.parameter_after)] = obj.parameter_after
+
+        elif isinstance(obj, Connector):
+            con = obj
+            for par_key in con.parameters:
+                par = con.parameters[par_key]
+                self.parameters[str(par)] = par
+            if type(con).__name__ == 'Chain':
+                for link_con in con.chain:
+                    for link_par_key in link_con.parameters:
+                        link_par = link_con.parameters[link_par_key]
+                        self.parameters[str(link_par)] = link_par
+
+        elif isinstance(obj, Population):
+            pop = obj
+            init = pop.initial_value
+            if type(init).__name__ == 'Parameter':
+                self.parameters[str(init)] = init
+
 
     def __update_population_list(self, connector):
 
@@ -349,3 +402,59 @@ class Model:
                                      pop.name)
             else:
                 self.populations[key] = pop
+                self.__update_parameter_list(pop)
+
+    def save_file(self, filename):
+        """
+        Save a copy of the current model to a file. The model can be restored
+        at a late time using Model.open_file(filename).
+
+        If no extension is provided, the default extension, .pypm is added.
+
+        Parameters
+        ----------
+        filename : str
+            name of file to save model
+
+        Returns
+        -------
+        None.
+
+        """
+        if not isinstance(filename, str):
+            raise TypeError('Error saving file. '+
+                            ': filename argument must be a str')
+
+        fullname = filename
+        if '.' not in filename:
+            fullname = filename+'.pypm'
+
+        with open(fullname, 'wb') as f:
+            pickle.dump(self, f, pickle.HIGHEST_PROTOCOL)
+
+    @classmethod
+    def open_file(self, filename):
+        """
+        Restore a model that was save to a file using Model.save_file(filename)
+
+        Parameters
+        ----------
+        filename : str
+            name of existing model file to open
+
+        Returns
+        -------
+        Model
+            The model object saved in the file
+
+        """
+        if not isinstance(filename, str):
+            raise TypeError('Error opening file. '+
+                            ': filename argument must be a str')
+
+        fullname = filename
+        if '.' not in filename:
+            fullname = filename+'.pypm'
+
+        with open(fullname, 'rb') as f:
+            return pickle.load(f)

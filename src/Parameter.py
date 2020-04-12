@@ -2,15 +2,18 @@
 """
 Parameter: A class for defining parameters of the model:
 
-For some parameters, when their value is changed, action is required (such
-as recalculating the distribution of future expectations) before performing
-evolution of system. Prior to starting evolution, all initialization code
-that needs to be performed due to changes is done by keeping list of
-methods that need to be called. For this reason, the parameter value is
-hidden by using the variable __value to store the current value and
-__status to store the current status
+Parameters with parameter_status = 'variable' identifies parameters that are to
+be adjusted within optimization or MCMC exploration methods. For such parameters,
+priors must be supplied using parameter_function and prior_parameters.
 
-TODO: ADD CODE TO DEAL WITH __value_changed and __status_changed
+Parameters with parameter_status = 'fixed' can be adjusted manually in an
+interactive exploration of model parameters. 
+
+The automatic transition of a parameter at defined point of the evolution is
+done by adding a Modifier object to the Model.
+
+The pre-calculated delay distributions need to be recalculated when its
+parameters are changed. Such parameters have must_update = True
 
 @author: karlen
 """
@@ -21,6 +24,7 @@ class Parameter:
     - parameter_name: short descriptor
     - description: long form description for documentation
     - value: value to be set initially or when reset requested
+    - parameter_min, parameter_max, allowed range for int or float parameter
     - parameter_type: 'int', 'float', 'bool'
     - parameter_status: 'fixed', 'variable'
     - prior_function: if (real or integer) and variable, the functional form
@@ -36,7 +40,8 @@ class Parameter:
     PRIOR_FUNCTIONS = ['norm', 'uniform']
     PRIOR_PARS = {'norm': ['mean','sigma'], 'uniform': ['mean','half_width']}
 
-    def __init__(self, parameter_name, value, description='',
+    def __init__(self, parameter_name, value,
+                 parameter_min = 0, parameter_max= 1, description='', 
                  parameter_type='float', parameter_status='fixed',
                  prior_function=None, prior_parameters=None):
 
@@ -54,6 +59,8 @@ class Parameter:
         self.set_value(value)
         self.initial_value = value
         self.description = description
+        self.parameter_min = parameter_min
+        self.parameter_max = parameter_max
 
         if parameter_status not in self.PARAMETER_STATUSES:
             buff = '/'.join(self.PARAMETER_STATUSES)
@@ -70,6 +77,12 @@ class Parameter:
 
     def __str__(self):
         return self.name
+
+    def get_min(self):
+        return self.parameter_min
+    
+    def get_max(self):
+        return self.parameter_max
 
     def get_value(self):
         """
@@ -104,8 +117,14 @@ class Parameter:
             self.parent.update()
 
     def set_must_update(self, parent):
+        """ identify this parameter as one that changes to its value requires 
+        that a calculation in the parent needs to be updated
+        """
         self.must_update = True
         self.parent = parent
+
+    def get_status(self):
+        return self.__status
 
     def set_fixed(self):
         """

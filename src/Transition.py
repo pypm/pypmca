@@ -63,6 +63,9 @@ class Transition:
 
         self.trigger_step = None
         self.__calculate_trigger_step()
+        
+        self.parameters = {}
+        self.parameters[str(self.transition_time)] = self.transition_time
 
     def update(self):
         """ Method called if transition_time parameter changed

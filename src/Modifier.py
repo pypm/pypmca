@@ -24,7 +24,6 @@ class Modifier(Transition):
 
     """
 
-
     def __init__(self, transition_name, time_spec, transition_time,
                  parameter_before, parameter_after, model=None):
         """Constructor
@@ -52,6 +51,7 @@ class Modifier(Transition):
 
         self.initial_value = parameter_before.get_value()
 
+        self.parameters[str(parameter_after)] = parameter_after
 
     def take_action(self, expectations=True):
         """

@@ -49,6 +49,8 @@ class Injector(Transition):
             raise TypeError('Error in constructing transition ('+self.name+
                             '): injection must be a float type Parameter object')
         self.injection = injection
+        
+        self.parameters[str(injection)] = injection
 
     def take_action(self, expectations=True):
         """
