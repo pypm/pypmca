@@ -43,7 +43,7 @@ class Parameter:
     def __init__(self, parameter_name, value,
                  parameter_min = 0, parameter_max= 1, description='', 
                  parameter_type='float', parameter_status='fixed',
-                 prior_function=None, prior_parameters=None):
+                 prior_function=None, prior_parameters=None, hidden=True):
 
         self.name = str(parameter_name)
         self.must_update = False
@@ -74,6 +74,11 @@ class Parameter:
         self.prior_parameters = None
         if parameter_status == 'variable':
             self.set_variable(prior_function, prior_parameters)
+            
+        if not isinstance(hidden,bool):
+            raise TypeError('Parameter ('+self.name+') hidden argument '+
+                            'must be of type bool')
+        self.hidden = hidden
 
     def __str__(self):
         return self.name

@@ -26,7 +26,8 @@ class Population:
         - description: string, optional - for documentation
     """
 
-    def __init__(self, population_name, initial_value, description=''):
+    def __init__(self, population_name, initial_value, description='',
+                 hidden=True):
         """
         Constructor
 
@@ -55,6 +56,7 @@ class Population:
 
         self.future = []
         self.initial_value = initial_value
+        self.hidden = hidden
 
     def __str__(self):
         return self.name

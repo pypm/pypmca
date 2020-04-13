@@ -26,7 +26,7 @@ bc_model.set_t0(2020, 3, 1)
 # Initialization
 
 initial_pop_par = Parameter('N_0', 5000000, 5000, 50000000,
-                            'Population of the region at t0','int')
+                            'Population of the region at t0', 'int')
 
 
 total_pop = Population('total', initial_pop_par,
@@ -40,13 +40,16 @@ infected_pop = Population('infected', 0,
 #oooooooooooooooooooooooooooo
 
 initial_contagious_par = Parameter('cont_0', 55., 0., 5000.,
-                                   'Number of contagious people at t0')
+                                   'Number of contagious people at t0',
+                                   hidden=False)
 
 contagious_pop = Population('contagious', initial_contagious_par,
-                            'number of people that can cause someone to become infected')
+                            'number of people that can cause someone to become infected',
+                            hidden=False)
 
 trans_rate = Parameter('alpha', 0.385, 0., 2.,
-                       'mean number of people that a contagious person infects per day')
+                       'mean number of people that a contagious person infects '+
+                       'per day', hidden=False)
 infection_delay = Delay('fast', 'fast', model=bc_model)
 
 bc_model.add_connector(
@@ -54,7 +57,8 @@ bc_model.add_connector(
                infected_pop, trans_rate, infection_delay, bc_model))
 
 contagious_frac = Parameter('cont_frac', 0.9, 0., 1.,
-                            'fraction of infected people that become contagious')
+                            'fraction of infected people that become contagious',
+                            hidden=False)
 contagious_delay_pars = {
     'mean': Parameter('cont_delay_mean', 3., 0., 50.,
                       'mean time from being infected to becoming contagious'),
@@ -75,9 +79,9 @@ recovered_pop = Population('recovered', 0,
                            'People who have recovered from the illness '+
                            'and are therefore no longer susceptible')
 deaths_pop = Population('deaths', 0,
-                        'people who have died from the illness')
-recover_fraction = Parameter('recover_frac', 0.99,0., 1.,
-                             'fraction of infected people who recover')
+                        'people who have died from the illness', hidden=False)
+recover_fraction = Parameter('recover_frac', 0.99, 0., 1.,
+                             'fraction of infected people who recover', hidden=False)
 recover_delay_pars = {
     'mean': Parameter('recover_delay_mean', 14., 0., 50., 'mean time from infection to recovery'),
     'sigma': Parameter('recover_delay_sigma', 5., 0.01, 20.,
@@ -109,7 +113,8 @@ chain = []
 symptomatic_pop = Population('symptomatic', 0,
                              'People who have shown symptoms')
 symptomatic_fraction = Parameter('symptomatic_frac', 0.9, 0., 1.,
-                                 'fraction of contagious people who become symptomatic')
+                                 'fraction of contagious people who become '+
+                                 'symptomatic', hidden=False)
 symptomatic_delay_pars = {
     'mean': Parameter('symptomatic_delay_mean', 3., 0., 50.,
                       'mean time from becoming contagious to having symptoms'),
@@ -129,10 +134,12 @@ chain.append(
 tested_pop = Population('tested', 0,
                         'People who have been tested')
 tested_fraction = Parameter('tested_frac', 0.8, 0., 1.,
-                            'fraction of symptomatic people who become tested')
+                            'fraction of symptomatic people who get tested',
+                            hidden=False)
 tested_delay_pars = {
     'mean': Parameter('tested_delay_mean', 3., 0., 50.,
-                      'mean time from having symptoms to getting tested'),
+                      'mean time from having symptoms to getting tested',
+                      hidden=False),
     'sigma': Parameter('tested_delay_sigma', 1., 0.01, 20.,
                        'standard deviation of times from from having symptoms to getting tested')
 }
@@ -146,12 +153,14 @@ chain.append(
 #ooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooo
 
 reported_pop = Population('reported', 0,
-                          'Infected people who received a positive test report')
+                          'Infected people who received a positive test report',
+                          hidden=False)
 reported_fraction = Parameter('reported_frac', 0.95, 0., 1.,
                               'fraction of tested infected people who will '+\
                                   'receive a positive report')
 reported_delay_pars = {
-    'mean': Parameter('reported_delay_mean', 5., 0., 50., 'mean time from having test to getting report'),
+    'mean': Parameter('reported_delay_mean', 5., 0., 50.,
+                      'mean time from having test to getting report', hidden=False),
     'sigma': Parameter('reported_delay_sigma', 2., 0.01, 20.,
                        'standard deviation of times from having test to getting report')
 }
@@ -174,7 +183,7 @@ bc_model.add_connector(
 
 nq_recovered_pop = Population('rec_non_quarantined', 0, 'natural recovery, never isolated')
 nq_recover_fraction = Parameter('recover_frac', 1.0, 0., 1.,
-                             'fraction of asymptomatic contagious people who recover')
+                                'fraction of asymptomatic contagious people who recover')
 bc_model.add_connector(
     Propagator('non-quarantined to recovered', non_quarantined_pop,
                nq_recovered_pop, nq_recover_fraction, recover_delay))
@@ -186,10 +195,10 @@ hospitalized_pop = Population('hospitalized', 0,
                               'Total hospitalization cases')
 hospitalized_fraction = Parameter('hosp_frac', 0.2, 0., 1.,
                                   'fraction of those with postive tests who will '+\
-                                  'be admitted to hospital')
+                                  'be admitted to hospital', hidden=False)
 hospitalized_delay_pars = {
     'mean': Parameter('hosp_delay_mean', 3., 0., 50.,
-                      'mean time from positive report to hospitalization'),
+                      'mean time from positive report to hospitalization', hidden=False),
     'sigma': Parameter('hosp_delay_sigma', 2., 0.01, 20.,
                        'standard deviation of times from positive report to hospitalization')
 }
@@ -203,7 +212,8 @@ bc_model.add_connector(
 #ooooooooooooooooooooooooooooooooooooooooooooooooooooooooo
 
 in_hospital_pop = Population('in_hospital', 0,
-                             'People currently in hospital')
+                             'People currently in hospital',
+                             hidden=False)
 bc_model.add_connector(
     Adder('copy hospitalizations', hospitalized_pop, in_hospital_pop))
 
@@ -216,7 +226,7 @@ released_fraction = Parameter('released_frac', 1., 0., 1.,
                               'fraction of those eventually released from hospital')
 released_delay_pars = {
     'mean': Parameter('released_delay_mean', 14., 0., 50.,
-                      'mean time from hospital admission to release'),
+                      'mean time from hospital admission to release', hidden=False),
     'sigma': Parameter('released_delay_sigma', 5., 0.01, 20.,
                        'standard deviation of times from hospital admission to release')
 }
@@ -253,9 +263,10 @@ bc_model.add_connector(
 #oooooooooooooooooooooooooooooooooo
 
 trans_rate_time = Parameter('trans_rate_time', 12., 0., 300.,
-                            'number of days before transmission rate changes')
+                            'number of days before transmission rate changes',
+                            hidden=False)
 trans_rate_after = Parameter('alpha_after', 0.062, 0., 2.,
-                             'transmission rate after lockdown')
+                             'transmission rate after lockdown', hidden=False)
 
 bc_model.add_transition(
     Modifier('transition_rate', 'rel_days', trans_rate_time, trans_rate,
@@ -265,22 +276,25 @@ traveller_pop = Population('travellers', 0,
                            'Infected travellers returning home')
 
 traveller_time = Parameter('traveller_time', 20., 0., 50.,
-                           'number of days before travellers start to return')
+                           'number of days before travellers start to return',
+                           hidden=False)
 
 traveller_number = Parameter('traveller_number', 50., 0., 50000.,
-                             'number of infected travellers returning')
+                             'number of infected travellers returning',
+                             hidden=False)
 
 bc_model.add_transition(
     Injector('infected_travellers', 'rel_days', traveller_time, traveller_pop,
              traveller_number, bc_model))
 
 traveller_fraction = Parameter('traveller_frac', 1., 0., 1.,
-                              'fraction of infected travellers that enter')
+                               'fraction of infected travellers that enter')
 traveller_delay_pars = {
     'mean': Parameter('traveller_delay_mean', 14., 0., 50.,
-                      'mean time for all travellers to enter'),
+                      'mean time for all travellers to enter', hidden=False),
     'sigma': Parameter('traveller_delay_sigma', 7., 0.01, 20.,
-                       'standard deviation of times of travellers entering')
+                       'standard deviation of times of travellers entering',
+                       hidden=False)
 }
 traveller_delay = Delay('traveller_delay', 'norm', traveller_delay_pars, bc_model)
 
@@ -291,7 +305,7 @@ bc_model.add_connector(
 # define boot parameters
 #ooooooooooooooooooooooo
 
-bc_model.boot_setup(contagious_pop, 1, 
+bc_model.boot_setup(contagious_pop, 1,
                     exclusion_populations=[total_pop, susceptible_pop])
 
 # bootstrap the model:
