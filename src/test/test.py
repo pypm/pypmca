@@ -30,11 +30,11 @@ initial_pop_par = Parameter('N_0', 5000000, 5000, 50000000,
 
 
 total_pop = Population('total', initial_pop_par,
-                       'total population of the region')
+                       'total population of the region', color='black')
 susceptible_pop = Population('susceptible', initial_pop_par,
-                             'number of people who could become infected')
+                             'number of people who could become infected', color='cornflowerblue')
 infected_pop = Population('infected', 0,
-                          'total number of people ever infected')
+                          'total number of people ever infected', color='orange')
 
 # Define the infection cycle
 #oooooooooooooooooooooooooooo
@@ -45,11 +45,12 @@ initial_contagious_par = Parameter('cont_0', 55., 0., 5000.,
 
 contagious_pop = Population('contagious', initial_contagious_par,
                             'number of people that can cause someone to become infected',
-                            hidden=False)
+                            hidden=False, color='red')
 
-trans_rate = Parameter('alpha', 0.385, 0., 2.,
+# this value is only used if the transition is removed
+trans_rate = Parameter('alpha', 0.390, 0., 2.,
                        'mean number of people that a contagious person infects '+
-                       'per day', hidden=False)
+                       'per day', hidden=True)
 infection_delay = Delay('fast', 'fast', model=bc_model)
 
 bc_model.add_connector(
@@ -77,9 +78,10 @@ bc_model.add_connector(
 
 recovered_pop = Population('recovered', 0,
                            'People who have recovered from the illness '+
-                           'and are therefore no longer susceptible')
+                           'and are therefore no longer susceptible', color='limegreen')
 deaths_pop = Population('deaths', 0,
-                        'people who have died from the illness', hidden=False)
+                        'people who have died from the illness', hidden=False,
+                        color='indigo')
 recover_fraction = Parameter('recover_frac', 0.99, 0., 1.,
                              'fraction of infected people who recover', hidden=False)
 recover_delay_pars = {
@@ -111,7 +113,7 @@ chain = []
 #oooooooooooooooooooooooooooooooooooooooooooo
 
 symptomatic_pop = Population('symptomatic', 0,
-                             'People who have shown symptoms')
+                             'People who have shown symptoms', color='chocolate')
 symptomatic_fraction = Parameter('symptomatic_frac', 0.9, 0., 1.,
                                  'fraction of contagious people who become '+
                                  'symptomatic', hidden=False)
@@ -132,7 +134,7 @@ chain.append(
 #oooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooo
 
 tested_pop = Population('tested', 0,
-                        'People who have been tested')
+                        'People who have been tested', color='deepskyblue')
 tested_fraction = Parameter('tested_frac', 0.8, 0., 1.,
                             'fraction of symptomatic people who get tested',
                             hidden=False)
@@ -154,7 +156,7 @@ chain.append(
 
 reported_pop = Population('reported', 0,
                           'Infected people who received a positive test report',
-                          hidden=False)
+                          hidden=False, color='forestgreen')
 reported_fraction = Parameter('reported_frac', 0.95, 0., 1.,
                               'fraction of tested infected people who will '+\
                                   'receive a positive report')
@@ -192,7 +194,7 @@ bc_model.add_connector(
 #oooooooooooooooooooooooooooooooooooooooooooooooooooooo
 
 hospitalized_pop = Population('hospitalized', 0,
-                              'Total hospitalization cases')
+                              'Total hospitalization cases', color='slategrey')
 hospitalized_fraction = Parameter('hosp_frac', 0.2, 0., 1.,
                                   'fraction of those with postive tests who will '+\
                                   'be admitted to hospital', hidden=False)
@@ -213,7 +215,7 @@ bc_model.add_connector(
 
 in_hospital_pop = Population('in_hospital', 0,
                              'People currently in hospital',
-                             hidden=False)
+                             hidden=False, color='darkcyan')
 bc_model.add_connector(
     Adder('copy hospitalizations', hospitalized_pop, in_hospital_pop))
 
@@ -221,7 +223,7 @@ bc_model.add_connector(
 #oooooooooooooooooooooooooooooooooo
 
 released_pop = Population('released', 0,
-                          'People released from hospital')
+                          'People released from hospital', color='darkolivegreen')
 released_fraction = Parameter('released_frac', 1., 0., 1.,
                               'fraction of those eventually released from hospital')
 released_delay_pars = {
@@ -262,15 +264,30 @@ bc_model.add_connector(
 # transitional aspects of the model
 #oooooooooooooooooooooooooooooooooo
 
-trans_rate_time = Parameter('trans_rate_time', 12., 0., 300.,
-                            'number of days before transmission rate changes',
+trans_rate_time1 = Parameter('trans_rate_time1', 12., 0., 300.,
+                            'number of days before 1st transmission rate change',
                             hidden=False)
-trans_rate_after = Parameter('alpha_after', 0.062, 0., 2.,
-                             'transmission rate after lockdown', hidden=False)
+
+trans_rate_time2 = Parameter('trans_rate_time2', 50., 0., 300.,
+                            'number of days before 2nd transmission rate change',
+                            hidden=False)
+
+trans_rate_before = Parameter('alpha_before', 0.385, 0., 2.,
+                             'initial transmission rate', hidden=False)
+
+trans_rate_after1 = Parameter('alpha_after1', 0.062, 0., 2.,
+                             'transmission rate after 1st transition', hidden=False)
+
+trans_rate_after2 = Parameter('alpha_after2', 0.062, 0., 2.,
+                              'transmission rate after 2nd transition', hidden=False)
 
 bc_model.add_transition(
-    Modifier('transition_rate', 'rel_days', trans_rate_time, trans_rate,
-             trans_rate_after, bc_model))
+    Modifier('transition_rate1', 'rel_days', trans_rate_time1, trans_rate,
+             trans_rate_before, trans_rate_after1, enabled=True, model=bc_model))
+
+bc_model.add_transition(
+    Modifier('transition_rate2', 'rel_days', trans_rate_time2, trans_rate,
+             trans_rate_after1, trans_rate_after2, enabled=True, model=bc_model))
 
 traveller_pop = Population('travellers', 0,
                            'Infected travellers returning home')
@@ -279,13 +296,13 @@ traveller_time = Parameter('traveller_time', 20., 0., 50.,
                            'number of days before travellers start to return',
                            hidden=False)
 
-traveller_number = Parameter('traveller_number', 50., 0., 50000.,
+traveller_number = Parameter('traveller_number', 10., 0., 50000.,
                              'number of infected travellers returning',
                              hidden=False)
 
 bc_model.add_transition(
     Injector('infected_travellers', 'rel_days', traveller_time, traveller_pop,
-             traveller_number, bc_model))
+             traveller_number, enabled=True, model=bc_model))
 
 traveller_fraction = Parameter('traveller_frac', 1., 0., 1.,
                                'fraction of infected travellers that enter')
@@ -333,7 +350,7 @@ bc_model.boot_setup(contagious_pop, 1,
 
 #bc_model.reboot(scale, exclusions=[total_pop, susceptible_pop])
 
-
+#bc_model.boot()
 
 
 #bc_model.evolve_expectations(200)
@@ -341,9 +358,9 @@ bc_model.boot_setup(contagious_pop, 1,
 
 #recover_delay_pars['mean'].set_value(4.)
 
-#i=1
+i=1
 
 #with open('model.pickle', 'wb') as f:
-#    pickle.dump(bc_model, f, pickle.HIGHEST_PROTOCOL)
+#    pickle.dump(bc_model, f, pickle.HIGHEST_PROTOCOL)#
 
-#bc_model.save_file('model.pypm')
+bc_model.save_file('model.pypm')
