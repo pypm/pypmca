@@ -219,30 +219,64 @@ in_hospital_pop = Population('in_hospital', 0,
 bc_model.add_connector(
     Adder('copy hospitalizations', hospitalized_pop, in_hospital_pop))
 
-# people are released from hospital
-#oooooooooooooooooooooooooooooooooo
+# people are released from hospital with or w/o entering ICU
+#ooooooooooooooooooooooooooooooooooooooooooooooooooooooooooo
 
 released_pop = Population('released', 0,
-                          'People released from hospital', color='darkolivegreen')
-released_fraction = Parameter('released_frac', 1., 0., 1.,
-                              'fraction of those eventually released from hospital')
+                          'People released from hospital w/o ICU', color='darkolivegreen')
+in_icu_pop = Population('in_icu', 0,
+                     'People in ICU', color='deeppink')
+released_fraction = Parameter('released_frac', 0.8, 0., 1.,
+                              'fraction of those released from hospital w/o ICU', hidden=False)
 released_delay_pars = {
-    'mean': Parameter('released_delay_mean', 14., 0., 50.,
+    'mean': Parameter('released_delay_mean', 5., 0., 50.,
                       'mean time from hospital admission to release', hidden=False),
-    'sigma': Parameter('released_delay_sigma', 5., 0.01, 20.,
+    'sigma': Parameter('released_delay_sigma', 2., 0.01, 20.,
                        'standard deviation of times from hospital admission to release')
 }
 released_delay = Delay('released_delay', 'norm', released_delay_pars, bc_model)
 
-bc_model.add_connector(
-    Propagator('hospitalized to released', hospitalized_pop,
-               released_pop, released_fraction, released_delay))
+to_icu_delay_pars = {
+    'mean': Parameter('to_icu_delay_mean', 5., 0., 50.,
+                      'mean time from hospital admission to icu', hidden=False),
+    'sigma': Parameter('to_icu_delay_sigma', 3., 0.01, 20.,
+                       'standard deviation of times from hospital admission to icu')
+}
+to_icu_delay = Delay('to_icu_delay', 'norm', to_icu_delay_pars, bc_model)
 
-# keep track of how many remain in hospital
-#oooooooooooooooooooooooooooooooooooooooooo
+bc_model.add_connector(
+    Splitter('hospital to ICU', hospitalized_pop, [released_pop, in_icu_pop],
+             released_fraction, [released_delay, to_icu_delay]))
+
+# people stay a while in the ICU and then leave
+#oooooooooooooooooooooooooooooooooooooooooooooo
+
+depart_icu_pop = Population('departed ICU', 0,
+                            'People who left ICU', color='plum')
+
+in_icu_delay_pars = {
+    'mean': Parameter('in_icu_delay_mean', 14., 0., 50.,
+                      'mean time from icu admission to departure', hidden=False),
+    'sigma': Parameter('in_icu_delay_sigma', 5., 0.01, 20.,
+                       'standard deviation of times from icu admission to departure')
+}
+in_icu_delay = Delay('in_icu_delay', 'norm', in_icu_delay_pars, bc_model)
+
+depart_icu_fraction = Parameter('depart_icu_frac', 1., 0., 1.,
+                              'fraction of those released who eventually leave ICU')
+
+bc_model.add_connector(
+    Propagator('ICU to departure', in_icu_pop,
+               depart_icu_pop, depart_icu_fraction, in_icu_delay))
+
+# keep track of how many remain in hospital and ICU
+#oooooooooooooooooooooooooooooooooooooooooooooooooo
 
 bc_model.add_connector(
     Subtractor('remove released patients', in_hospital_pop, released_pop))
+
+bc_model.add_connector(
+    Subtractor('remove ICU departures', in_icu_pop, depart_icu_pop))
 
 # adjust other populations as required
 #ooooooooooooooooooooooooooooooooooooo
@@ -251,8 +285,8 @@ bc_model.add_connector(
     Subtractor('subtract deaths from total', total_pop, deaths_pop))
 
 bc_model.add_connector(
-    Subtractor('remove those who get a positive report '+\
-               'from the contagious population (isolation)',
+    Subtractor('remove those tested positive '+\
+               'from contagious (isolation)',
                contagious_pop, reported_pop))
 
 bc_model.add_connector(
@@ -363,4 +397,4 @@ i=1
 #with open('model.pickle', 'wb') as f:
 #    pickle.dump(bc_model, f, pickle.HIGHEST_PROTOCOL)#
 
-bc_model.save_file('model.pypm')
+bc_model.save_file('model2.pypm')
