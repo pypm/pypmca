@@ -27,7 +27,7 @@ class Population:
     """
 
     def __init__(self, population_name, initial_value, description='',
-                 hidden=True):
+                 hidden=True, color='black'):
         """
         Constructor
 
@@ -56,7 +56,11 @@ class Population:
 
         self.future = []
         self.initial_value = initial_value
+        self.color = color
         self.hidden = hidden
+        # identify those populations for which daily contributions are meaningful
+        # this is set to False if a subtraction is performed on the population
+        self.monotonic = True
 
     def __str__(self):
         return self.name

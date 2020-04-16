@@ -47,7 +47,7 @@ class Parameter:
 
         self.name = str(parameter_name)
         self.must_update = False
-        self.parent = None
+        self.parents = []
 
         if parameter_type not in self.PARAMETER_TYPES:
             buff = '/'.join(self.PARAMETER_TYPES)
@@ -89,6 +89,12 @@ class Parameter:
     def get_max(self):
         return self.parameter_max
 
+    def reset(self):
+        self.set_value(self.initial_value)
+
+    def new_initial_value(self):
+        self.initial_value = self.get_value()
+
     def get_value(self):
         """
         Return current value of parameter
@@ -119,14 +125,16 @@ class Parameter:
 
         # if this parameter is used for delay - do a recalculation of the distribution
         if self.must_update:
-            self.parent.update()
+            for parent in self.parents:
+                parent.update()
 
     def set_must_update(self, parent):
         """ identify this parameter as one that changes to its value requires 
         that a calculation in the parent needs to be updated
         """
         self.must_update = True
-        self.parent = parent
+        if parent not in self.parents:
+            self.parents.append(parent)
 
     def get_status(self):
         return self.__status

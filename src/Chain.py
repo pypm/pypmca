@@ -60,6 +60,13 @@ class Chain(Connector):
             if prop.delay.delay_type != 'norm':
                 raise ValueError('Chain ('+self.name+
                                  ') chain must be a list of Propagator objects with "norm" delays')
+                
+            for key in prop.delay.delay_parameters:
+                # notify parameter that this object's update method must be call if changed
+                prop.delay.delay_parameters[key].set_must_update(self)
+                
+            prop.fraction.set_must_update(self)
+                
         self.chain = chain
 
         if not isinstance(fraction, Parameter):
@@ -92,6 +99,10 @@ class Chain(Connector):
 
         self.propagators = None
         self.remainder_propagator = None
+        self.__setup_compound_propagation()
+    
+    # the same issue for delay parameters (update required after a change)
+    def update(self):
         self.__setup_compound_propagation()
 
     def __setup_compound_propagation(self):

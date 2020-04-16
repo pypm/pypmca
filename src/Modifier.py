@@ -24,11 +24,15 @@ class Modifier(Transition):
 
     """
 
-    def __init__(self, transition_name, time_spec, transition_time,
-                 parameter_before, parameter_after, model=None):
+    def __init__(self, transition_name, time_spec, transition_time, parameter,
+                 parameter_before, parameter_after, enabled=True, model=None):
         """Constructor
         """
-        super().__init__(transition_name, time_spec, transition_time, model)
+        super().__init__(transition_name, time_spec, transition_time, enabled, model)
+
+        if parameter is None:
+            raise TypeError('Error in constructing transition ('+self.name+
+                            '): parameter_before cannot be None')
 
         if parameter_before is None:
             raise TypeError('Error in constructing transition ('+self.name+
@@ -38,6 +42,10 @@ class Modifier(Transition):
             raise TypeError('Error in constructing transition ('+self.name+
                             '): parameter_after cannot be None')
 
+        if not isinstance(parameter, Parameter):
+            raise TypeError('Error in constructing transition ('+self.name+
+                            '): parameter must be a Parameter object')
+
         if not isinstance(parameter_before, Parameter):
             raise TypeError('Error in constructing transition ('+self.name+
                             '): parameter_before must be a Parameter object')
@@ -46,21 +54,23 @@ class Modifier(Transition):
             raise TypeError('Error in constructing transition ('+self.name+
                             '): parameter_after must be a Parameter object')
 
+        self.parameter = parameter
         self.parameter_before = parameter_before
         self.parameter_after = parameter_after
 
         self.initial_value = parameter_before.get_value()
 
         self.parameters[str(parameter_after)] = parameter_after
+        self.parameters[str(parameter_before)] = parameter_before
 
     def take_action(self, expectations=True):
         """
         Modify the value of the parameter
         """
-        self.parameter_before.set_value(self.parameter_after.get_value())
+        self.parameter.set_value(self.parameter_after.get_value())
 
     def reset(self):
         """
-        Revert to the oriinal value for the parameter
+        Revert to the value of the before parameter
         """
-        self.parameter_before.set_value(self.initial_value)
+        self.parameter.set_value(self.parameter_before.get_value())

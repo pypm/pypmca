@@ -27,10 +27,10 @@ class Injector(Transition):
     """
 
     def __init__(self, transition_name, time_spec, transition_time,
-                 to_population, injection, model=None):
+                 to_population, injection, enabled=True, model=None):
         """Constructor
         """
-        super().__init__(transition_name, time_spec, transition_time, model)
+        super().__init__(transition_name, time_spec, transition_time, enabled, model)
 
         if not isinstance(to_population, Population):
             raise TypeError('Injector ('+self.name+

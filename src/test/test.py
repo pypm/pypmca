@@ -20,7 +20,7 @@ from Injector import Injector
 
 # Test by building a population model for BC
 
-bc_model = Model('BC v1')
+bc_model = Model('BC v2')
 bc_model.set_t0(2020, 3, 1)
 
 # Initialization
@@ -184,7 +184,7 @@ bc_model.add_connector(
           chain, chain_fraction, chain_delay, bc_model))
 
 nq_recovered_pop = Population('rec_non_quarantined', 0, 'natural recovery, never isolated')
-nq_recover_fraction = Parameter('recover_frac', 1.0, 0., 1.,
+nq_recover_fraction = Parameter('nq_recover_frac', 1.0, 0., 1.,
                                 'fraction of asymptomatic contagious people who recover')
 bc_model.add_connector(
     Propagator('non-quarantined to recovered', non_quarantined_pop,
@@ -225,7 +225,7 @@ bc_model.add_connector(
 released_pop = Population('released', 0,
                           'People released from hospital w/o ICU', color='darkolivegreen')
 in_icu_pop = Population('in_icu', 0,
-                     'People in ICU', color='deeppink')
+                     'People in ICU', hidden=False, color='deeppink')
 released_fraction = Parameter('released_frac', 0.8, 0., 1.,
                               'fraction of those released from hospital w/o ICU', hidden=False)
 released_delay_pars = {
@@ -276,7 +276,10 @@ bc_model.add_connector(
     Subtractor('remove released patients', in_hospital_pop, released_pop))
 
 bc_model.add_connector(
-    Subtractor('remove ICU departures', in_icu_pop, depart_icu_pop))
+    Subtractor('remove ICU departures from ICU', in_icu_pop, depart_icu_pop))
+
+bc_model.add_connector(
+    Subtractor('remove ICU departures from hospital', in_hospital_pop, depart_icu_pop))
 
 # adjust other populations as required
 #ooooooooooooooooooooooooooooooooooooo
@@ -384,9 +387,19 @@ bc_model.boot_setup(contagious_pop, 1,
 
 #bc_model.reboot(scale, exclusions=[total_pop, susceptible_pop])
 
+#'symptomatic_frac'
+
+#bc_model.parameters['symptomatic_frac'].set_value(0.9)
 #bc_model.boot()
+#bc_model.evolve_expectations(200)
+#print(bc_model.populations['non_quarantined'].history[-1])
 
+#bc_model.parameters['symptomatic_frac'].set_value(0.09)
+#bc_model.boot()
+#bc_model.evolve_expectations(200)
+#print(bc_model.populations['non_quarantined'].history[-1])
 
+#bc_model.boot()
 #bc_model.evolve_expectations(200)
 #bc_model.generate_data(200)
 
@@ -397,4 +410,4 @@ i=1
 #with open('model.pickle', 'wb') as f:
 #    pickle.dump(bc_model, f, pickle.HIGHEST_PROTOCOL)#
 
-bc_model.save_file('model2.pypm')
+#bc_model.save_file('model432.pypm')

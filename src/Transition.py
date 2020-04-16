@@ -17,13 +17,16 @@ class Transition:
     The time_step for which the action is taken can be specified as one of 'time_spec':
     - 'rel_days': float, number of days after start (t0)
     - 'rel_steps': int, number of time_steps after start (t0)
+    
+    The transition can be disabled by setting enabled=False
 
     In all cases, the time is specified by a Parameter object
     """
 
     TIME_SPECS = {'rel_days':'float', 'rel_steps':'int'}
 
-    def __init__(self, transition_name, time_spec, transition_time, model=None):
+    def __init__(self, transition_name, time_spec, transition_time,
+                 enabled=True, model=None):
         """Constructor
         """
         self.name = str(transition_name)
@@ -66,6 +69,8 @@ class Transition:
         
         self.parameters = {}
         self.parameters[str(self.transition_time)] = self.transition_time
+        
+        self.enabled = enabled
 
     def update(self):
         """ Method called if transition_time parameter changed

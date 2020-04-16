@@ -22,6 +22,7 @@ class Model:
     def __init__(self, model_name):
 
         self.name = str(model_name)
+        self.description = ''
         self.t0 = date.today()
         self.__time_step = 1. # default time step is one day. (hidden)
         self.__time_step_changed = False
@@ -72,11 +73,11 @@ class Model:
 
         """
         return self.__time_step
-    
+
     def get_history(self, population_name):
         if not isinstance(population_name, str):
             raise TypeError('model.get_history argument must be a str')
-            
+
         pop = self.populations[population_name]
         return pop.history
 
@@ -141,8 +142,20 @@ class Model:
         for key in self.populations:
             self.populations[key].reset()
 
+        # do this in reverse order, so earlier transitions get precidence
+        trans_dict = {}
+        rc = 0.
         for key in self.transitions:
-            self.transitions[key].reset()
+            rc += 0.01
+            trans = self.transitions[key]
+            trig_step = trans.trigger_step + rc
+            trans_dict[trig_step] = trans
+        trans_list = list(trans_dict.keys())
+        trans_list.sort()
+        trans_list.reverse()
+        for trans_step in trans_list:
+            trans = trans_dict[trans_step]
+            trans.reset()
 
         self.boot_needed = True
 
@@ -212,7 +225,8 @@ class Model:
             for transition_name in self.transitions:
                 transition = self.transitions[transition_name]
                 if step == transition.trigger_step:
-                    transition.take_action(expectations=True)
+                    if transition.enabled:
+                        transition.take_action(expectations=True)
             # calculate future expectations
             for connector_name in self.connector_list:
                 connector = self.connectors[connector_name]
@@ -232,7 +246,8 @@ class Model:
             for transition_name in self.transitions:
                 transition = self.transitions[transition_name]
                 if step == transition.trigger_step:
-                    transition.take_action(expectations=False)
+                    if transition.enabled:
+                        transition.take_action(expectations=False)
             # calculate future data
             for connector_name in self.connector_list:
                 connector = self.connectors[connector_name]
@@ -254,7 +269,7 @@ class Model:
                              str(transition)+') to model ('+self.name+
                              '). Transition with that name already present in model.')
         self.transitions[str(transition)] = transition
-        
+
         self.__update_parameter_list(transition)
 
     def add_connector(self, connector, before_connector=None, after_connector=None):
@@ -331,14 +346,14 @@ class Model:
         for con_name in self.connector_list:
             con = self.connectors[con_name]
             self.__update_population_list(con)
-            
+
         # remake list of active parameters
         self.parameters = {}
         for con_name in self.connectors:
             con = self.connectors[con_name]
             self.__update_parameter_list(con)
         for pop_name in self.populations:
-            pop = self.populations[con_name]
+            pop = self.populations[pop_name]
             self.__update_parameter_list(pop)
         for trans_name in self.transitions:
             trans = self.transitions[trans_name]
@@ -351,9 +366,10 @@ class Model:
         if type(obj).__name__ == 'Injector':
             self.parameters[str(obj.transition_time)] = obj.transition_time
             self.parameters[str(obj.injection)] = obj.injection
-   
+
         elif type(obj).__name__ == 'Modifier':
             self.parameters[str(obj.transition_time)] = obj.transition_time
+            self.parameters[str(obj.parameter_before)] = obj.parameter_before
             self.parameters[str(obj.parameter_after)] = obj.parameter_after
 
         elif isinstance(obj, Connector):
@@ -409,6 +425,9 @@ class Model:
         Save a copy of the current model to a file. The model can be restored
         at a late time using Model.open_file(filename).
 
+        Before saving, the model futures are removed, and the initial_values
+        are set to the current values for all parameters.
+
         If no extension is provided, the default extension, .pypm is added.
 
         Parameters
@@ -428,6 +447,17 @@ class Model:
         fullname = filename
         if '.' not in filename:
             fullname = filename+'.pypm'
+
+#       eliminate histories, undo transitioned parameter adjustments
+
+        self.reset()
+
+#       set initial parameter values to their current values to define a new
+#       reference
+
+        for par_name in self.parameters:
+            par = self.parameters[par_name]
+            par.new_initial_value()
 
         with open(fullname, 'wb') as f:
             pickle.dump(self, f, pickle.HIGHEST_PROTOCOL)

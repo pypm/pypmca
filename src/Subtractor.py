@@ -37,6 +37,9 @@ class Subtractor(Connector):
             raise TypeError('Subtractor ('+self.name+
                             ') to_population must be a Population object')
 
+        # Identify the from_population as one not to derive daily numbers
+        self.from_population.monotonic = False
+
     def update_expectation(self):
         """
         do subtraction
@@ -55,3 +58,4 @@ class Subtractor(Connector):
         """
         reduction = -1 * self.to_population.future[0]
         self.from_population.update_future_fast(reduction)
+

@@ -225,6 +225,6 @@ def parameter_table(model, width=120):
     return table.draw()
 
 
-#my_model = Model.open_file('../test/model2.pypm')
+#my_model = Model.open_file('../test/model2v1.pypm')
 #print(parameter_table(my_model))
 #print_all(my_model)
