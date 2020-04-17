@@ -20,7 +20,7 @@ from Injector import Injector
 
 # Test by building a population model for BC
 
-bc_model = Model('BC v2')
+bc_model = Model('BC v2.5')
 bc_model.set_t0(2020, 3, 1)
 
 # Initialization
@@ -100,7 +100,7 @@ death_delay = Delay('death_delay', 'norm', death_delay_pars, bc_model)
 
 bc_model.add_connector(
     Splitter('recovery', infected_pop, [recovered_pop, deaths_pop],
-             recover_fraction, [recover_delay, death_delay]))
+             [recover_fraction], [recover_delay, death_delay]))
 
 # Those contagious may become symptomatic, then get tested, and finally
 # with a positive report, become isolated and therefore not contagious.
@@ -246,7 +246,7 @@ to_icu_delay = Delay('to_icu_delay', 'norm', to_icu_delay_pars, bc_model)
 
 bc_model.add_connector(
     Splitter('hospital to ICU', hospitalized_pop, [released_pop, in_icu_pop],
-             released_fraction, [released_delay, to_icu_delay]))
+             [released_fraction], [released_delay, to_icu_delay]))
 
 # people stay a while in the ICU and then leave
 #oooooooooooooooooooooooooooooooooooooooooooooo
@@ -400,7 +400,7 @@ bc_model.boot_setup(contagious_pop, 1,
 #print(bc_model.populations['non_quarantined'].history[-1])
 
 #bc_model.boot()
-#bc_model.evolve_expectations(200)
+bc_model.evolve_expectations(200)
 #bc_model.generate_data(200)
 
 #recover_delay_pars['mean'].set_value(4.)
@@ -410,4 +410,4 @@ i=1
 #with open('model.pickle', 'wb') as f:
 #    pickle.dump(bc_model, f, pickle.HIGHEST_PROTOCOL)#
 
-#bc_model.save_file('model432.pypm')
+bc_model.save_file('model_v2_6.pypm')

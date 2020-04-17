@@ -6,6 +6,9 @@ Show the details of a pypm model by a set of tables for:
     - parameters (fixed and variable)
     - variable parameters - not yet done
     - transitions: modifiers and injectors separately
+    
+    - The optional parameter reveal (default False), if set True will
+    show all elements, even those that are "hidden" or "disabled"
 
 @author: karlen
 """
@@ -37,7 +40,7 @@ def table_setup(model, width):
     table.set_max_width(width)
     return table
 
-def injector_table(model, width=120):    
+def injector_table(model, width=120, reveal=False):    
     table = table_setup(model, width)
     
  #   transition_name, time_spec, transition_time,
@@ -52,12 +55,13 @@ def injector_table(model, width=120):
     rows = [header]
     for key in model.transitions:
         trans = model.transitions[key]
-        if type(trans).__name__ == 'Injector':
-            row = [str(trans), str(trans.transition_time),
-                   trans.transition_time.get_value(), trans.time_spec,
-                   str(trans.to_population),
-                   str(trans.injection), trans.injection.get_value()]
-            rows.append(row)
+        if reveal or trans.enabled:
+            if type(trans).__name__ == 'Injector':
+                row = [str(trans), str(trans.transition_time),
+                       trans.transition_time.get_value(), trans.time_spec,
+                       str(trans.to_population),
+                       str(trans.injection), trans.injection.get_value()]
+                rows.append(row)
         
     table.add_rows(rows)
     return table.draw()
