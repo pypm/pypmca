@@ -30,15 +30,17 @@ class Parameter:
     - prior_function: if (real or integer) and variable, the functional form
       of prior. Allowed: 'norm' or 'uniform'
     - prior_parameters for (list of floats, not parameter objects):
-        - for 'norm': dict [mean, sigma]
-        - for 'uniform': dict [mean, half_width]
+        - for 'norm': dict [mean, sigma, step]
+        - for 'uniform': dict [mean, half_width, step]
         - for boolean: truth probability
+    - step is maximum size of step during MCMC ((1-2*uni_ran)*step)
     """
 
     PARAMETER_TYPES = {'int':int, 'float':float, 'bool':bool}
     PARAMETER_STATUSES = ['fixed', 'variable']
     PRIOR_FUNCTIONS = ['norm', 'uniform']
-    PRIOR_PARS = {'norm': ['mean','sigma'], 'uniform': ['mean','half_width']}
+    PRIOR_PARS = {'norm': ['mean','sigma','step'], 
+                  'uniform': ['mean','half_width','step']}
 
     def __init__(self, parameter_name, value,
                  parameter_min = 0, parameter_max= 1, description='', 
@@ -164,8 +166,8 @@ class Parameter:
             of prior. Allowed: 'norm' or 'uniform'
         prior_parameters : TYPE, optional
             DESCRIPTION. (list of floats, not parameter objects):
-                - for 'norm': dict  having keys ['mean', 'sigma']
-                - for 'uniform': dict having keys ['mean', 'half_width']
+                - for 'norm': dict  having keys ['mean', 'sigma', 'step']
+                - for 'uniform': dict having keys ['mean', 'half_width', 'step']
                 - for boolean: float, truth probability
 
         if prior not supplied, the previously used prior will be used

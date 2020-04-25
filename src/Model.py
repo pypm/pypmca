@@ -31,6 +31,8 @@ class Model:
         self.connector_list = []
         self.transitions = {}
         self.parameters = {}
+        self.lnl = None
+        self.population_mcmc_time_step_range = {}
 
         self.boot_pars = {}
         self.boot_needed = True
