@@ -26,10 +26,15 @@ class Multiplier(Connector):
         of the from_population totals
         - delay: Delay object that defines how propagation is spread over time.
         - model: necessary to access the time_step
+        - distribution: newly infected production distribution. 
+            poisson (indendent infections)
+            nbinom (negative binomial - in popular use)
+            nbinom_par = p in the scipy nbinom. limit 0.001<p<0.999
     """
 
     def __init__(self, connector_name, from_population, to_population,
-                 scale_parameter, delay, model):
+                 scale_parameter, delay, model, distribution='poisson', 
+                 nbinom_par=None):
         """Constructor
         """
         super().__init__(connector_name, from_population, to_population)
@@ -63,6 +68,17 @@ class Multiplier(Connector):
         if delay.delay_parameters is not None:
             for key in delay.delay_parameters:
                 self.parameters['delay_'+key] = delay.delay_parameters[key]
+                
+        if distribution not in ['poisson','nbinom']:
+            raise ValueError('Multiplier ('+self.name+
+                             ') distribution must be poisson or nbinom')
+        self.distribution = distribution
+
+        if distribution == 'nbinom' and \
+            (nbinom_par is None or not isinstance(nbinom_par, Parameter)):
+            raise TypeError('Multiplier ('+self.name+
+                            ') nbinom_par must be a Parameter object')
+        self.nbinom_par = nbinom_par
 
     def update_expectation(self):
         """
@@ -78,8 +94,18 @@ class Multiplier(Connector):
         future_expectations
         """
         scale = self.__get_scale()
-        n = stats.poisson.rvs(scale)
-        self.to_population.update_future_data(n, self.delay)
+        if not hasattr(self,'distribution') or self.distribution == 'poisson':
+            n = stats.poisson.rvs(scale)
+            self.to_population.update_future_data(n, self.delay)
+        else:
+            p = self.nbinom_par.get_value()
+            if p < 0.001:
+                p = 0.001
+            if p > 0.999:
+                p = 0.999
+            r = scale * p/(1.-p)
+            n = stats.nbinom.rvs(r,p)
+            self.to_population.update_future_data(n, self.delay)
 
     def __get_scale(self):
         """

@@ -235,7 +235,7 @@ class Model:
                 connector.update_expectation()
             # make one time step
             for key in self.populations:
-                self.populations[key].do_time_step()
+                self.populations[key].do_time_step(expectations=True)
 
     def generate_data(self, n_step):
         """
@@ -256,7 +256,7 @@ class Model:
                 connector.update_data()
             # make one time step
             for key in self.populations:
-                self.populations[key].do_time_step()
+                self.populations[key].do_time_step(expectations=True)
 
     def add_transition(self, transition):
         """

@@ -23,7 +23,7 @@ class Transition:
     In all cases, the time is specified by a Parameter object
     """
 
-    TIME_SPECS = {'rel_days':'float', 'rel_steps':'int'}
+    TIME_SPECS = {'rel_days':'int', 'rel_steps':'int'}
 
     def __init__(self, transition_name, time_spec, transition_time,
                  enabled=True, model=None):

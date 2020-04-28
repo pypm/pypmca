@@ -17,6 +17,7 @@ class Delay:
             - fast: all passed in next time step
             - norm: delay_parameters are mean and standard deviation
             - uniform: delay_parameters are mean and half width
+            - erlang: delay_parameters are mean and 'k' (number of ODE stages)
         - delay_parameters: dictionary of Parameter objects. The units are days.
             - Can be None if delay_type is 'fast'
         - model: Model object that this delay is to be used with
@@ -24,9 +25,10 @@ class Delay:
               specified to access the model time_step
     """
 
-    DELAY_TYPES = ['fast', 'norm', 'uniform']
+    DELAY_TYPES = ['fast', 'norm', 'uniform', 'erlang']
     DELAY_PAR_KEYS = {'fast':[], 'norm':['mean', 'sigma'],
-                      'uniform':['mean', 'half_width']}
+                      'uniform':['mean', 'half_width'],
+                      'erlang':['mean', 'k']}
     EPSILON = 0.0001 # futures assigned until cdf reaches (1.-EPS)
 
     def __init__(self, delay_name, delay_type,
@@ -67,7 +69,14 @@ class Delay:
             for key in delay_parameters:
                 if not isinstance(delay_parameters[key], Parameter):
                     raise TypeError('Delay ('+self.name+
-                                    ' parameters must be Parameter objects')
+                                    ') parameters must be Parameter objects')
+                if key =='k':
+                    if delay_parameters[key].parameter_type != 'int':
+                        raise TypeError('Delay ('+self.name+
+                                        ') k erlang parameter must be an integer parameter')
+                    elif delay_parameters[key].parameter_type != 'float':
+                        raise TypeError('Delay ('+self.name+
+                                    ') parameter '+key+' must be a float parameter')
                 # flag the parameter that if changed, the parent
                 # update method must be called
                 delay_parameters[key].set_must_update(self)
@@ -75,7 +84,7 @@ class Delay:
             for key in keys:
                 if key not in delay_parameters:
                     raise ValueError('Delay ('+self.name+
-                                     ' parameters missing parameter: '+key)
+                                     ') parameters missing parameter: '+key)
 
         self.delay_type = delay_type
         self.delay_parameters = delay_parameters
@@ -97,26 +106,43 @@ class Delay:
         else:
             time_step = self.model.get_time_step()
             day = 1./time_step
-            # Normal distribution parameters
             mean = self.delay_parameters['mean'].get_value()
-            loc = mean*day
-            sigma = self.delay_parameters['sigma'].get_value()
-            scale = sigma*day
-            dist = stats.norm
+            loc = 0.
+            scale = 0.
+            a = 0
+            dist = None
+            if self.delay_type == 'norm':
+                loc = mean*day
+                sigma = self.delay_parameters['sigma'].get_value()
+                scale = sigma*day
+                dist = stats.norm
             if self.delay_type == 'uniform':
                 half_width = self.delay_parameters['half_width'].get_value()
                 loc = mean*day - half_width*day
                 scale = 2.*half_width*day
                 dist = stats.uniform
+            if self.delay_type == 'erlang':
+                # this mimics an ODE type delay with # of stages = a 
+                loc = 0.
+                a = self.delay_parameters['k'].get_value()
+                scale = mean*day/a
+                dist = stats.erlang
 
             # use cdf with 0.5 time_step offsets
-            cdf = dist.cdf(0.5, loc=loc, scale=scale)
+            cdf = 0
+            if self.delay_type != 'erlang':
+                cdf = dist.cdf(0.5, loc=loc, scale=scale)
+            else:
+                cdf = dist.cdf(0.5, a, loc=loc, scale=scale)
             future = [cdf]
             step = 0
             while cdf < (1-self.EPSILON):
                 last_cdf = cdf
                 step += 1
-                cdf = dist.cdf(step + 0.5, loc=loc, scale=scale)
+                if self.delay_type != 'erlang':
+                    cdf = dist.cdf(step + 0.5, loc=loc, scale=scale)
+                else:
+                    cdf = dist.cdf(step + 0.5, a, loc=loc, scale=scale)
                 increment = cdf - last_cdf
                 future.append(increment)
             missing = 1. - cdf

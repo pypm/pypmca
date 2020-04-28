@@ -85,7 +85,7 @@ recovered_pop = Population('recovered', 0,
                            'and are therefore no longer susceptible', color='limegreen')
 deaths_pop = Population('deaths', 0,
                         'people who have died from the illness', hidden=False,
-                        color='indigo')
+                        color='indigo', show_sim = True)
 recover_fraction = Parameter('recover_frac', 0.99, 0., 1.,
                              'fraction of infected people who recover', hidden=False)
 recover_delay_pars = {
@@ -113,7 +113,7 @@ bc_model.add_connector(
 # the last being a catch all...
 
 icu_pop = Population('icu admissions', 0,
-                     'People admitted to ICU', hidden=True, color='deeppink')
+                     'People admitted to ICU', hidden=True, color='deeppink', show_sim=True)
 
 to_icu_fraction = Parameter('icu_frac', 0.05, 0., 1.,
                             'fraction of contagious people who go to '+
@@ -186,7 +186,7 @@ chain.append(
 
 reported_pop = Population('reported', 0,
                           'Infected people who received a positive test report',
-                          hidden=False, color='forestgreen')
+                          hidden=False, color='forestgreen', show_sim=True)
 reported_fraction = Parameter('reported_frac', 0.95, 0., 1.,
                               'fraction of tested infected people who will '+\
                                   'receive a positive report')
@@ -223,7 +223,7 @@ bc_model.add_connector(
 #oooooooooooooooooooooooooooooooooooooooooooooooooooooo
 
 hospitalized_pop = Population('hospitalized', 0,
-                              'Total hospitalization cases', color='slategrey')
+                              'Total hospitalization cases', color='slategrey', show_sim=True)
 hospitalized_fraction = Parameter('hosp_frac', 0.2, 0., 1.,
                                   'fraction of those with postive tests who will '+\
                                   'be admitted to hospital', hidden=False)
@@ -244,7 +244,7 @@ bc_model.add_connector(
 
 in_hospital_pop = Population('in_hospital', 0,
                              'People currently in hospital',
-                             hidden=False, color='darkcyan')
+                             hidden=False, color='darkcyan', show_sim=True)
 bc_model.add_connector(
     Adder('copy hospitalizations', hospitalized_pop, in_hospital_pop))
 
@@ -276,7 +276,7 @@ depart_icu_pop = Population('departed ICU', 0,
                             'People who left ICU', color='plum')
 
 in_icu_pop = Population('in_icu', 0,
-                     'People remaining ICU', hidden=False, color='deeppink')
+                     'People remaining ICU', hidden=False, color='deeppink', show_sim=True)
 
 bc_model.add_connector(
     Adder('copy icu admissions', icu_pop, in_icu_pop))
@@ -453,4 +453,4 @@ i=1
 #with open('model.pickle', 'wb') as f:
 #    pickle.dump(bc_model, f, pickle.HIGHEST_PROTOCOL)#
 
-bc_model.save_file('model_v3_3.pypm')
+bc_model.save_file('model_v4_0.pypm')
