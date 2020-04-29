@@ -5,6 +5,9 @@ along with the covariance (optional)
 
 This is done using the scipy.optimize.curve_fit method
 
+The full_population_name has the prefix daily or total. If daily, then the
+differences need to be calculated
+
 @author: karlen
 """
 import copy
@@ -16,9 +19,11 @@ class Optimizer:
     """ Optimizer: point estimator and covariance
     """
 
-    def __init__(self, model, population_name, data, data_range):
+    def __init__(self, model, full_population_name, data, data_range):
         self.model = model
-        self.population_name = population_name
+        self.full_population_name = full_population_name
+        self.population_name = full_population_name[6:]
+        self.population_type = full_population_name[:5]
         self.data = data
         self.data_range = data_range
         self.variable_names = []
@@ -56,6 +61,12 @@ class Optimizer:
     def reset_variables(self):
         for var_name in self.variable_names:
             self.model.parameters[var_name].set_value(self.variable_initial_values[var_name])
+            
+    def delta(self, cumul):
+        diff = []
+        for i in range(1,len(cumul)):
+            diff.append(cumul[i] - cumul[i-1])
+        return diff
 
     def fit(self, with_cov=False):
         """ work out point estimate. Note that this does not seem to work
@@ -71,10 +82,17 @@ class Optimizer:
 
             self.model.reset()
             self.model.evolve_expectations(self.data_range[1])
+            pop = self.model.populations[self.population_name]
             func_values = []
-            for xi in x:
-                i = int(round(xi))
-                func_values.append(self.model.populations[self.population_name].history[i])
+            if self.population_type == 'total':
+                for xi in x:
+                    i = int(round(xi))
+                    func_values.append(pop.history[i])
+            else:
+                diff = self.delta(pop.history)
+                for xi in x:
+                    i = int(round(xi))
+                    func_values.append(diff[i])
             return np.array(func_values)
 
         par_0, bounds = self.func_setup()
@@ -108,6 +126,8 @@ class Optimizer:
         """ Calculate the autocovariance matrix. Do that by generating simulated datasets.
             At the same time, investigate the chi^2 for cases where the last simulated point
             is close to the expectation (which would be the case for fitting)
+            
+            STILL TO DO: deal with daily data! Not hard. see above ***
         """
         # Make a copy first
 
@@ -195,7 +215,7 @@ class Optimizer:
                 var_parameters[par_name] = par
                 var_values[par_name] = par.get_value()
                 prior_function[par_name] = par.prior_function
-                hypercube[par_name] = par.prior_parameters['step']
+                hypercube[par_name] = par.mcmc_step
                 mean[par_name] = par.prior_parameters['mean']
                 if par.prior_function == 'uniform':
                     half_width[par_name] = par.prior_parameters['half_width']

@@ -36,6 +36,10 @@ class Subtractor(Connector):
         if not isinstance(to_population, Population):
             raise TypeError('Subtractor ('+self.name+
                             ') to_population must be a Population object')
+            
+        if hasattr(from_population,'report_noise') and from_population.report_noise:
+            raise TypeError('Subtractor ('+self.name+
+                            ') from_population cannot have report_noise set to True')
 
         # Identify the from_population as one not to derive daily numbers
         self.from_population.monotonic = False

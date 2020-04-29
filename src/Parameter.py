@@ -30,22 +30,22 @@ class Parameter:
     - prior_function: if (real or integer) and variable, the functional form
       of prior. Allowed: 'norm' or 'uniform'
     - prior_parameters for (list of floats, not parameter objects):
-        - for 'norm': dict [mean, sigma, step]
-        - for 'uniform': dict [mean, half_width, step]
+        - for 'norm': dict [mean, sigma]
+        - for 'uniform': dict [mean, half_width]
         - for boolean: truth probability
-    - step is maximum size of step during MCMC ((1-2*uni_ran)*step)
+    - mcmc_step is maximum size of step during MCMC ((1-2*uni_ran)*step)
     """
 
     PARAMETER_TYPES = {'int':int, 'float':float, 'bool':bool}
     PARAMETER_STATUSES = ['fixed', 'variable']
     PRIOR_FUNCTIONS = ['norm', 'uniform']
-    PRIOR_PARS = {'norm': ['mean','sigma','step'], 
-                  'uniform': ['mean','half_width','step']}
+    PRIOR_PARS = {'norm': ['mean','sigma'], 
+                  'uniform': ['mean','half_width']}
 
     def __init__(self, parameter_name, value,
                  parameter_min = 0, parameter_max= 1, description='', 
                  parameter_type='float', parameter_status='fixed',
-                 prior_function=None, prior_parameters=None, hidden=True):
+                 prior_function=None, prior_parameters=None, mcmc_step=None, hidden=True):
 
         self.name = str(parameter_name)
         self.must_update = False
@@ -81,6 +81,8 @@ class Parameter:
             raise TypeError('Parameter ('+self.name+') hidden argument '+
                             'must be of type bool')
         self.hidden = hidden
+        
+        self.mcmc_step = mcmc_step
 
     def __str__(self):
         return self.name
