@@ -23,7 +23,7 @@ class Model:
 
         self.name = str(model_name)
         self.description = ''
-        self.t0 = date.today()
+        self.t0 = date(2020,3,1)
         self.__time_step = 1. # default time step is one day. (hidden)
         self.__time_step_changed = False
         self.populations = {}

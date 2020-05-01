@@ -92,6 +92,18 @@ class Parameter:
     
     def get_max(self):
         return self.parameter_max
+    
+    def set_min(self, val):
+        if self.parameter_type == 'int':
+            self.parameter_min = int(val)
+        else:
+            self.parameter_min = val
+    
+    def set_max(self, val):
+        if self.parameter_type == 'int':
+            self.parameter_max = int(val)
+        else:
+            self.parameter_max = val
 
     def reset(self):
         self.set_value(self.initial_value)
@@ -163,16 +175,21 @@ class Parameter:
 
         Parameters
         ----------
-        prior_function : TYPE, optional
+        prior_function : STR, optional
             DESCRIPTION. if (real or integer) and variable, the functional form
             of prior. Allowed: 'norm' or 'uniform'
-        prior_parameters : TYPE, optional
+        prior_parameters : dict, optional
             DESCRIPTION. (list of floats, not parameter objects):
                 - for 'norm': dict  having keys ['mean', 'sigma', 'step']
                 - for 'uniform': dict having keys ['mean', 'half_width', 'step']
                 - for boolean: float, truth probability
 
         if prior not supplied, the previously used prior will be used
+        if prior not supplied and no prior previously used, then set
+        prior to be uniform: [parameter_min, parameter_max]
+
+        Note that the priors are used for MCMC. For the fitting, the
+        bounds are set directly by paramete_min, parameter_max
 
         Returns
         -------
@@ -180,44 +197,49 @@ class Parameter:
 
         """
         
-        ## by default use the previously used prior
+        ## by default use the previously used prior or uniform if no previous prior
         if prior_function is None and prior_parameters is None:
-            prior_function = self.prior_function
-            prior_parameters = self.prior_parameters
+            if self.prior_function is None or self.prior_parameters is None:
+                self.prior_function = 'uniform'
+                mean = (self.parameter_max + self.parameter_min)/2
+                half_width = (self.parameter_max - self.parameter_min)/2
+                self.prior_parameters ={'mean':mean, 'half_width':half_width}
+                
+        else:
 
-        if self.parameter_type != 'bool':
-            if prior_function is None:
-                raise TypeError('Variable parameter ('+self.name+
-                                ') prior_function cannot be None')
-            if prior_function not in self.PRIOR_FUNCTIONS:
-                buff = '/'.join(self.PRIOR_FUNCTIONS)
-                raise ValueError('Parameter ('+self.name+') prior_function "'+
-                                 str(self.parameter_type)+
-                                 '" invalid: not in: '+buff)
-            self.prior_function = prior_function
-
-            if prior_parameters is None:
-                raise TypeError('Variable parameter ('+self.name+
-                                ') prior_parameters cannot be None')
-            if not isinstance(prior_parameters, dict):
-                raise TypeError('Variable parameter ('+self.name+
-                                ') prior_parameters must be a dictionary')
-            for key in self.PRIOR_PARS[prior_function]:
-                if key not in prior_parameters:
-                    raise ValueError('Variable parameter ('+self.name+
-                                     ') prior_parameters must include '+key)
-                if not isinstance(prior_parameters[key], float):
+            if self.parameter_type != 'bool':
+                if prior_function is None:
                     raise TypeError('Variable parameter ('+self.name+
-                                    ' prior_parameters must be floats')
-
-        elif self.parameter_type == 'bool':
-            if self.prior_parameters is None:
-                raise TypeError('Variable parameter ('+self.name+
-                                ') prior_parameters cannot be None')
-            if not isinstance(prior_parameters, float):
-                raise TypeError('Variable parameter ('+self.name+
-                                ' prior_parameters must be a float')
-        self.prior_parameters = prior_parameters
+                                    ') prior_function cannot be None')
+                if prior_function not in self.PRIOR_FUNCTIONS:
+                    buff = '/'.join(self.PRIOR_FUNCTIONS)
+                    raise ValueError('Parameter ('+self.name+') prior_function "'+
+                                     prior_function+
+                                     '" invalid: not in: '+buff)
+                self.prior_function = prior_function
+    
+                if prior_parameters is None:
+                    raise TypeError('Variable parameter ('+self.name+
+                                    ') prior_parameters cannot be None')
+                if not isinstance(prior_parameters, dict):
+                    raise TypeError('Variable parameter ('+self.name+
+                                    ') prior_parameters must be a dictionary')
+                for key in self.PRIOR_PARS[prior_function]:
+                    if key not in prior_parameters:
+                        raise ValueError('Variable parameter ('+self.name+
+                                         ') prior_parameters must include '+key)
+                    if not isinstance(prior_parameters[key], float):
+                        raise TypeError('Variable parameter ('+self.name+
+                                        ' prior_parameters must be floats')
+    
+            elif self.parameter_type == 'bool':
+                if self.prior_parameters is None:
+                    raise TypeError('Variable parameter ('+self.name+
+                                    ') prior_parameters cannot be None')
+                if not isinstance(prior_parameters, float):
+                    raise TypeError('Variable parameter ('+self.name+
+                                    ' prior_parameters must be a float')
+            self.prior_parameters = prior_parameters
 
         self.__status = 'variable'
         self.__status_changed = True

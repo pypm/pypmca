@@ -26,16 +26,19 @@ class Optimizer:
         self.population_type = full_population_name[:5]
         self.data = data
         self.data_range = data_range
-        self.variable_names = []
-        self.variable_parameters = None
+        self.variable_names = []  # float ype variable parameters
         self.variable_initial_values = None
+        self.i_variable_names = []  # float ype variable parameters
+        self.i_variable_initial_values = None
         self.chi2d = 0.
         self.chi2m = 0.
         self.chi2s = 0.
+        self.accept_fraction = 0.
         self.auto_cov = None
 
     def func_setup(self):
         # find the variable parameters and return the bounds
+        # note: scipy.curve_fit only works for floats
         self.variable_names = []
         self.variable_initial_values = {}
         par_0 = []
@@ -44,29 +47,75 @@ class Optimizer:
         for par_name in self.model.parameters:
             par = self.model.parameters[par_name]
             if par.get_status() == 'variable':
-                self.variable_names.append(par_name)
-                self.variable_initial_values[par_name] = par.get_value()
-                mean = par.prior_parameters['mean']
-                hw = 1.
-                # if half_width exists, use that
-                if 'half_width' in par.prior_parameters:
-                    hw = par.prior_parameters['half_width']
-                else:
-                    hw = 3.*par.prior_parameters['sigma']
-                par_0.append(par.get_value())
-                bound_low.append(mean-hw)
-                bound_high.append(mean+hw)
+                if par.parameter_type == 'float':
+                    self.variable_names.append(par_name)
+                    self.variable_initial_values[par_name] = par.get_value()
+                    par_0.append(par.get_value())
+                    bound_low.append(par.get_min())
+                    bound_high.append(par.get_max())
+        return par_0, (bound_low, bound_high)
+    
+    def i_func_setup(self):
+        self.i_variable_names = []
+        self.i_variable_initial_values = {}
+        par_0 = []
+        bound_low = []
+        bound_high = []
+        for par_name in self.model.parameters:
+            par = self.model.parameters[par_name]
+            if par.get_status() == 'variable':
+                if par.parameter_type == 'int':
+                    self.i_variable_names.append(par_name)
+                    self.i_variable_initial_values[par_name] = par.get_value()
+                    par_0.append(par.get_value())
+                    bound_low.append(par.get_min())
+                    bound_high.append(par.get_max())
         return par_0, (bound_low, bound_high)
 
     def reset_variables(self):
         for var_name in self.variable_names:
             self.model.parameters[var_name].set_value(self.variable_initial_values[var_name])
             
+    def reset_i_variables(self):
+        for var_name in self.i_variable_names:
+            self.model.parameters[var_name].set_value(self.i_variable_initial_values[var_name])
+            
     def delta(self, cumul):
         diff = []
         for i in range(1,len(cumul)):
             diff.append(cumul[i] - cumul[i-1])
         return diff
+
+    def i_fit(self):
+        """ scan the first integer variable parameter over the range provided
+            iterating over different integers by hand
+            Returns a dict if a scan was done over an integer,
+            describing the scan
+        """
+        
+        i_par0, i_bounds = self.i_func_setup()
+        if len(i_par0) == 0:
+            return None
+
+        par_name = self.i_variable_names[0]
+        par = self.model.parameters[par_name]
+        scan_dict = {'name': par_name}
+        val_list = []
+        chi2_list = []
+        
+        for i in range(par.get_min(), par.get_max()+1):
+            par.set_value(i)
+            self.fit()
+            val_list.append(i)
+            chi2_list.append(self.chi2d)
+            self.reset_variables()
+ 
+        arg = np.argmin(chi2_list)
+        par.set_value(val_list[arg])
+
+        scan_dict['val_list'] = val_list
+        scan_dict['chi2_list'] = chi2_list
+        return scan_dict        
 
     def fit(self, with_cov=False):
         """ work out point estimate. Note that this does not seem to work
@@ -276,4 +325,5 @@ class Optimizer:
                         n_accept += 1
             chain.append(var_values)
 
+        self.accept_fraction = 1.*n_accept/n_MCMC
         return chain

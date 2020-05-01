@@ -228,7 +228,141 @@ def parameter_table(model, width=120):
         
     return table.draw()
 
+def get_var_par_row(par):
+    buff = []
+    buff.append(str(par))
+    buff.append(par.description)
+    buff.append(par.get_min())
+    buff.append(par.get_max())
+    buff.append(par.prior_function)
+    buff.append(par.prior_parameters['mean'])
+    if par.prior_function == 'uniform':
+        buff.append(par.prior_parameters['half_width'])
+    else:
+        buff.append(par.prior_parameters['sigma'])
+    buff.append(par.mcmc_step)
+    buff.append(par.initial_value)
+    buff.append(par.get_value())
+    return buff
 
-#my_model = Model.open_file('../test/model2v1.pypm')
-#print(parameter_table(my_model))
+def variable_parameter_table(model, width=120):
+    table = table_setup(model, width)
+
+    header = ['Parameter', 'Description', 'min', 'max', 'prior', 'prior_mean', 'prior_w', 'mcmc_step', 'Init', 'Value']
+    table.set_cols_dtype(['t', 't', 'a', 'a', 't', 'a', 'a', 'a', 'a', 'a'])
+    table.set_header_align(['l', 'l', 'l', 'l', 'l', 'l', 'l', 'l', 'l', 'l'])
+
+    par_dict = {}
+    
+    for key in model.connectors:
+        con = model.connectors[key]
+        for par_key in con.parameters:
+            par = con.parameters[par_key]
+            if par.get_status() == 'variable':
+                row = get_var_par_row(par)
+                if len(row) > 0:
+                    par_dict[row[0]] = row
+        if type(con).__name__ == 'Chain':
+            for chain_con in con.chain:
+                for par_key in chain_con.parameters:
+                    par = chain_con.parameters[par_key]
+                    if par.get_status() == 'variable':
+                        row = get_var_par_row(par)
+                        if len(row) > 0:
+                            par_dict[row[0]] = row
+
+    for key in model.populations:
+        pop = model.populations[key]
+        init = pop.initial_value
+        if isinstance(init, Parameter):
+            if init.get_status() == 'variable':
+                row = get_var_par_row(init)
+                par_dict[row[0]] = row
+        
+    for key in model.transitions:
+        trans = model.transitions[key]
+        for par_key in trans.parameters:
+            par = trans.parameters[par_key]
+            if par.get_status() == 'variable':
+                row = get_var_par_row(par)
+                if len(row) > 0:
+                    par_dict[row[0]] = row
+
+    par_list = list(par_dict.keys())
+    par_list.sort()
+    
+    rows = [header]
+    for item in par_list:
+        rows.append(par_dict[item])
+        
+    table.add_rows(rows)
+        
+    return table.draw()
+
+def get_delay_row(connector, delay):
+    con = connector
+    row = [str(con), type(con).__name__]
+    row.append(str(delay))
+    row.append(delay.delay_type)
+    if delay.delay_type != 'fast':
+        delay_parameters = delay.delay_parameters
+        mean_par = delay_parameters['mean']
+        width_par = None
+        if delay.delay_type == 'norm':
+            width_par = delay_parameters['sigma']
+        elif delay.delay_type == 'uniform':
+            width_par = delay_parameters['half_width']
+        elif delay.delay_type == 'erlang':
+            width_par = delay_parameters['k']
+            
+        row.append(str(mean_par))
+        row.append(mean_par.get_value())
+        row.append(str(width_par))
+        row.append(width_par.get_value())
+    else:
+        row.append('')
+        row.append('')
+        row.append('')
+        row.append('')
+    return row
+    
+
+def delay_table(model, width=120):
+    table = table_setup(model, width)
+
+    header = ['Connector','Con Type', 'Delay name', 'Delay Type',
+              'mean par','mean val', 'width par', 'width val']
+    table.set_cols_dtype(['t', 't', 't', 't', 't',
+                          'a', 't', 'a'])
+    table.set_header_align(['l', 'l', 'l', 'l', 'l',
+                            'l', 'l', 'l'])
+    
+    rows = [header]
+    for key in model.connectors:
+        con = model.connectors[key]
+        if hasattr(con,'delay'):
+            if isinstance(con.delay, list):
+                for delay in con.delay:
+                    rows.append(get_delay_row(con, delay))
+                    if type(con).__name__ == 'Chain':
+                        for chain_con in con.chain:
+                            row = get_delay_row(chain_con, chain_con.delay)
+                            row[0] = str(con)+': '+row[0]
+                            row[1] = '->'+row[1]
+                            rows.append(row)
+                    
+            else:
+                rows.append(get_delay_row(con, con.delay))
+                if type(con).__name__ == 'Chain':
+                    for chain_con in con.chain:
+                        row = get_delay_row(chain_con, chain_con.delay)
+                        row[0] = str(con)+': '+row[0]
+                        row[1] = '->'+row[1]
+                        rows.append(row)
+    
+    table.add_rows(rows)
+    return table.draw()
+
+#my_model = Model.open_file('../test/test_table.pypm')
+#print(delay_table(my_model))
 #print_all(my_model)
