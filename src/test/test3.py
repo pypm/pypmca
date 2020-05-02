@@ -24,7 +24,7 @@ from Injector import Injector
 
 # Test by building a population model for BC
 
-bc_model = Model('BC v3.x')
+bc_model = Model('model v4.x')
 bc_model.set_t0(2020, 3, 1)
 
 # Initialization

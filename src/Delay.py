@@ -48,12 +48,12 @@ class Delay:
                             ') model must be a model object')
         self.model = model
 
-        self.__setup_delay(delay_type, delay_parameters)
+        self.setup_delay(delay_type, delay_parameters)
 
     def __str__(self):
         return self.name
 
-    def __setup_delay(self, delay_type, delay_parameters):
+    def setup_delay(self, delay_type, delay_parameters):
 
         if str(delay_type) not in self.DELAY_TYPES:
             buff = '/'.join(self.DELAY_TYPES)

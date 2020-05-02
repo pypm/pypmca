@@ -128,7 +128,8 @@ def connector_table(model, width=120):
                             'l', 'r'])
     
     rows = [header]
-    for key in model.connectors:
+    # order is important!
+    for key in model.connector_list:
         con = model.connectors[key]
         rows.append(get_connector_row(con))
         if type(con).__name__ == 'Chain':

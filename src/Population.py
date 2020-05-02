@@ -53,17 +53,12 @@ class Population:
         self.description = str(description)
         self.history = None
         self.__initialization_by_parameter = False
-        if isinstance(initial_value, (float, int)):
-            self.history = [initial_value]
-        elif isinstance(initial_value, Parameter):
-            self.history = [initial_value.get_value()]
-            self.__initialization_by_parameter = True
-        else:
+        if not isinstance(initial_value, (float, int)) and not isinstance(initial_value, Parameter):
             raise TypeError('Error setting initial_value to population ('+
                             self.name+') - must be a float, int, or Parameter object')
+        self.set_initial_value(initial_value)
 
         self.future = []
-        self.initial_value = initial_value
         self.color = color
         self.hidden = hidden
         # identify those populations for which daily contributions are meaningful
@@ -79,6 +74,14 @@ class Population:
                             self.name+') - it must be a Parameter object')
         self.report_noise_par = report_noise_par
         self.missed_yesterday = 0
+
+    def set_initial_value(self,initial_value):
+        if isinstance(initial_value, (float, int)):
+            self.history = [initial_value]
+        elif isinstance(initial_value, Parameter):
+            self.history = [initial_value.get_value()]
+            self.__initialization_by_parameter = True
+        self.initial_value = initial_value
 
     def __str__(self):
         return self.name

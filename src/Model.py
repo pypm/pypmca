@@ -342,7 +342,13 @@ class Model:
 
         self.connector_list.remove(name)
         removed_connector = self.connectors.pop(name, None)
+        self.update_lists()
+        return removed_connector
 
+    def update_lists(self):
+        """ After modifying any connector or transition, call this to be sure that
+            the list of active populations and parameters is current
+        """
         # remake list of active populations
         self.populations = {}
         for con_name in self.connector_list:
@@ -360,8 +366,6 @@ class Model:
         for trans_name in self.transitions:
             trans = self.transitions[trans_name]
             self.__update_parameter_list(trans)
-
-        return removed_connector
 
     def __update_parameter_list(self, obj):
 
