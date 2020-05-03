@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 """
 Splitter: A Connector class that distributes its incoming
-population to two others, either in the next time step or distributed in time.
+population to n others, either in the next time step or distributed in time.
 
 @author: karlen
 """

@@ -20,6 +20,9 @@ class Connector:
     def __init__(self, connector_name, from_population, to_population):
         """Constructor
         """
+        if connector_name.find(',') > -1:
+            raise ValueError('Error in constructing '+self.name+
+                             ': name cannot contain a comma.')
         self.name = str(connector_name)
 
         pops = {'from_population':from_population,
@@ -34,6 +37,29 @@ class Connector:
                 if not isinstance(pops[key], Population):
                     raise TypeError('Error in constructing '+self.name+
                                     ': '+key+' argument must be a Population object')
+
+        match = False
+        if isinstance(from_population,list):
+            for fpop in from_population:
+                if isinstance(to_population,list):
+                    for tpop in to_population:
+                        if fpop == tpop:
+                            match = True
+                else:
+                    if fpop == to_population:
+                        match = True
+        else:
+            if isinstance(to_population,list):
+                for tpop in to_population:
+                    if from_population == tpop:
+                        match = True
+            else:
+                if from_population == to_population:
+                    match = True
+            
+        if match:
+            raise ValueError('Error in constructing '+self.name+
+                                    ': from_ and to_ populations cannot be the same')
 
         self.from_population = from_population
         self.to_population = to_population

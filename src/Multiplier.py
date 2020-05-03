@@ -69,17 +69,28 @@ class Multiplier(Connector):
             for key in delay.delay_parameters:
                 self.parameters['delay_'+key] = delay.delay_parameters[key]
                 
+        self.set_distribution(distribution, nbinom_par)
+
+    def set_distribution(self, distribution, nbinom_par):
         if distribution not in ['poisson','nbinom']:
             raise ValueError('Multiplier ('+self.name+
                              ') distribution must be poisson or nbinom')
-        self.distribution = distribution
+        self.__distribution = distribution
 
         if distribution == 'nbinom' and \
             (nbinom_par is None or not isinstance(nbinom_par, Parameter)):
             raise TypeError('Multiplier ('+self.name+
                             ') nbinom_par must be a Parameter object')
-        self.nbinom_par = nbinom_par
-
+        self.__nbinom_par = nbinom_par
+        
+        if distribution == 'nbinom':
+            self.parameters['nbinom_par'] = self.__nbinom_par
+        # in case parameter changed, update the model list of parameters
+        self.model.update_lists()
+        
+    def get_distribution(self):
+        return self.__distribution, self.__nbinom_par
+        
     def update_expectation(self):
         """
         Calculate contributions to other populations by updating their
@@ -94,11 +105,11 @@ class Multiplier(Connector):
         future_expectations
         """
         scale = self.__get_scale()
-        if not hasattr(self,'distribution') or self.distribution == 'poisson':
+        if not hasattr(self,'__distribution') or self.__distribution == 'poisson':
             n = stats.poisson.rvs(scale)
             self.to_population.update_future_data(n, self.delay)
         else:
-            p = self.nbinom_par.get_value()
+            p = self.__nbinom_par.get_value()
             if p < 0.001:
                 p = 0.001
             if p > 0.999:

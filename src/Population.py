@@ -49,6 +49,9 @@ class Population:
         None.
 
         """
+        if population_name.find(',') > -1:
+            raise ValueError('Error in constructing '+self.name+
+                             ': name cannot contain a comma.')
         self.name = str(population_name)
         self.description = str(description)
         self.history = None
@@ -66,14 +69,28 @@ class Population:
         self.monotonic = True
         # identify those populations for which simulated data is appropriate to show 
         self.show_sim = show_sim
+        # for tracking missed reports from yesterday (reporting noise)
+        self.missed_yesterday = 0
         
-        self.report_noise = report_noise
+        self.set_report_noise(report_noise, report_noise_par)
+        
+    def set_report_noise(self, report_noise, report_noise_par):
+        
+        self.__report_noise = report_noise
         if report_noise and (report_noise_par is None or \
                              not isinstance(report_noise_par, Parameter)):
             raise TypeError('Error setting report_noise_par in population ('+
                             self.name+') - it must be a Parameter object')
-        self.report_noise_par = report_noise_par
-        self.missed_yesterday = 0
+        self.__report_noise_par = report_noise_par
+        
+        if report_noise:
+            self.parameters['noise_par'] = self.__report_noise_par
+        # in case parameter changed, update the model list of parameters
+        # unfortunately population does not have link to model
+        # self.model.update_lists()
+        
+    def get_report_noise(self):
+        return self.__report_noise, self.__report_noise_par
 
     def set_initial_value(self,initial_value):
         if isinstance(initial_value, (float, int)):
@@ -96,13 +113,13 @@ class Population:
         next_value = 0
         if self.future is not None:
             if expectations or not \
-                (hasattr(self,'report_noise') and self.report_noise):
+                (hasattr(self,'__report_noise') and self.__report_noise):
                 if len(self.future) > 0:
                     next_value = self.future[0]
             else:
                 next_value = self.missed_yesterday
                 # how many will be reported from today?
-                low_edge = self.report_noise_par.get_value()
+                low_edge = self.__report_noise_par.get_value()
                 frac_report = stats.uniform.rvs(loc=low_edge, scale=1.-low_edge)
                 n_report = stats.binom.rvs(self.future[0], frac_report)
                 self.missed_yesterday = self.future[0] - n_report

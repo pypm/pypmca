@@ -86,9 +86,9 @@ class Chain(Connector):
         self.delay = delay
 
         if model is None:
-            raise TypeError('Multiplier ('+self.name+') model cannot be None')
+            raise TypeError('Chain ('+self.name+') model cannot be None')
         if not hasattr(model, 'get_time_step'):
-            raise TypeError('Multiplier ('+self.name+
+            raise TypeError('Chain ('+self.name+
                             ') model must be a model object')
         self.model = model
         

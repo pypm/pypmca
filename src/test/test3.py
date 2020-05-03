@@ -449,6 +449,8 @@ bc_model.boot_setup(contagious_pop, 1,
 #recover_delay_pars['mean'].set_value(4.)
 
 i=1
+#bc_model.update_lists()
+i=2
 
 #with open('model.pickle', 'wb') as f:
 #    pickle.dump(bc_model, f, pickle.HIGHEST_PROTOCOL)#

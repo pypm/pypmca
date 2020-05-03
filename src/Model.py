@@ -346,23 +346,20 @@ class Model:
         return removed_connector
 
     def update_lists(self):
-        """ After modifying any connector or transition, call this to be sure that
+        """ After modifying any element of the model that involves
+            populations or parameters, call this to be sure that
             the list of active populations and parameters is current
         """
-        # remake list of active populations
+        # remake list of active populations and their parameters
         self.populations = {}
+        self.parameters = {}
+        
         for con_name in self.connector_list:
             con = self.connectors[con_name]
             self.__update_population_list(con)
-
-        # remake list of active parameters
-        self.parameters = {}
-        for con_name in self.connectors:
-            con = self.connectors[con_name]
             self.__update_parameter_list(con)
-        for pop_name in self.populations:
-            pop = self.populations[pop_name]
-            self.__update_parameter_list(pop)
+
+        # add to list of active parameters            
         for trans_name in self.transitions:
             trans = self.transitions[trans_name]
             self.__update_parameter_list(trans)
@@ -370,31 +367,39 @@ class Model:
     def __update_parameter_list(self, obj):
 
         if type(obj).__name__ == 'Injector':
-            self.parameters[str(obj.transition_time)] = obj.transition_time
-            self.parameters[str(obj.injection)] = obj.injection
+            self.__add_to_parameter_list(obj.transition_time)
+            self.__add_to_parameter_list(obj.injection)
 
         elif type(obj).__name__ == 'Modifier':
-            self.parameters[str(obj.transition_time)] = obj.transition_time
-            self.parameters[str(obj.parameter_before)] = obj.parameter_before
-            self.parameters[str(obj.parameter_after)] = obj.parameter_after
+            self.__add_to_parameter_list(obj.transition_time)
+            self.__add_to_parameter_list(obj.parameter_before)
+            self.__add_to_parameter_list(obj.parameter_after)
 
         elif isinstance(obj, Connector):
             con = obj
             for par_key in con.parameters:
                 par = con.parameters[par_key]
-                self.parameters[str(par)] = par
+                self.__add_to_parameter_list(par)
             if type(con).__name__ == 'Chain':
                 for link_con in con.chain:
                     for link_par_key in link_con.parameters:
                         link_par = link_con.parameters[link_par_key]
-                        self.parameters[str(link_par)] = link_par
+                        self.__add_to_parameter_list(link_par)
 
         elif isinstance(obj, Population):
             pop = obj
             init = pop.initial_value
             if type(init).__name__ == 'Parameter':
-                self.parameters[str(init)] = init
+                self.__add_to_parameter_list(init)
 
+    def __add_to_parameter_list(self, obj):
+        # check that the name of the parameter is unique
+        if str(obj) in self.parameters:
+            par = self.parameters[str(obj)]
+            if obj != par:
+                raise ValueError('Two parameters share the same name: '+str(obj))
+        else:
+            self.parameters[str(obj)] = obj
 
     def __update_population_list(self, connector):
 

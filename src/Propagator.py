@@ -7,6 +7,9 @@ Note that propagation is done independently to the other populations.
 To divide the incoming population into different sub-populations (dependently),
 use the Split class instead.
 
+There is no benefit in having a list of to_populations, since it is equivalent
+to having two independent propagators.
+
 @author: karlen
 """
 from scipy import stats

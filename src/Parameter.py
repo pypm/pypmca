@@ -47,6 +47,10 @@ class Parameter:
                  parameter_type='float', parameter_status='fixed',
                  prior_function=None, prior_parameters=None, mcmc_step=None, hidden=True):
 
+
+        if parameter_name.find(',') > -1:
+            raise ValueError('Error in constructing '+self.name+
+                             ': name cannot contain a comma.')
         self.name = str(parameter_name)
         self.must_update = False
         self.parents = []
