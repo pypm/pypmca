@@ -70,10 +70,10 @@ def modifier_table(model, width=120):
     table = table_setup(model, width)
 
     header = ['Modifier', 'Time parameter', 'Time', 'spec', 'Parameter', 
-              'before value', 'after parameter', 'after value']
-    table.set_cols_dtype(['t', 't', 'a', 't', 't', 'a', 't', 'a'])
+              'before parameter', 'after parameter']
+    table.set_cols_dtype(['t', 't', 'a', 't', 't', 't', 't'])
   
-    table.set_header_align(['l', 'l', 'l', 'l', 'l', 'l', 'l', 'l'])
+    table.set_header_align(['l', 'l', 'l', 'l', 'l', 'l', 'l'])
     
     rows = [header]
     for key in model.transitions:

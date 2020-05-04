@@ -19,6 +19,8 @@ class Transition:
     - 'rel_steps': int, number of time_steps after start (t0)
     
     The transition can be disabled by setting enabled=False
+    
+    enabled: specifies default state for the transition
 
     In all cases, the time is specified by a Parameter object
     """
@@ -49,11 +51,16 @@ class Transition:
                             '): transition_time argument must be a Parameter object')
 
         if transition_time.parameter_type != self.TIME_SPECS[self.time_spec]:
-            raise TypeError('Parameter ('+self.name+
+            raise TypeError('Transition ('+self.name+
                             ') transition time ('+
                             transition_time.parameter_type+
                             ') does not match time_spec ('+
                             self.time_spec+')')
+            
+        if transition_time.get_value() <= 0:
+            raise ValueError('Transition ('+self.name+
+                            ') transition time must be larger than zero.')
+
         self.transition_time = transition_time
         self.transition_time.set_must_update(self)
 

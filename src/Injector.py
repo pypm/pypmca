@@ -16,7 +16,7 @@ class Injector(Transition):
     in the evolution.
 
     The time_step for which the action is taken can be specified as one of 'time_spec':
-    - 'rel_days': float, number of days after start (t0)
+    - 'rel_days': int, number of days after start (t0)
     - 'rel_steps': int, number of time_steps after start (t0)
 
     - to_population: will have its numbers increased by an amount defined by

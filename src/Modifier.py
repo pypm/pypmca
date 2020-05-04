@@ -15,12 +15,20 @@ class Modifier(Transition):
     in the evolution.
 
     The time_step for which the action is taken can be specified as one of 'time_spec':
-    - 'rel_days': float, number of days after start (t0)
+    - 'rel_days': int, number of days after start (t0)
     - 'rel_steps': int, number of time_steps after start (t0)
+    
+    After the time_step is reached in the model, the value for parameter is
+    changed to the value contained in parameter_after.
+    
+    The _before value of the parameter is specified so that
+    the transition can be reversed. To restart the model the transitions are
+    reset in reverse order, so that the _before value for the first transition
+    is used at the beginning.
 
-    The value of parameter_before is change to the value contained in parameter_after.
+    The transition time is specified by a Parameter object.
 
-    In all cases, the time is specified by a Parameter object
+    Transitions are not applied during the model "boot"
 
     """
 

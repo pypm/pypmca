@@ -359,7 +359,7 @@ bc_model.add_transition(
 traveller_pop = Population('travellers', 0,
                            'Infected travellers')
 
-traveller_1_time = Parameter('traveller_1_time', 14, 0., 50.,
+traveller_1_time = Parameter('traveller_1_time', 14, 0, 100,
                            'number of days since t0 when travellers_1 depart',
                            parameter_type='int', hidden=False)
 
@@ -386,7 +386,7 @@ bc_model.add_connector(
     Propagator('travellers to infected', traveller_pop, infected_pop,
                traveller_fraction, traveller_delay))
 
-traveller_2_time = Parameter('traveller_2_time', 21, 0., 50.,
+traveller_2_time = Parameter('traveller_2_time', 21, 0, 100,
                            'number of days since t0 when travellers_2 depart',
                            parameter_type='int', hidden=False)
 

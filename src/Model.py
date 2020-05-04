@@ -23,7 +23,7 @@ class Model:
 
         self.name = str(model_name)
         self.description = ''
-        self.t0 = date(2020,3,1)
+        self.t0 = date(2020, 3, 1)
         self.__time_step = 1. # default time step is one day. (hidden)
         self.__time_step_changed = False
         self.populations = {}
@@ -342,8 +342,21 @@ class Model:
 
         self.connector_list.remove(name)
         removed_connector = self.connectors.pop(name, None)
+
         self.update_lists()
         return removed_connector
+
+    def remove_transition(self, transition):
+        name = str(transition)
+        if name not in self.transitions:
+            raise ValueError('Error in removing transition('+
+                             str(transition)+') from model ('+self.name+
+                             '): '+str(transition)+' not found.')
+
+        removed_transition = self.transitions.pop(name, None)
+
+        self.update_lists()
+        return removed_transition
 
     def update_lists(self):
         """ After modifying any element of the model that involves
@@ -353,13 +366,13 @@ class Model:
         # remake list of active populations and their parameters
         self.populations = {}
         self.parameters = {}
-        
+
         for con_name in self.connector_list:
             con = self.connectors[con_name]
             self.__update_population_list(con)
             self.__update_parameter_list(con)
 
-        # add to list of active parameters            
+        # add to list of active parameters
         for trans_name in self.transitions:
             trans = self.transitions[trans_name]
             self.__update_parameter_list(trans)
