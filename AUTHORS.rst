@@ -10,6 +10,6 @@ Development Lead
 Contributors
 ------------
 
-* Pradeep Reddy Raamana <raamana@gmail.com>
+* `Pradeep Reddy Raamana  <https://crossinvalidation.com>`_
 
 
