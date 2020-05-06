@@ -5,18 +5,8 @@ Created on Mon Apr  6 14:29:36 2020
 @author: karlen
 """
 
-from Population import Population
-from Model import Model
-from Delay import Delay
-from Parameter import Parameter
-from Multiplier import Multiplier
-from Propagator import Propagator
-from Splitter import Splitter
-from Adder import Adder
-from Subtractor import Subtractor
-from Chain import Chain
-from Modifier import Modifier
-from Injector import Injector
+from pypm import Model, Population, Delay, Parameter, Multiplier, Propagator, \
+    Splitter, Adder, Subtractor, Chain, Modifier, Injector
 
 # Test by building a population model for BC
 
@@ -155,16 +145,16 @@ chain.append(
 #ooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooo
 
 reported_pop = Population('reported', 0,
-                          'Infected people who received a positive test report',
+                          'Infected people who received a positive examples report',
                           hidden=False, color='forestgreen')
 reported_fraction = Parameter('reported_frac', 0.95, 0., 1.,
                               'fraction of tested infected people who will '+\
                                   'receive a positive report')
 reported_delay_pars = {
     'mean': Parameter('reported_delay_mean', 5., 0., 50.,
-                      'mean time from having test to getting report', hidden=False),
+                      'mean time from having examples to getting report', hidden=False),
     'sigma': Parameter('reported_delay_sigma', 2., 0.01, 20.,
-                       'standard deviation of times from having test to getting report')
+                       'standard deviation of times from having examples to getting report')
 }
 reported_delay = Delay('reported_delay', 'norm', reported_delay_pars, bc_model)
 

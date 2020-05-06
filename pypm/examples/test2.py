@@ -6,7 +6,7 @@ Created on Wed Apr  8 10:57:09 2020
 """
 
 import pickle
-from Model import Model
+from pypm import Model
 
 my_model=None
 
