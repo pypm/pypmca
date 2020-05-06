@@ -1,2 +1,0 @@
-# pyPM
-python Population Modeler
