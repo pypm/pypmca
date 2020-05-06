@@ -8,8 +8,8 @@ from_population to the to_population.
 @author: karlen
 """
 
-from Connector import Connector
-from Population import Population
+from pypm.Connector import Connector
+from pypm.Population import Population
 
 class Adder(Connector):
     """

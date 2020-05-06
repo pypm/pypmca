@@ -14,9 +14,9 @@ to having two independent propagators.
 """
 from scipy import stats
 
-from Connector import Connector
-from Delay import Delay
-from Parameter import Parameter
+from pypm.Connector import Connector
+from pypm.Delay import Delay
+from pypm.Parameter import Parameter
 
 class Propagator(Connector):
     """

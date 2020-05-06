@@ -17,7 +17,7 @@ simulated data (integers).
 
 from scipy import stats
 
-from Parameter import Parameter
+from pypm.Parameter import Parameter
 
 class Population:
     """A class that keeps state information of a population at each time step:

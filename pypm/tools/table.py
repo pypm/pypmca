@@ -364,6 +364,6 @@ def delay_table(model, width=120):
     table.add_rows(rows)
     return table.draw()
 
-#my_model = Model.open_file('../test/test_table.pypm')
+#my_model = Model.open_file('../examples/test_table.pypm')
 #print(delay_table(my_model))
 #print_all(my_model)

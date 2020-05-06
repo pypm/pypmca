@@ -10,9 +10,9 @@ either by updating expectations or simulated data.
 from datetime import date
 import pickle
 
-from Connector import Connector
-from Population import Population
-from Transition import Transition
+from pypm.Connector import Connector
+from pypm.Population import Population
+from pypm.Transition import Transition
 
 class Model:
     """

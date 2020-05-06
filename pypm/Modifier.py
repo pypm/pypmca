@@ -6,8 +6,8 @@ a specific point in the evolution
 @author:karlen
 """
 
-from Parameter import Parameter
-from Transition import Transition
+from pypm.Parameter import Parameter
+from pypm.Transition import Transition
 
 class Modifier(Transition):
     """

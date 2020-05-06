@@ -7,7 +7,7 @@ Delay: A class that holds information about delayed propagation
 
 from scipy import stats
 
-from Parameter import Parameter
+from pypm.Parameter import Parameter
 
 class Delay:
     """

@@ -9,8 +9,8 @@ of just monitoring the total hospitalized.
 @author: karlen
 """
 
-from Connector import Connector
-from Population import Population
+from pypm.Connector import Connector
+from pypm.Population import Population
 
 class Subtractor(Connector):
     """
