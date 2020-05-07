@@ -18,6 +18,7 @@ from pypm.Connector import Connector
 from pypm.Delay import Delay
 from pypm.Parameter import Parameter
 
+
 class Propagator(Connector):
     """
     Propagator sends a fraction of an incoming population to other populations,
@@ -36,55 +37,55 @@ class Propagator(Connector):
         must match length of to_population.
     """
 
-    def __init__(self, connector_name, from_population, to_population,
-                 fraction, delay):
+    def __init__(self, connector_name: str, from_population, to_population,
+                 fraction, delay: Delay):
         """Constructor
         """
         super().__init__(connector_name, from_population, to_population)
 
         if isinstance(from_population, list):
-            raise TypeError('Propagator ('+self.name+
+            raise TypeError('Propagator (' + self.name +
                             ') from_population cannot be a list')
 
         if isinstance(fraction, list):
             if not isinstance(to_population, list):
-                raise TypeError('Propagator ('+self.name+
-                                ') fraction cannot be a list when'+
+                raise TypeError('Propagator (' + self.name +
+                                ') fraction cannot be a list when' +
                                 ' to_population is not a list')
             if len(fraction) != len(to_population):
-                raise ValueError('Propagator ('+self.name+
-                                 ') fraction list length does not match'+
+                raise ValueError('Propagator (' + self.name +
+                                 ') fraction list length does not match' +
                                  ' to_population list length')
             for frac in fraction:
                 if not isinstance(frac, Parameter):
-                    raise TypeError('Propagator ('+self.name+
+                    raise TypeError('Propagator (' + self.name +
                                     ') fraction list must contain Parameter objects')
         elif not isinstance(fraction, Parameter):
-            raise TypeError('Propagator ('+self.name+
+            raise TypeError('Propagator (' + self.name +
                             ') fraction must be a Parameter object')
         self.fraction = fraction
 
         if not isinstance(delay, Delay):
-            raise TypeError('Propagator ('+self.name+
+            raise TypeError('Propagator (' + self.name +
                             ') delay must be a Delay object')
         self.delay = delay
-        
+
         if isinstance(fraction, list):
             for i in range(len(fraction)):
-                name = 'fraction_'+str(to_population[i])
+                name = 'fraction_' + str(to_population[i])
                 self.parameters[name] = self.fraction[i]
         else:
             self.parameters['fraction'] = self.fraction
         if isinstance(delay, list):
             for i in range(len(delay)):
-                name = 'delay_'+str(to_population[i])
+                name = 'delay_' + str(to_population[i])
                 if delay[i].delay_parameters is not None:
                     for key in delay[i].delay_parameters:
-                        self.parameters[name+'_'+key] = delay[i].delay_parameters[key]
+                        self.parameters[name + '_' + key] = delay[i].delay_parameters[key]
         else:
             if delay.delay_parameters is not None:
                 for key in delay.delay_parameters:
-                    self.parameters['delay_'+key] = delay.delay_parameters[key]
+                    self.parameters['delay_' + key] = delay.delay_parameters[key]
 
     def update_expectation(self):
         """

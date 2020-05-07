@@ -19,6 +19,7 @@ from scipy import stats
 
 from pypm.Parameter import Parameter
 
+
 class Population:
     """A class that keeps state information of a population at each time step:
         - population_name : string, short descriptor. Must be unique
@@ -33,9 +34,9 @@ class Population:
           the remaining will be in tomorrows report (along with some fraction of tomorrows report)
     """
 
-    def __init__(self, population_name, initial_value, description='',
-                 hidden=True, color='black', show_sim=False, report_noise=False,
-                 report_noise_par=None):
+    def __init__(self, population_name: str, initial_value, description: str = '',
+                 hidden: bool = True, color: str = 'black', show_sim: bool = False, report_noise: bool = False,
+                 report_noise_par: Parameter = None):
         """
         Constructor
 
@@ -50,15 +51,17 @@ class Population:
 
         """
         if population_name.find(',') > -1:
-            raise ValueError('Error in constructing '+self.name+
+            raise ValueError('Error in constructing ' + self.name +
                              ': name cannot contain a comma.')
         self.name = str(population_name)
         self.description = str(description)
         self.history = None
+        self.parameters = {}
         self.__initialization_by_parameter = False
         if not isinstance(initial_value, (float, int)) and not isinstance(initial_value, Parameter):
-            raise TypeError('Error setting initial_value to population ('+
-                            self.name+') - must be a float, int, or Parameter object')
+            raise TypeError('Error setting initial_value to population (' +
+                            self.name + ') - must be a float, int, or Parameter object')
+        self.initial_value = None
         self.set_initial_value(initial_value)
 
         self.future = []
@@ -71,33 +74,41 @@ class Population:
         self.show_sim = show_sim
         # for tracking missed reports from yesterday (reporting noise)
         self.missed_yesterday = 0
-        
+
+        self.__report_noise = None
+        self.__report_noise_par = None
         self.set_report_noise(report_noise, report_noise_par)
-        
+
     def set_report_noise(self, report_noise, report_noise_par):
-        
+
         self.__report_noise = report_noise
-        if report_noise and (report_noise_par is None or \
+        if report_noise and (report_noise_par is None or
                              not isinstance(report_noise_par, Parameter)):
-            raise TypeError('Error setting report_noise_par in population ('+
-                            self.name+') - it must be a Parameter object')
+            raise TypeError('Error setting report_noise_par in population (' +
+                            self.name + ') - it must be a Parameter object')
         self.__report_noise_par = report_noise_par
-        
+
         if report_noise:
             self.parameters['noise_par'] = self.__report_noise_par
+        else:
+            if 'noise_par' in self.parameters:
+                self.parameters.pop('noise_par')
         # in case parameter changed, update the model list of parameters
         # unfortunately population does not have link to model
         # self.model.update_lists()
-        
+
     def get_report_noise(self):
         return self.__report_noise, self.__report_noise_par
 
-    def set_initial_value(self,initial_value):
+    def set_initial_value(self, initial_value):
         if isinstance(initial_value, (float, int)):
             self.history = [initial_value]
+            if 'init_value' in self.parameters:
+                self.parameters.pop('init_value')
         elif isinstance(initial_value, Parameter):
             self.history = [initial_value.get_value()]
             self.__initialization_by_parameter = True
+            self.parameters['init_value'] = initial_value
         self.initial_value = initial_value
 
     def __str__(self):
@@ -112,17 +123,20 @@ class Population:
         """
         next_value = 0
         if self.future is not None:
-            if expectations or not \
-                (hasattr(self,'__report_noise') and self.__report_noise):
+
+            if expectations or not self.__report_noise:
                 if len(self.future) > 0:
                     next_value = self.future[0]
             else:
                 next_value = self.missed_yesterday
+                incoming = 0
+                if len(self.future) > 0:
+                    incoming = self.future[0]
                 # how many will be reported from today?
                 low_edge = self.__report_noise_par.get_value()
-                frac_report = stats.uniform.rvs(loc=low_edge, scale=1.-low_edge)
-                n_report = stats.binom.rvs(self.future[0], frac_report)
-                self.missed_yesterday = self.future[0] - n_report
+                frac_report = stats.uniform.rvs(loc=low_edge, scale=1. - low_edge)
+                n_report = stats.binom.rvs(incoming, frac_report)
+                self.missed_yesterday = incoming - n_report
                 next_value += n_report
         self.history.append(self.history[-1] + next_value)
         # don't let the population go negative
@@ -141,32 +155,32 @@ class Population:
             self.history = [self.initial_value.get_value()]
         else:
             self.history = [self.initial_value]
-            
+
         self.missed_yesterday = 0
-                
+
     def remove_history(self):
         """Replace history with array of length 1
         """
         if len(self.history) > 0:
             current_value = self.history[-1]
             self.history = [current_value]
-        
+
     def scale_history(self, scale, expectations=True):
         if len(self.history) > 0:
             for i in range(len(self.history)):
                 if expectations:
                     self.history[i] *= scale
                 else:
-                    nu = self.history[i]*scale
+                    nu = self.history[i] * scale
                     self.history[i] = int(round(nu))
-        
+
     def scale_future(self, scale, expectations=True):
         if len(self.future) > 0:
             for i in range(len(self.future)):
                 if expectations:
                     self.future[i] *= scale
                 else:
-                    nu = self.future[i]*scale
+                    nu = self.future[i] * scale
                     self.future[i] = int(round(nu))
 
     def update_future_expectation(self, scale, delay):

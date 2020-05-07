@@ -22,7 +22,7 @@ class Adder(Connector):
         entering from_population.
     """
 
-    def __init__(self, connector_name, from_population, to_population):
+    def __init__(self, connector_name: str, from_population: Population, to_population: Population):
         """Constructor
         """
         super().__init__(connector_name, from_population, to_population)

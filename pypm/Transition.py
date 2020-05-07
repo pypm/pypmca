@@ -10,6 +10,7 @@ The derived classes must define the action methods
 
 from pypm.Parameter import Parameter
 
+
 class Transition:
     """
     Base class for defining transitions during the evolution
@@ -25,7 +26,7 @@ class Transition:
     In all cases, the time is specified by a Parameter object
     """
 
-    TIME_SPECS = {'rel_days':'int', 'rel_steps':'int'}
+    TIME_SPECS = {'rel_days': 'int', 'rel_steps': 'int'}
 
     def __init__(self, transition_name, time_spec, transition_time,
                  enabled=True, model=None):
@@ -34,7 +35,7 @@ class Transition:
         self.name = str(transition_name)
 
         if not isinstance(time_spec, str):
-            raise TypeError('Error in constructing transition ('+self.name+
+            raise TypeError('Error in constructing transition (' + self.name +
                             '): time_spec argument must be a str')
 
         if time_spec not in self.TIME_SPECS:
@@ -42,41 +43,40 @@ class Transition:
             for key in self.TIME_SPECS:
                 specs.append(key)
             buff = '/'.join(specs)
-            raise TypeError('Error in constructing transition ('+self.name+
-                            '): time_spec argument must be one of'+buff)
+            raise TypeError('Error in constructing transition (' + self.name +
+                            '): time_spec argument must be one of' + buff)
         self.time_spec = time_spec
 
         if not isinstance(transition_time, Parameter):
-            raise TypeError('Error in constructing transition ('+self.name+
+            raise TypeError('Error in constructing transition (' + self.name +
                             '): transition_time argument must be a Parameter object')
 
         if transition_time.parameter_type != self.TIME_SPECS[self.time_spec]:
-            raise TypeError('Transition ('+self.name+
-                            ') transition time ('+
-                            transition_time.parameter_type+
-                            ') does not match time_spec ('+
-                            self.time_spec+')')
-            
+            raise TypeError('Transition (' + self.name +
+                            ') transition time (' +
+                            transition_time.parameter_type +
+                            ') does not match time_spec (' +
+                            self.time_spec + ')')
+
         if transition_time.get_value() <= 0:
-            raise ValueError('Transition ('+self.name+
-                            ') transition time must be larger than zero.')
+            raise ValueError('Transition (' + self.name +
+                             ') transition time must be larger than zero.')
 
         self.transition_time = transition_time
         self.transition_time.set_must_update(self)
 
         if model is None:
-            raise TypeError('Transition ('+self.name+') model cannot be None')
+            raise TypeError('Transition (' + self.name + ') model cannot be None')
         if not hasattr(model, 'get_time_step'):
-            raise TypeError('Transition ('+self.name+
+            raise TypeError('Transition (' + self.name +
                             ') model must be a model object')
         self.model = model
 
         self.trigger_step = None
         self.__calculate_trigger_step()
-        
-        self.parameters = {}
-        self.parameters[str(self.transition_time)] = self.transition_time
-        
+
+        self.parameters = {str(self.transition_time): self.transition_time}
+
         self.enabled = enabled
 
     def update(self):
@@ -88,10 +88,10 @@ class Transition:
         """ calculate the step when this transition should take place
         """
         time_step = self.model.get_time_step()
-        day = 1./time_step
+        day = 1. / time_step
 
         if self.time_spec == 'rel_days':
-            self.trigger_step = int(round(self.transition_time.get_value()*day))
+            self.trigger_step = int(round(self.transition_time.get_value() * day))
         elif self.time_spec == 'rel_steps':
             self.trigger_step = self.transition_time.get_value()
 

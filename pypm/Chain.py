@@ -14,6 +14,7 @@ from pypm.Parameter import Parameter
 from pypm.Population import Population
 from pypm.Propagator import Propagator
 
+
 class Chain(Connector):
     """
     Chain: processes multiple one-to-one propagators and
@@ -29,78 +30,78 @@ class Chain(Connector):
         propagation is spread over time.
     """
 
-    def __init__(self, connector_name, from_population, to_population,
-                 chain, fraction, delay, model):
+    def __init__(self, connector_name: str, from_population: Population, to_population: Population,
+                 chain: list, fraction: Parameter, delay: Parameter, model):
         """Constructor
         """
         super().__init__(connector_name, from_population, to_population)
 
         if not isinstance(from_population, Population):
-            raise TypeError('Chain ('+self.name+
+            raise TypeError('Chain (' + self.name +
                             ') from_population must be a Population object')
 
         if not isinstance(to_population, Population):
-            raise TypeError('Chain ('+self.name+
+            raise TypeError('Chain (' + self.name +
                             ') to_population must be a Population object')
 
         if not isinstance(chain, list):
-            raise TypeError('Chain ('+self.name+
+            raise TypeError('Chain (' + self.name +
                             ') chain must be a list of Propagator objects')
 
         for prop in chain:
             if not isinstance(prop, Propagator):
-                raise TypeError('Chain ('+self.name+
+                raise TypeError('Chain (' + self.name +
                                 ') chain must be a list of only Propagator objects')
             if not isinstance(prop.from_population, Population):
-                raise ValueError('Chain ('+self.name+
+                raise ValueError('Chain (' + self.name +
                                  ') chain must be a list of one-to-one Propagator objects')
             if not isinstance(prop.to_population, Population):
-                raise ValueError('Chain ('+self.name+
+                raise ValueError('Chain (' + self.name +
                                  ') chain must be a list of one-to-one Propagator objects')
             if prop.delay.delay_type != 'norm':
-                raise ValueError('Chain ('+self.name+
+                raise ValueError('Chain (' + self.name +
                                  ') chain must be a list of Propagator objects with "norm" delays')
-                
+
             for key in prop.delay.delay_parameters:
                 # notify parameter that this object's update method must be call if changed
                 prop.delay.delay_parameters[key].set_must_update(self)
-                
+
             prop.fraction.set_must_update(self)
-                
+
         self.chain = chain
 
         if not isinstance(fraction, Parameter):
-            raise TypeError('Chain ('+self.name+
+            raise TypeError('Chain (' + self.name +
                             ') fraction must be a Parameter object')
         if fraction.get_value() < 0.:
-            raise ValueError('Chain ('+self.name+
+            raise ValueError('Chain (' + self.name +
                              ') fraction cannot be negative')
         if fraction.get_value() > 1.:
-            raise ValueError('Chain ('+self.name+
+            raise ValueError('Chain (' + self.name +
                              ') fraction cannot exceed 1')
         self.fraction = fraction
 
         if not isinstance(delay, Delay):
-            raise TypeError('Chain ('+self.name+
+            raise TypeError('Chain (' + self.name +
                             ') delay must be a Delay object')
         self.delay = delay
 
         if model is None:
-            raise TypeError('Chain ('+self.name+') model cannot be None')
+            raise TypeError('Chain (' + self.name + ') model cannot be None')
         if not hasattr(model, 'get_time_step'):
-            raise TypeError('Chain ('+self.name+
+            raise TypeError('Chain (' + self.name +
                             ') model must be a model object')
         self.model = model
-        
+
         self.parameters['fraction'] = self.fraction
         if delay.delay_parameters is not None:
             for key in delay.delay_parameters:
-                self.parameters['delay_'+key] = delay.delay_parameters[key]
+                self.parameters['delay_' + key] = delay.delay_parameters[key]
 
         self.propagators = None
         self.remainder_propagator = None
         self.__setup_compound_propagation()
-    
+
     # the same issue for delay parameters (update required after a change)
     def update(self):
         self.__setup_compound_propagation()
@@ -115,25 +116,25 @@ class Chain(Connector):
         self.propagators = []
         for prop in self.chain:
             prop_frac = prop.fraction.get_value()
-            remainder_fraction += current_fraction*(1.-prop_frac)
+            remainder_fraction += current_fraction * (1. - prop_frac)
             current_fraction *= prop_frac
             mean += prop.delay.delay_parameters['mean'].get_value()
             prop_sig = prop.delay.delay_parameters['sigma'].get_value()
-            sigma2 = sigma*sigma + prop_sig*prop_sig
+            sigma2 = sigma * sigma + prop_sig * prop_sig
             sigma = np.sqrt(sigma2)
 
-            frac = Parameter('frac', prop_frac, '')
+            frac = Parameter('frac', prop_frac)
             delay_pars = {
-                'mean': Parameter('mean', mean, 'combined_mean'),
-                'sigma': Parameter('sigma', sigma, 'combined_sigma')
-                }
-            delay = Delay('delay', 'norm', delay_pars, self.model)
+                'mean': Parameter('mean', mean, parameter_min=0., parameter_max=2.*mean),
+                'sigma': Parameter('sigma', sigma, parameter_min= 0., parameter_max=2.*mean)
+            }
+            delay = Delay('delay_'+str(prop), 'norm', delay_pars, self.model)
             self.propagators.append(
-                Propagator(prop.name+'_chain', self.from_population,
+                Propagator(prop.name + '_chain', self.from_population,
                            prop.to_population, frac, delay))
-        frac = Parameter('frac', remainder_fraction*self.fraction.get_value(), '')
+        frac = Parameter('frac', remainder_fraction * self.fraction.get_value())
         self.remainder_propagator = \
-            Propagator(self.name+'_remainder', self.from_population,
+            Propagator(self.name + '_remainder', self.from_population,
                        self.to_population, frac, self.delay)
 
     def update_expectation(self):

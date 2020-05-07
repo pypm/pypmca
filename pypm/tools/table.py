@@ -14,8 +14,8 @@ Show the details of a pypm model by a set of tables for:
 """
 from texttable import Texttable
 
-from Model import Model
-from Parameter import Parameter
+from pypm import Model, Parameter
+
 
 def print_all(model):
     print(connector_table(model))
@@ -26,32 +26,34 @@ def print_all(model):
     print('\n')
     print(modifier_table(model))
     print('\n')
-    print(injector_table(model))    
+    print(injector_table(model))
+
 
 def table_setup(model, width):
     if not isinstance(model, Model):
-        raise TypeError('Error in model_table. '+
-                            ': model argument must be a Model object')
+        raise TypeError('Error in model_table. ' +
+                        ': model argument must be a Model object')
 
-# show table of modifiers
+    # show table of modifiers
 
     table = Texttable()
     table.set_deco(Texttable.HEADER | Texttable.HLINES)
     table.set_max_width(width)
     return table
 
-def injector_table(model, width=120, reveal=False):    
-    table = table_setup(model, width)
-    
- #   transition_name, time_spec, transition_time,
- #                to_population, injection
 
-    header = ['Injector', 'Time parameter', 'Time', 'spec', 'to (Population)', 
+def injector_table(model, width=120, reveal=False):
+    table = table_setup(model, width)
+
+    #   transition_name, time_spec, transition_time,
+    #                to_population, injection
+
+    header = ['Injector', 'Time parameter', 'Time', 'spec', 'to (Population)',
               'Injection parameter', 'value']
     table.set_cols_dtype(['t', 't', 'a', 't', 't', 't', 'a'])
-  
+
     table.set_header_align(['l', 'l', 'l', 'l', 'l', 'l', 'l'])
-    
+
     rows = [header]
     for key in model.transitions:
         trans = model.transitions[key]
@@ -62,19 +64,20 @@ def injector_table(model, width=120, reveal=False):
                        str(trans.to_population),
                        str(trans.injection), trans.injection.get_value()]
                 rows.append(row)
-        
+
     table.add_rows(rows)
     return table.draw()
+
 
 def modifier_table(model, width=120):
     table = table_setup(model, width)
 
-    header = ['Modifier', 'Time parameter', 'Time', 'spec', 'Parameter', 
+    header = ['Modifier', 'Time parameter', 'Time', 'spec', 'Parameter',
               'before parameter', 'after parameter']
     table.set_cols_dtype(['t', 't', 'a', 't', 't', 't', 't'])
-  
+
     table.set_header_align(['l', 'l', 'l', 'l', 'l', 'l', 'l'])
-    
+
     rows = [header]
     for key in model.transitions:
         trans = model.transitions[key]
@@ -84,9 +87,10 @@ def modifier_table(model, width=120):
                    str(trans.parameter_before), trans.parameter_before.get_value(),
                    str(trans.parameter_after), trans.parameter_after.get_value()]
             rows.append(row)
-        
+
     table.add_rows(rows)
     return table.draw()
+
 
 def get_connector_row(connector):
     con = connector
@@ -115,18 +119,18 @@ def get_connector_row(connector):
     row.append('\n'.join(names))
     row.append('\n'.join(values))
     return row
-    
+
 
 def connector_table(model, width=120):
     table = table_setup(model, width)
 
-    header = ['Connector','Type','From\n(populations)','To\n(populations)',
-              'Parameters','Values']
+    header = ['Connector', 'Type', 'From\n(populations)', 'To\n(populations)',
+              'Parameters', 'Values']
     table.set_cols_dtype(['t', 't', 't', 't',
                           't', 't'])
     table.set_header_align(['l', 'l', 'l', 'l',
                             'l', 'r'])
-    
+
     rows = [header]
     # order is important!
     for key in model.connector_list:
@@ -135,12 +139,13 @@ def connector_table(model, width=120):
         if type(con).__name__ == 'Chain':
             for chain_con in con.chain:
                 row = get_connector_row(chain_con)
-                row[0] = str(con)+': '+row[0]
-                row[1] = '->'+row[1]
+                row[0] = str(con) + ': ' + row[0]
+                row[1] = '->' + row[1]
                 rows.append(row)
-    
+
     table.add_rows(rows)
     return table.draw()
+
 
 def population_table(model, width=120):
     table = table_setup(model, width)
@@ -148,9 +153,9 @@ def population_table(model, width=120):
     header = ['Population', 'Description', 'Parameter', 'Start value']
     table.set_cols_dtype(['t', 't', 't', 'a'])
     table.set_header_align(['l', 'l', 'l', 'l'])
-    
+
     rows = [header]
-    
+
     for key in model.populations:
         pop = model.populations[key]
         row = [str(pop), pop.description]
@@ -161,12 +166,13 @@ def population_table(model, width=120):
         else:
             row.append(' ')
             row.append(init)
-        
+
         rows.append(row)
-        
+
     table.add_rows(rows)
-        
+
     return table.draw()
+
 
 def get_par_row(par):
     buff = []
@@ -187,7 +193,7 @@ def parameter_table(model, width=120):
     table.set_header_align(['l', 'l', 'l', 'l', 'l', 'l'])
 
     par_dict = {}
-    
+
     for key in model.connectors:
         con = model.connectors[key]
         for par_key in con.parameters:
@@ -209,7 +215,7 @@ def parameter_table(model, width=120):
         if isinstance(init, Parameter):
             row = get_par_row(init)
             par_dict[row[0]] = row
-        
+
     for key in model.transitions:
         trans = model.transitions[key]
         for par_key in trans.parameters:
@@ -220,14 +226,15 @@ def parameter_table(model, width=120):
 
     par_list = list(par_dict.keys())
     par_list.sort()
-    
+
     rows = [header]
     for item in par_list:
         rows.append(par_dict[item])
-        
+
     table.add_rows(rows)
-        
+
     return table.draw()
+
 
 def get_var_par_row(par):
     buff = []
@@ -246,6 +253,7 @@ def get_var_par_row(par):
     buff.append(par.get_value())
     return buff
 
+
 def variable_parameter_table(model, width=120):
     table = table_setup(model, width)
 
@@ -254,7 +262,7 @@ def variable_parameter_table(model, width=120):
     table.set_header_align(['l', 'l', 'l', 'l', 'l', 'l', 'l', 'l', 'l', 'l'])
 
     par_dict = {}
-    
+
     for key in model.connectors:
         con = model.connectors[key]
         for par_key in con.parameters:
@@ -279,7 +287,7 @@ def variable_parameter_table(model, width=120):
             if init.get_status() == 'variable':
                 row = get_var_par_row(init)
                 par_dict[row[0]] = row
-        
+
     for key in model.transitions:
         trans = model.transitions[key]
         for par_key in trans.parameters:
@@ -291,14 +299,15 @@ def variable_parameter_table(model, width=120):
 
     par_list = list(par_dict.keys())
     par_list.sort()
-    
+
     rows = [header]
     for item in par_list:
         rows.append(par_dict[item])
-        
+
     table.add_rows(rows)
-        
+
     return table.draw()
+
 
 def get_delay_row(connector, delay):
     con = connector
@@ -315,7 +324,7 @@ def get_delay_row(connector, delay):
             width_par = delay_parameters['half_width']
         elif delay.delay_type == 'erlang':
             width_par = delay_parameters['k']
-            
+
         row.append(str(mean_par))
         row.append(mean_par.get_value())
         row.append(str(width_par))
@@ -326,44 +335,45 @@ def get_delay_row(connector, delay):
         row.append('')
         row.append('')
     return row
-    
+
 
 def delay_table(model, width=120):
     table = table_setup(model, width)
 
-    header = ['Connector','Con Type', 'Delay name', 'Delay Type',
-              'mean par','mean val', 'width par', 'width val']
+    header = ['Connector', 'Con Type', 'Delay name', 'Delay Type',
+              'mean par', 'mean val', 'width par', 'width val']
     table.set_cols_dtype(['t', 't', 't', 't', 't',
                           'a', 't', 'a'])
     table.set_header_align(['l', 'l', 'l', 'l', 'l',
                             'l', 'l', 'l'])
-    
+
     rows = [header]
     for key in model.connectors:
         con = model.connectors[key]
-        if hasattr(con,'delay'):
+        if hasattr(con, 'delay'):
             if isinstance(con.delay, list):
                 for delay in con.delay:
                     rows.append(get_delay_row(con, delay))
                     if type(con).__name__ == 'Chain':
                         for chain_con in con.chain:
                             row = get_delay_row(chain_con, chain_con.delay)
-                            row[0] = str(con)+': '+row[0]
-                            row[1] = '->'+row[1]
+                            row[0] = str(con) + ': ' + row[0]
+                            row[1] = '->' + row[1]
                             rows.append(row)
-                    
+
             else:
                 rows.append(get_delay_row(con, con.delay))
                 if type(con).__name__ == 'Chain':
                     for chain_con in con.chain:
                         row = get_delay_row(chain_con, chain_con.delay)
-                        row[0] = str(con)+': '+row[0]
-                        row[1] = '->'+row[1]
+                        row[0] = str(con) + ': ' + row[0]
+                        row[1] = '->' + row[1]
                         rows.append(row)
-    
+
     table.add_rows(rows)
     return table.draw()
 
-#my_model = Model.open_file('../examples/test_table.pypm')
-#print(delay_table(my_model))
-#print_all(my_model)
+
+my_model = Model.open_file('../examples/model_v4_4.pypm')
+print(delay_table(my_model))
+# print_all(my_model)

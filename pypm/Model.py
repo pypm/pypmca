@@ -14,6 +14,7 @@ from pypm.Connector import Connector
 from pypm.Population import Population
 from pypm.Transition import Transition
 
+
 class Model:
     """
     Class that defines populations and their evolution through connectors
@@ -24,13 +25,14 @@ class Model:
         self.name = str(model_name)
         self.description = ''
         self.t0 = date(2020, 3, 1)
-        self.__time_step = 1. # default time step is one day. (hidden)
-        self.__time_step_changed = False
+        # default time step is one day. (hidden)
+        self.__time_step = 1.
         self.populations = {}
         self.connectors = {}
         self.connector_list = []
         self.transitions = {}
         self.parameters = {}
+        self.delays = {}
         self.lnl = None
         self.population_mcmc_time_step_range = {}
 
@@ -44,7 +46,8 @@ class Model:
 
     def set_time_step(self, time_step):
         """
-        Define the length of time corresponding to one step in the evolution
+        Define the length of time corresponding to one step in the evolution.
+        Update all delays and transitions if this is changed.
 
         Parameters
         ----------
@@ -63,7 +66,18 @@ class Model:
             raise ValueError('Model ('+self.name+
                              ' time_step must be positive')
         self.__time_step = time_step
-        self.__time_step_changed = True
+
+        # update the objects that are sensitive to time_step
+        for delay_name in self.delays:
+            delay = self.delays[delay_name]
+            delay.update()
+        for transition_name in self.transitions:
+            transition = self.transitions[transition_name]
+            transition.update()
+        for connector_name in self.connectors:
+            connector = self.connectors[connector_name]
+            if type(connector).__name__ == 'Chain':
+                connector.update()
 
     def get_time_step(self):
         """
@@ -114,22 +128,22 @@ class Model:
 
         name_boot_pop = str(boot_population)
         if name_boot_pop not in self.populations:
-            raise ValueError('Error in boot_setup for model ('+self.name+
-                             '). '+name_boot_pop+'is not present in model.')
+            raise ValueError('Error in boot_setup for model (' + self.name +
+                             '). ' + name_boot_pop + 'is not present in model.')
         exc_pop_list = []
         if exclusion_populations is not None:
             if isinstance(exclusion_populations, list):
                 for exc_pop in exclusion_populations:
                     name_exc_pop = str(exc_pop)
                     if name_exc_pop not in self.populations:
-                        raise ValueError('Error in boot_setup for model ('+self.name+
-                                         '). '+name_exc_pop+'is not present in model.')
+                        raise ValueError('Error in boot_setup for model (' + self.name +
+                                         '). ' + name_exc_pop + 'is not present in model.')
                     exc_pop_list.append(name_exc_pop)
             else:
                 name_exc_pop = str(exclusion_populations)
                 if name_exc_pop not in self.populations:
-                    raise ValueError('Error in boot_setup for model ('+self.name+
-                                     '). '+name_exc_pop+'is not present in model.')
+                    raise ValueError('Error in boot_setup for model (' + self.name +
+                                     '). ' + name_exc_pop + 'is not present in model.')
                 exc_pop_list.append(name_exc_pop)
 
         self.boot_pars['boot_population'] = name_boot_pop
@@ -164,8 +178,11 @@ class Model:
     def boot(self, expectations=True):
         """ Using information in boot_pars, evolve the system to a point where
         the target population is reached or exceeded:
-            - expectations: if True, history begins with expectations,
+            - expectations: if True, after the boot completes, the
+            history will begin with an expectation,
             otherwise, a Poisson number is drawn using that expectation.
+        Note: check is added so that if boot requirement is not made within
+        10k steps, it fails (rather than stay in infinite loop)
         """
         if len(self.boot_pars) == 0:
             raise RuntimeError('Model boot parameters not set.')
@@ -189,13 +206,20 @@ class Model:
             exc_vals[exc_pop_name] = exc_pop.history[-1]
 
         last_value = -1
+        i_step = 0
         while boot_pop.history[-1] < goal_value and boot_pop.history[-1] >= last_value:
             last_value = boot_pop.history[-1]
             self.evolve_expectations(1)
+            i_step += 1
+            if i_step % 1000 == 0:
+                if boot_pop.history[-1] < 0.1 * goal_value:
+                    self.boot_needed = True
+                    raise ValueError('The boot process is taking too long to complete. ' +
+                                     'Adjust parameters to allow the goal to be reached.')
 
-        scale = goal_value/boot_pop.history[-1]
+        scale = goal_value / boot_pop.history[-1]
 
-        #Erase history until current. Scale all histories and futures.
+        # Erase history until current. Scale all histories and futures.
         for key in self.populations:
             pop = self.populations[key]
             pop.remove_history()
@@ -260,15 +284,15 @@ class Model:
 
     def add_transition(self, transition):
         """
-        Add a transition to the model. Special action is taken in the specied
+        Add a transition to the model. Special action is taken in the specified
         time step. Transitions do not apply to the boot phase.
         """
         if not isinstance(transition, Transition):
-            raise TypeError('Error in adding transition to '+self.name+
+            raise TypeError('Error in adding transition to ' + self.name +
                             ': add_transition argument must be a Transition object')
         if str(transition) in self.transitions:
-            raise ValueError('Error in adding transition ('+
-                             str(transition)+') to model ('+self.name+
+            raise ValueError('Error in adding transition (' +
+                             str(transition) + ') to model (' + self.name +
                              '). Transition with that name already present in model.')
         self.transitions[str(transition)] = transition
 
@@ -285,30 +309,30 @@ class Model:
         connector : Connector object
         """
         if not isinstance(connector, Connector):
-            raise TypeError('Error in adding connector to '+self.name+
+            raise TypeError('Error in adding connector to ' + self.name +
                             ': add_connector argument must be a Connector object')
         if str(connector) in self.connectors:
-            raise ValueError('Error in adding connector ('+
-                             str(connector)+') to model ('+self.name+
+            raise ValueError('Error in adding connector (' +
+                             str(connector) + ') to model (' + self.name +
                              '). Connector with that name already present in model.')
         if after_connector is not None and before_connector is not None:
-            raise ValueError('Error in adding connector('+
-                             str(connector)+') to model ('+self.name+
+            raise ValueError('Error in adding connector(' +
+                             str(connector) + ') to model (' + self.name +
                              '). Cannot specify both before and after locations.')
         index_loc = -1
         if before_connector is not None:
             name = str(before_connector)
             if name not in self.connector_list:
-                raise ValueError('Error in adding connector('+
-                                 str(connector)+') to model ('+self.name+
-                                 '): '+str(before_connector)+' not found.')
+                raise ValueError('Error in adding connector(' +
+                                 str(connector) + ') to model (' + self.name +
+                                 '): ' + str(before_connector) + ' not found.')
             index_loc = self.connector_list.index(name)
         elif after_connector is not None:
             name = str(after_connector)
             if name not in self.connector_list:
-                raise ValueError('Error in adding connector('+
-                                 str(connector)+') to model ('+self.name+
-                                 '): '+str(after_connector)+' not found.')
+                raise ValueError('Error in adding connector(' +
+                                 str(connector) + ') to model (' + self.name +
+                                 '): ' + str(after_connector) + ' not found.')
             index_loc = self.connector_list.index(name) + 1
         else:
             index_loc = len(self.connector_list)
@@ -318,6 +342,7 @@ class Model:
 
         self.__update_population_list(connector)
         self.__update_parameter_list(connector)
+        self.__update_delay_list(connector)
 
     def remove_connector(self, connector):
         """
@@ -336,9 +361,9 @@ class Model:
 
         name = str(connector)
         if name not in self.connector_list:
-            raise ValueError('Error in removing connector('+
-                             str(connector)+') from model ('+self.name+
-                             '): '+str(connector)+' not found.')
+            raise ValueError('Error in removing connector(' +
+                             str(connector) + ') from model (' + self.name +
+                             '): ' + str(connector) + ' not found.')
 
         self.connector_list.remove(name)
         removed_connector = self.connectors.pop(name, None)
@@ -349,9 +374,9 @@ class Model:
     def remove_transition(self, transition):
         name = str(transition)
         if name not in self.transitions:
-            raise ValueError('Error in removing transition('+
-                             str(transition)+') from model ('+self.name+
-                             '): '+str(transition)+' not found.')
+            raise ValueError('Error in removing transition(' +
+                             str(transition) + ') from model (' + self.name +
+                             '): ' + str(transition) + ' not found.')
 
         removed_transition = self.transitions.pop(name, None)
 
@@ -366,11 +391,13 @@ class Model:
         # remake list of active populations and their parameters
         self.populations = {}
         self.parameters = {}
+        self.delays = {}
 
         for con_name in self.connector_list:
             con = self.connectors[con_name]
             self.__update_population_list(con)
             self.__update_parameter_list(con)
+            self.__update_delay_list(con)
 
         # add to list of active parameters
         for trans_name in self.transitions:
@@ -401,21 +428,20 @@ class Model:
 
         elif isinstance(obj, Population):
             pop = obj
-            init = pop.initial_value
-            if type(init).__name__ == 'Parameter':
-                self.__add_to_parameter_list(init)
+            for par_key in pop.parameters:
+                par = pop.parameters[par_key]
+                self.__add_to_parameter_list(par)
 
     def __add_to_parameter_list(self, obj):
         # check that the name of the parameter is unique
         if str(obj) in self.parameters:
             par = self.parameters[str(obj)]
             if obj != par:
-                raise ValueError('Two parameters share the same name: '+str(obj))
+                raise ValueError('Two parameters share the same name: ' + str(obj))
         else:
             self.parameters[str(obj)] = obj
 
     def __update_population_list(self, connector):
-
         # make a list of populations involved in this connector
         pops = []
         args = [connector.from_population, connector.to_population]
@@ -438,11 +464,40 @@ class Model:
             if key in self.populations:
                 dict_pop = self.populations[key]
                 if dict_pop != pop:
-                    raise ValueError('Two populations share the same name: '+
+                    raise ValueError('Two populations share the same name: ' +
                                      pop.name)
             else:
                 self.populations[key] = pop
                 self.__update_parameter_list(pop)
+
+    def __update_delay_list(self, connector):
+        # make a list of delays involved in this connector
+        delays = []
+        if hasattr(connector, 'delay'):
+            if isinstance(connector.delay, list):
+                for delay in connector.delay:
+                    delays.append(delay)
+                    if type(connector).__name__ == 'Chain':
+                        for chain_con in connector.chain:
+                            delays.append(chain_con.delay)
+
+            else:
+                delays.append(connector.delay)
+                if type(connector).__name__ == 'Chain':
+                    for chain_con in connector.chain:
+                        delays.append(chain_con.delay)
+
+        # If necessary add to delay dictionary.
+        # Check there are no duplicate keys
+        for delay in delays:
+            key = delay.name
+            if key in self.delays:
+                dict_delay = self.delays[key]
+                if dict_delay != delay:
+                    raise ValueError('Two delays share the same name: ' +
+                                     delay.name)
+            else:
+                self.delays[key] = delay
 
     def save_file(self, filename):
         """
@@ -465,19 +520,19 @@ class Model:
 
         """
         if not isinstance(filename, str):
-            raise TypeError('Error saving file. '+
+            raise TypeError('Error saving file. ' +
                             ': filename argument must be a str')
 
         fullname = filename
         if '.' not in filename:
-            fullname = filename+'.pypm'
+            fullname = filename + '.pypm'
 
-#       eliminate histories, undo transitioned parameter adjustments
+        #       eliminate histories, undo transitioned parameter adjustments
 
         self.reset()
 
-#       set initial parameter values to their current values to define a new
-#       reference
+        #       set initial parameter values to their current values to define a new
+        #       reference
 
         for par_name in self.parameters:
             par = self.parameters[par_name]
@@ -503,12 +558,12 @@ class Model:
 
         """
         if not isinstance(filename, str):
-            raise TypeError('Error opening file. '+
+            raise TypeError('Error opening file. ' +
                             ': filename argument must be a str')
 
         fullname = filename
         if '.' not in filename:
-            fullname = filename+'.pypm'
+            fullname = filename + '.pypm'
 
         with open(fullname, 'rb') as f:
             return pickle.load(f)

@@ -9,6 +9,7 @@ a specific point in the evolution
 from pypm.Parameter import Parameter
 from pypm.Transition import Transition
 
+
 class Modifier(Transition):
     """
     A modifier object will cause a parameter value to change at specified point
@@ -32,34 +33,34 @@ class Modifier(Transition):
 
     """
 
-    def __init__(self, transition_name, time_spec, transition_time, parameter,
-                 parameter_before, parameter_after, enabled=True, model=None):
+    def __init__(self, transition_name: str, time_spec: str, transition_time: Parameter, parameter: Parameter,
+                 parameter_before: Parameter, parameter_after: Parameter, enabled: bool = True, model=None):
         """Constructor
         """
         super().__init__(transition_name, time_spec, transition_time, enabled, model)
 
         if parameter is None:
-            raise TypeError('Error in constructing transition ('+self.name+
+            raise TypeError('Error in constructing transition (' + self.name +
                             '): parameter_before cannot be None')
 
         if parameter_before is None:
-            raise TypeError('Error in constructing transition ('+self.name+
+            raise TypeError('Error in constructing transition (' + self.name +
                             '): parameter_before cannot be None')
 
         if parameter_after is None:
-            raise TypeError('Error in constructing transition ('+self.name+
+            raise TypeError('Error in constructing transition (' + self.name +
                             '): parameter_after cannot be None')
 
         if not isinstance(parameter, Parameter):
-            raise TypeError('Error in constructing transition ('+self.name+
+            raise TypeError('Error in constructing transition (' + self.name +
                             '): parameter must be a Parameter object')
 
         if not isinstance(parameter_before, Parameter):
-            raise TypeError('Error in constructing transition ('+self.name+
+            raise TypeError('Error in constructing transition (' + self.name +
                             '): parameter_before must be a Parameter object')
 
         if not isinstance(parameter_after, Parameter):
-            raise TypeError('Error in constructing transition ('+self.name+
+            raise TypeError('Error in constructing transition (' + self.name +
                             '): parameter_after must be a Parameter object')
 
         self.parameter = parameter

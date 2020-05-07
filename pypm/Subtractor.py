@@ -12,6 +12,7 @@ of just monitoring the total hospitalized.
 from pypm.Connector import Connector
 from pypm.Population import Population
 
+
 class Subtractor(Connector):
     """
     Subtractor removes from the from_population, the newcomers to the
@@ -24,21 +25,21 @@ class Subtractor(Connector):
         this connector.
     """
 
-    def __init__(self, connector_name, from_population, to_population):
+    def __init__(self, connector_name: str, from_population: Population, to_population: Population):
         """Constructor
         """
         super().__init__(connector_name, from_population, to_population)
 
         if not isinstance(from_population, Population):
-            raise TypeError('Subtractor ('+self.name+
+            raise TypeError('Subtractor (' + self.name +
                             ') from_population must be a Population object')
 
         if not isinstance(to_population, Population):
-            raise TypeError('Subtractor ('+self.name+
+            raise TypeError('Subtractor (' + self.name +
                             ') to_population must be a Population object')
-            
-        if hasattr(from_population,'report_noise') and from_population.report_noise:
-            raise TypeError('Subtractor ('+self.name+
+
+        if hasattr(from_population, 'report_noise') and from_population.report_noise:
+            raise TypeError('Subtractor (' + self.name +
                             ') from_population cannot have report_noise set to True')
 
         # Identify the from_population as one not to derive daily numbers
@@ -62,4 +63,3 @@ class Subtractor(Connector):
         """
         reduction = -1 * self.to_population.future[0]
         self.from_population.update_future_fast(reduction)
-
