@@ -14,6 +14,7 @@ if version_info.major >= 3:
     from pypm.Chain import Chain
     from pypm.Modifier import Modifier
     from pypm.Injector import Injector
+    from pypm.Ensemble import Ensemble
 else:
     raise NotImplementedError('pypm requires Python 3 or higher. Please upgrade!')
 

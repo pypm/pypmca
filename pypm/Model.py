@@ -60,10 +60,10 @@ class Model:
 
         """
         if not isinstance(time_step, float):
-            raise TypeError('Model ('+self.name+
+            raise TypeError('Model (' + self.name +
                             ' time_step must be a float')
         if not time_step > 0.:
-            raise ValueError('Model ('+self.name+
+            raise ValueError('Model (' + self.name +
                              ' time_step must be positive')
         self.__time_step = time_step
 
@@ -248,18 +248,13 @@ class Model:
             self.boot(expectations=True)
 
         for step in range(n_step):
-            for transition_name in self.transitions:
-                transition = self.transitions[transition_name]
-                if step == transition.trigger_step:
-                    if transition.enabled:
-                        transition.take_action(expectations=True)
+            self.do_transitions(step, expectations=False)
+
             # calculate future expectations
-            for connector_name in self.connector_list:
-                connector = self.connectors[connector_name]
-                connector.update_expectation()
+            self.calculate_future(expectations=True)
+
             # make one time step
-            for key in self.populations:
-                self.populations[key].do_time_step(expectations=True)
+            self.do_time_step(expectations=True)
 
     def generate_data(self, n_step):
         """
@@ -269,18 +264,32 @@ class Model:
             self.boot(expectations=False)
 
         for step in range(n_step):
-            for transition_name in self.transitions:
-                transition = self.transitions[transition_name]
-                if step == transition.trigger_step:
-                    if transition.enabled:
-                        transition.take_action(expectations=False)
+            self.do_transitions(step, expectations=False)
+
             # calculate future data
-            for connector_name in self.connector_list:
-                connector = self.connectors[connector_name]
-                connector.update_data()
+            self.calculate_future(expectations=False)
+
             # make one time step
-            for key in self.populations:
-                self.populations[key].do_time_step(expectations=True)
+            self.do_time_step(expectations=False)
+
+    def do_transitions(self, step, expectations=True):
+        for transition_name in self.transitions:
+            transition = self.transitions[transition_name]
+            if step == transition.trigger_step:
+                if transition.enabled:
+                    transition.take_action(expectations)
+
+    def calculate_future(self, expectations=True):
+        for connector_name in self.connector_list:
+            connector = self.connectors[connector_name]
+            if expectations:
+                connector.update_expectation()
+            else:
+                connector.update_data()
+
+    def do_time_step(self, expectations=True):
+        for key in self.populations:
+            self.populations[key].do_time_step(expectations)
 
     def add_transition(self, transition):
         """
@@ -542,7 +551,7 @@ class Model:
             pickle.dump(self, f, pickle.HIGHEST_PROTOCOL)
 
     @classmethod
-    def open_file(self, filename):
+    def open_file(cls, filename):
         """
         Restore a model that was save to a file using Model.save_file(filename)
 
