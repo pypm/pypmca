@@ -105,48 +105,50 @@ class Splitter(Connector):
         Calculate contributions to other populations by updating their
         future_expectations
         """
-        incoming = self.from_population.future[0]
+        if len(self.from_population.future) > 0:
+            incoming = self.from_population.future[0]
 
-        remaining = 1.
-        fractions = []
-        for fraction in self.fractions:
-            frac = remaining * fraction.get_value()
-            fractions.append(frac)
-            remaining -= frac
-        fractions.append(remaining)
+            remaining = 1.
+            fractions = []
+            for fraction in self.fractions:
+                frac = remaining * fraction.get_value()
+                fractions.append(frac)
+                remaining -= frac
+            fractions.append(remaining)
 
-        if isinstance(self.delay, list):
-            for i in range(len(self.to_population)):
-                to_pop = self.to_population[i]
-                scale = fractions[i] * incoming
-                to_pop.update_future_expectation(scale, self.delay[i])
-        else:
-            for i in range(len(self.to_population)):
-                to_pop = self.to_population[i]
-                scale = fractions[i] * incoming
-                to_pop.update_future_expectation(scale, self.delay)
+            if isinstance(self.delay, list):
+                for i in range(len(self.to_population)):
+                    to_pop = self.to_population[i]
+                    scale = fractions[i] * incoming
+                    to_pop.update_future_expectation(scale, self.delay[i])
+            else:
+                for i in range(len(self.to_population)):
+                    to_pop = self.to_population[i]
+                    scale = fractions[i] * incoming
+                    to_pop.update_future_expectation(scale, self.delay)
 
     def update_data(self):
         """
         Simulate data for other populations by updating their
         future_expectations
         """
-        incoming = self.from_population.future[0]
+        if len(self.from_population.future) > 0:
+            incoming = self.from_population.future[0]
 
-        remaining = 1.
-        fractions = []
-        for fraction in self.fractions:
-            frac = remaining * fraction.get_value()
-            fractions.append(frac)
-            remaining -= frac
-        fractions.append(remaining)
+            remaining = 1.
+            fractions = []
+            for fraction in self.fractions:
+                frac = remaining * fraction.get_value()
+                fractions.append(frac)
+                remaining -= frac
+            fractions.append(remaining)
 
-        scales = stats.multinomial.rvs(incoming, fractions)
-        if isinstance(self.delay, list):
-            for i in range(len(self.to_population)):
-                to_pop = self.to_population[i]
-                to_pop.update_future_data(scales[i], self.delay[i])
-        else:
-            for i in range(len(self.to_population)):
-                to_pop = self.to_population[i]
-                to_pop.update_future_data(scales[i], self.delay)
+            scales = stats.multinomial.rvs(incoming, fractions)
+            if isinstance(self.delay, list):
+                for i in range(len(self.to_population)):
+                    to_pop = self.to_population[i]
+                    to_pop.update_future_data(scales[i], self.delay[i])
+            else:
+                for i in range(len(self.to_population)):
+                    to_pop = self.to_population[i]
+                    to_pop.update_future_data(scales[i], self.delay)

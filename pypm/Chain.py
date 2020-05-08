@@ -142,35 +142,37 @@ class Chain(Connector):
         Calculate contributions to other populations by updating their
         future_expectations
         """
-        incoming = self.from_population.future[0]
+        if len(self.from_population.future) > 0:
+            incoming = self.from_population.future[0]
 
-        current_fraction = 1.
-        for prop in self.propagators:
-            current_fraction *= prop.fraction.get_value()
-            scale = current_fraction * incoming
+            current_fraction = 1.
+            for prop in self.propagators:
+                current_fraction *= prop.fraction.get_value()
+                scale = current_fraction * incoming
+                prop.to_population.update_future_expectation(scale, prop.delay)
+
+            prop = self.remainder_propagator
+            scale = prop.fraction.get_value() * incoming
             prop.to_population.update_future_expectation(scale, prop.delay)
-
-        prop = self.remainder_propagator
-        scale = prop.fraction.get_value() * incoming
-        prop.to_population.update_future_expectation(scale, prop.delay)
 
     def update_data(self):
         """
         Simulate data for other populations by updating their
         future_expectations
         """
-        incoming = self.from_population.future[0]
+        if len(self.from_population.future) > 0:
+            incoming = self.from_population.future[0]
 
-        remaining = 0
-        in_chain = incoming
-        for prop in self.propagators:
-            frac = prop.fraction.get_value()
-            selected = stats.binom.rvs(in_chain, frac)
-            remaining += (in_chain - selected)
-            in_chain = selected
+            remaining = 0
+            in_chain = incoming
+            for prop in self.propagators:
+                frac = prop.fraction.get_value()
+                selected = stats.binom.rvs(in_chain, frac)
+                remaining += (in_chain - selected)
+                in_chain = selected
+                prop.to_population.update_future_data(selected, prop.delay)
+
+            prop = self.remainder_propagator
+            # note that there is no need to apply the remainder fraction here
+            selected = stats.binom.rvs(remaining, self.fraction.get_value())
             prop.to_population.update_future_data(selected, prop.delay)
-
-        prop = self.remainder_propagator
-        # note that there is no need to apply the remainder fraction here
-        selected = stats.binom.rvs(remaining, self.fraction.get_value())
-        prop.to_population.update_future_data(selected, prop.delay)

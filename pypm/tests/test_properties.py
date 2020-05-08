@@ -44,7 +44,6 @@ def test_Model_properties():
         sim_model.reset()
         sim_model.generate_data(n_days)
         sim_models.append(sim_model)
-    print()
     for pop_name in ref_model.populations:
         pop = ref_model.populations[pop_name]
         if pop.show_sim:
@@ -55,7 +54,6 @@ def test_Model_properties():
             std = np.std(np.array(results))
             error = std / np.sqrt(1. * n_rep)
             expect = ref_model.populations[pop_name].history[-1]
-            print(pop_name, expect, mean, error)
             assert np.abs(expect - mean) < 8. * error
 
 
@@ -85,7 +83,7 @@ def test_Ensemble_properties_identical():
     for contact in contacts:
         test_ensemble.define_cross_transmission('infection cycle', 'infected',
                                                 'susceptible', 'total',
-                                                'contagious', 'alpha', contact)
+                                                'contagious', 'alpha', contact=contact)
 
         n_days = 100
         test_ensemble.reset()
@@ -121,7 +119,8 @@ def test_Ensemble_properties_different():
     test_ensemble.upload_models([test_a, test_b])
     test_ensemble.define_cross_transmission('infection cycle', 'infected',
                                             'susceptible', 'total',
-                                            'contagious', 'alpha', [[1., 0.], [0.0, 1.]])
+                                            'contagious', 'alpha',
+                                            diagonal=True)
 
     n_days = 100
     test_ensemble.reset()
@@ -158,7 +157,8 @@ def test_Ensemble_properties_different2():
     test_ensemble.upload_models([test_a, test_b])
     test_ensemble.define_cross_transmission('infection cycle', 'infected',
                                             'susceptible', 'total',
-                                            'contagious', 'alpha', [[1., 0.3], [0.5, 1.]])
+                                            'contagious', 'alpha',
+                                            contact=[[1., 0.3], [0.5, 1.]])
 
     n_days = 100
     test_ensemble.reset()

@@ -15,6 +15,7 @@ the entire system.
 from datetime import date
 import numpy as np
 from scipy import stats
+import copy
 
 import pickle
 from pypm import Model, Parameter, Population
@@ -35,19 +36,27 @@ class Ensemble(Model):
         super().__init__(name)
 
         self.model = None
+        in_model = None
         if isinstance(model, Model):
-            self.model = model
+            in_model = model
         elif isinstance(model, str):
-            self.model = Model.open_file(model)
+            in_model = Model.open_file(model)
         else:
             raise TypeError('Error creating ensemble. The model argument needs to be a model object ' +
                             'or a .pypm filename')
 
-        # use the population objects in self.model to save the histories
+        # to avoid the possibility that the reference model is subsequently modified, make a copy
+        # that will not be as exposed to tampering
+        self.model = copy.deepcopy(in_model)
+
+        # point to the population objects in self.model to save the histories
         # this allows for consistent access to history between models and ensembles
         for pop_name in self.model.populations:
             pop = self.model.populations[pop_name]
             self.populations[pop_name] = pop
+
+        # the parameters will be set once the list of models are read in
+        self.parameters = {}
 
         # The list of models (either provided directly or as a list of .pypm files)
         # They are required to have unique names for user interaction
@@ -61,6 +70,7 @@ class Ensemble(Model):
         self.alpha_name = None
         self.infection_cycle_name = None
         self.contact_matrix = None
+        self.diagonal = False
         self.null_pop = Population('null', 0.)
 
         self.__distribution = None
@@ -112,9 +122,16 @@ class Ensemble(Model):
         self.models[model.name] = model
         self.reset_cross_transmission()
 
+        # include parameters
+        model_app = '#' + str(len(self.model_list) - 1)
+        for par_name in model.parameters:
+            new_name = par_name + model_app
+            self.parameters[new_name] = model.parameters[par_name]
+
     def define_cross_transmission(self, infection_cycle_name: str, infected_name: str,
                                   susceptible_name: str, total_name: str,
-                                  contagious_name: str, alpha_name: str, contact: list):
+                                  contagious_name: str, alpha_name: str,
+                                  diagonal: bool = False, contact: list = None):
         """
         Define how the populations mix to produce new infections:
         For example new infections in model A arising from interactions with group B
@@ -153,20 +170,22 @@ class Ensemble(Model):
         self.alpha_name = alpha_name
 
         n_model = len(self.model_list)
-        if not isinstance(contact, list):
-            raise TypeError('The contact matrix must be a list of lists')
-        if len(contact) != n_model:
-            raise ValueError('The contact matrix must be an nxn matrix, where n=number of models')
-        for i in range(n_model):
-            row = contact[i]
-            if not isinstance(row, list):
+        self.diagonal = diagonal
+        if not diagonal:
+            if not isinstance(contact, list):
                 raise TypeError('The contact matrix must be a list of lists')
-            if len(row) != n_model:
+            if len(contact) != n_model:
                 raise ValueError('The contact matrix must be an nxn matrix, where n=number of models')
-            if np.abs(contact[i][i] - 1.) > 0.001:
-                raise ValueError('The diagonal terms in the contact matrix should be 1.')
+            for i in range(n_model):
+                row = contact[i]
+                if not isinstance(row, list):
+                    raise TypeError('The contact matrix must be a list of lists')
+                if len(row) != n_model:
+                    raise ValueError('The contact matrix must be an nxn matrix, where n=number of models')
+                if np.abs(contact[i][i] - 1.) > 0.001:
+                    raise ValueError('The diagonal terms in the contact matrix should be 1.')
 
-        self.contact_matrix = contact
+            self.contact_matrix = contact
 
     def reset_cross_transmission(self):
         self.infected_name = None
@@ -175,6 +194,7 @@ class Ensemble(Model):
         self.contagious_name = None
         self.alpha_name = None
         self.contact_matrix = None
+        self.diagonal = False
 
     def set_t0(self, year=2020, month=1, day=1):
         """Define the date of the first element in the history lists
@@ -322,6 +342,10 @@ class Ensemble(Model):
                 model.populations[self.infected_name]
 
     def __cross_model_transmission(self, expectations=True):
+        # check that everything is ready
+        if not self.diagonal and self.contact_matrix is None:
+            raise RuntimeError('The cross-transmission information has not been provided yet.')
+
         n = len(self.model_list)
 
         for ia in range(n):
@@ -329,16 +353,23 @@ class Ensemble(Model):
             model_A = self.models[model_name_A]
             sum_denom = 0.
             sum_numer = 0.
-            for ib in range(n):
-                model_name_B = self.model_list[ib]
-                model_B = self.models[model_name_B]
-
-                sum_denom += self.contact_matrix[ia][ib] * model_B.populations[self.total_name].history[-1]
-                term1 = np.sqrt(model_A.parameters[self.alpha_name].get_value() *
-                                model_B.parameters[self.alpha_name].get_value())
+            if self.diagonal:
+                sum_denom += model_A.populations[self.total_name].history[-1]
+                term1 = model_A.parameters[self.alpha_name].get_value()
                 term2 = model_A.populations[self.susceptible_name].history[-1]
-                term3 = model_B.populations[self.contagious_name].history[-1]
-                sum_numer += term1 * term2 * term3 * self.contact_matrix[ia][ib]
+                term3 = model_A.populations[self.contagious_name].history[-1]
+                sum_numer += term1 * term2 * term3
+            else:
+                for ib in range(n):
+                    model_name_B = self.model_list[ib]
+                    model_B = self.models[model_name_B]
+
+                    sum_denom += self.contact_matrix[ia][ib] * model_B.populations[self.total_name].history[-1]
+                    term1 = np.sqrt(model_A.parameters[self.alpha_name].get_value() *
+                                    model_B.parameters[self.alpha_name].get_value())
+                    term2 = model_A.populations[self.susceptible_name].history[-1]
+                    term3 = model_B.populations[self.contagious_name].history[-1]
+                    sum_numer += term1 * term2 * term3 * self.contact_matrix[ia][ib]
             new_infections = sum_numer / sum_denom
 
             if expectations:
