@@ -12,27 +12,43 @@ pypm
 * Free software: GNU General Public License v3
 
 
-The ``pyPM`` population modeller (pyPM.ca) is a general framework for building models
-of virus spread using discrete-time difference equations.
+The ``pyPM`` population modeller (pyPM.ca) is a general framework for population
+modeling using discrete-time difference equations. It was developed specifically
+to understand and characterize the CoViD-19 epidemic.
+
+A ``pyPM`` model is built by connecting a set of population objects with
+connector objects. The connectors represent either a transfer that is immediate
+or one which is delayed and distributed in time. Each
+population object retains a record of its number at each step, and also
+a list of future contributions, arising from the delayed transfers from other
+populations.
+The calculations can be done in terms of expectation values or simulated data.
+
+By using discrete-time difference equations, realistic delays are easily
+incorporated.
+This is in stark contrast with the majority of
+epidemiological models, which are almost exclusively based on
+ordinary differential equations (ODEs).
+With a single stage between two populations, ODE delays follow an
+exponential distribution.
+
+The object oriented design makes it possible to model complex systems with little
+or no programming required.
+
+A separate package, ipypm, provides a graphical user interface to pypm that runs
+inside jupyter notebook. Data-model comparison and parameter adjustment
+can be performed.
+
+Heterogeneous systems can be modelled by combining several models, each
+representing a distinct group or category, into an ensemble.
 
 
-A ``pyPM`` model consists of a set of population objects connected by connector
-objects, allowing expectations and simulated data for time histories (such as
-positive tests and ICU admissions) to be produced. Propagation from one
-population to another is done with realistic time lags, defined by normal delay
-distributions, with the mean and standard deviation specified for each connector.
-It is important to note that models based on ODEs (ordinary differential
-equations), popular in the virus modelling community perhaps for historical
-reasons, are not able to correctly model the propagation of infectious bursts to
-the reporting stage.
-
-
-Authors
+Author
 --------
 
  - `Dean Karlen <https://www.uvic.ca/science/physics/vispa/people/faculty/karlen.php>`_
 
-Contributors
+Contributor
 -------------
 
  - `Pradeep Reddy Raamana <https://crossinvalidation.com>`_
