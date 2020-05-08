@@ -12,36 +12,49 @@ pypm
 * Free software: GNU General Public License v3
 
 
-The ``pyPM`` population modeller (pyPM.ca) is a general framework for population
-modeling using discrete-time difference equations. It was developed specifically
+The ``pyPM`` population modeller (pyPM.ca) that describes connected systems with
+discrete-time difference equations. It was developed specifically
 to understand and characterize the CoViD-19 epidemic.
 
 A ``pyPM`` model is built by connecting a set of population objects with
 connector objects. The connectors represent either a transfer that is immediate
 or one which is delayed and distributed in time. Each
-population object retains a record of its number at each step, and also
-a list of future contributions, arising from the delayed transfers from other
-populations.
-The calculations can be done in terms of expectation values or simulated data.
+population object retains a record of its number at each time step, and also
+maintains a list of future contributions, arising from delayed transfers
+from other populations.
+Calculations are done either in terms of expectation values or simulated data,
+allowing the model to be used as both an analysis tool and a simulator.
 
-By using discrete-time difference equations, realistic delays are easily
-incorporated.
-This is in stark contrast with the majority of
-epidemiological models, which are almost exclusively based on
-ordinary differential equations (ODEs).
-With a single stage between two populations, ODE delays follow an
-exponential distribution.
+Steady state solutions for these systems may develop. For viral epidemics these
+consist of either exponential growth or decline.
+Systems perturbed by external influences, such as an instantaneous change
+to a growth parameter or a sudden change in the size of a group,
+may relax to a new steady state solution.
+The relaxation time depends on the various time delay distributions in the system.
+To account for such perturbations, ``pyPM`` models can include transition objects.
 
-The object oriented design makes it possible to model complex systems with little
-or no programming required.
+In order to correctly model both long term and short term behaviour, realistic time
+delay distributions must be included.
+The is achieved in ``pyPM`` by using discrete-time difference equations,
+instead of ordinary differential equations (ODEs) which are the foundation of
+the vast majority of epidemiological models.
+The ODE approach is limited in its approach to introduce delays
+and offer no real benefit in modeling slowing evolving systems.
 
-A separate package, ipypm, provides a graphical user interface to pypm that runs
-inside jupyter notebook. Data-model comparison and parameter adjustment
-can be performed.
+The object oriented design makes it possible to create or modify a
+connection network with little or no programming required.
 
-Heterogeneous systems can be modelled by combining several models, each
-representing a distinct group or category, into an ensemble.
+A separate package, ``ipyPM``, provides a graphical user interface to pypm that runs
+inside a jupyter notebook. Data-model comparison, parameter adjustment,
+and parameter estimation can be performed.
+With these tools, the past behaviour of the system, and possible future
+behaviours can be explored.
 
+A single ``pyPM`` model describes a homogenous system.
+Heterogeneous systems can be modelled with an ensemble object,
+by combining several ``pyPM`` models, each
+representing a distinct group or category, along with a contact matrix the represents
+the engagement between the groups.
 
 Author
 --------
