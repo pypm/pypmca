@@ -1,5 +1,6 @@
 scipy
 numpy
+texttable
 flake8==3.7.8
 pytest
 pytest-runner
