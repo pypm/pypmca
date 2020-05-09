@@ -9,7 +9,7 @@ either by updating expectations or simulated data.
 """
 from datetime import date
 import pickle
-
+from pathlib import Path
 from pypm.Connector import Connector
 from pypm.Population import Population
 from pypm.Transition import Transition
@@ -520,7 +520,7 @@ class Model:
 
         Parameters
         ----------
-        filename : str
+        filename : Path or str
             name of file to save model
 
         Returns
@@ -528,13 +528,15 @@ class Model:
         None.
 
         """
-        if not isinstance(filename, str):
-            raise TypeError('Error saving file. ' +
-                            ': filename argument must be a str')
 
-        fullname = filename
-        if '.' not in filename:
-            fullname = filename + '.pypm'
+        try:
+            filepath = Path(filename).resolve()
+        except:
+            raise TypeError('Input arg could not be converted to a valid path: {}' +
+                            '\n It must be a str or Path-like.'.format(filename))
+
+        if len(filepath.suffix) < 2:
+            filepath = filepath.with_suffix('.pypm')
 
         #       eliminate histories, undo transitioned parameter adjustments
 
@@ -547,17 +549,18 @@ class Model:
             par = self.parameters[par_name]
             par.new_initial_value()
 
-        with open(fullname, 'wb') as f:
+        with open(filepath, 'wb') as f:
             pickle.dump(self, f, pickle.HIGHEST_PROTOCOL)
 
+
     @classmethod
-    def open_file(cls, filename):
+    def open_file(cls, filepath):
         """
         Restore a model that was save to a file using Model.save_file(filename)
 
         Parameters
         ----------
-        filename : str
+        filepath : Path or str
             name of existing model file to open
 
         Returns
@@ -566,13 +569,18 @@ class Model:
             The model object saved in the file
 
         """
-        if not isinstance(filename, str):
-            raise TypeError('Error opening file. ' +
-                            ': filename argument must be a str')
 
-        fullname = filename
-        if '.' not in filename:
-            fullname = filename + '.pypm'
+        try:
+            filepath = Path(filepath).resolve()
+        except:
+            raise TypeError('Input arg could not be converted to a valid path: {}' +
+                            '\n It must be a str or Path-like.'.format(filepath))
 
-        with open(fullname, 'rb') as f:
+        if not filepath.exists():
+            raise ValueError('Filepath does not exist: {}'.format(filepath))
+
+        if len(filepath.suffix) < 2:
+            filepath = filepath.with_suffix('.pypm')
+
+        with open(filepath, 'rb') as f:
             return pickle.load(f)
