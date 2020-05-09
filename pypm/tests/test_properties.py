@@ -8,12 +8,17 @@ from pypm import Model, Population, Delay, Parameter, Multiplier, Propagator, \
     Splitter, Adder, Subtractor, Chain, Modifier, Injector, Ensemble
 import numpy as np
 import copy
+from pathlib import Path
+
+example_dir = Path('../../examples/').resolve()
+path_model_v44 = example_dir / 'model_v4_4.pypm'
+path_model_v42 = example_dir / 'model_v4_2.pypm'
 
 
 def test_Model_properties():
     """tests to ensure the properties of Model"""
-    test_model44 = Model.open_file('../examples/model_v4_4.pypm')
-    test_model42 = Model.open_file('../examples/model_v4_2.pypm')
+    test_model44 = Model.open_file(path_model_v44)
+    test_model42 = Model.open_file(path_model_v42)
 
     for test_model in [test_model44, test_model42]:
         # check simple scaling of initial contagious population
@@ -33,7 +38,7 @@ def test_Model_properties():
 
     # check that the mean of many data runs is near expectation
 
-    ref_model = Model.open_file('../examples/model_v4_4.pypm')
+    ref_model = Model.open_file(path_model_v44)
     ref_model.reset()
     n_days = 60
     ref_model.evolve_expectations(n_days)
@@ -62,13 +67,13 @@ def test_Ensemble_properties_identical():
     # Test that the ensemble of two identical models
     # behalves like twice a single model.
     # independent of the contact matrix
-    test_a = Model.open_file('../examples/model_v4_4.pypm')
+    test_a = Model.open_file(path_model_v44)
     test_a.name = 'test_a'
-    test_b = Model.open_file('../examples/model_v4_4.pypm')
+    test_b = Model.open_file(path_model_v44)
     test_b.name = 'test_b'
-    reference = Model.open_file('../examples/model_v4_4.pypm')
+    reference = Model.open_file(path_model_v44)
     reference.name = 'reference'
-    single = Model.open_file('../examples/model_v4_4.pypm')
+    single = Model.open_file(path_model_v44)
     single.name = 'single'
 
     test_ensemble = Ensemble('test_ensemble', reference)
@@ -107,12 +112,12 @@ def test_Ensemble_properties_different():
     # Test that the ensemble of two identical models
     # behalves like twice a single model.
     # independent of the contact matrix
-    test_a = Model.open_file('../examples/model_v4_4.pypm')
+    test_a = Model.open_file(path_model_v44)
     test_a.name = 'test_a'
-    test_b = Model.open_file('../examples/model_v4_4.pypm')
+    test_b = Model.open_file(path_model_v44)
     test_b.name = 'test_b'
     test_b.parameters['alpha_0'].set_value(0.7)
-    reference = Model.open_file('../examples/model_v4_4.pypm')
+    reference = Model.open_file(path_model_v44)
     reference.name = 'reference'
 
     test_ensemble = Ensemble('test_ensemble', reference)
@@ -145,12 +150,12 @@ def test_Ensemble_properties_different2():
     # Test that the ensemble of two identical models
     # behalves like twice a single model.
     # independent of the contact matrix
-    test_a = Model.open_file('../examples/model_v4_4.pypm')
+    test_a = Model.open_file(path_model_v44)
     test_a.name = 'test_a'
-    test_b = Model.open_file('../examples/model_v4_4.pypm')
+    test_b = Model.open_file(path_model_v44)
     test_b.name = 'test_b'
     test_b.parameters['alpha_0'].set_value(0.7)
-    reference = Model.open_file('../examples/model_v4_4.pypm')
+    reference = Model.open_file(path_model_v44)
     reference.name = 'reference'
 
     test_ensemble = Ensemble('test_ensemble', reference)
