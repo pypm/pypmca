@@ -13,7 +13,7 @@ from pathlib import Path
 from pypm.Connector import Connector
 from pypm.Population import Population
 from pypm.Transition import Transition
-
+from pypm.Parameter import Parameter
 
 class Model:
     """
@@ -119,6 +119,11 @@ class Model:
         The boot sequence ends when the boot_population reaches or exceeds
         the value set for the initial_value of that population.
 
+        To fit data to a model it will be necessary to set the initial size of
+        a critical population (the boot population) to match the scale for data.
+        For that reason, we insist that the boot population be initialized by
+        a parameter below.
+
         One downside of the rescaling is that the long term of contagious
         population can be non-zero (a few).
 
@@ -130,6 +135,10 @@ class Model:
         if name_boot_pop not in self.populations:
             raise ValueError('Error in boot_setup for model (' + self.name +
                              '). ' + name_boot_pop + 'is not present in model.')
+        initial_value = self.populations[name_boot_pop].initial_value
+        if not isinstance(initial_value, Parameter):
+            raise ValueError('Error in boot_setup for model (' + self.name +
+                             '). ' + name_boot_pop + 'is not initialized by a parameter.')
         exc_pop_list = []
         if exclusion_populations is not None:
             if isinstance(exclusion_populations, list):
@@ -216,6 +225,9 @@ class Model:
                     self.boot_needed = True
                     raise ValueError('The boot process is taking too long to complete. ' +
                                      'Adjust parameters to allow the goal to be reached.')
+
+        if boot_pop.history[-1] < goal_value:
+            raise ValueError('The boot process did not reach its target. Consider reduce the target.')
 
         scale = goal_value / boot_pop.history[-1]
 

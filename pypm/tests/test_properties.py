@@ -14,7 +14,6 @@ example_dir = Path('../../examples/').resolve()
 path_model_v44 = example_dir / 'model_v4_4.pypm'
 path_model_v42 = example_dir / 'model_v4_2.pypm'
 
-
 def test_Model_properties():
     """tests to ensure the properties of Model"""
     test_model44 = Model.open_file(path_model_v44)
@@ -88,7 +87,9 @@ def test_Ensemble_properties_identical():
     for contact in contacts:
         test_ensemble.define_cross_transmission('infection cycle', 'infected',
                                                 'susceptible', 'total',
-                                                'contagious', 'alpha', contact=contact)
+                                                'contagious', 'alpha',
+                                                contact_type='fixed',
+                                                contact=contact)
 
         n_days = 100
         test_ensemble.reset()
@@ -111,12 +112,23 @@ def test_Ensemble_properties_different():
     """tests to ensure the properties of Ensemble with different sub models"""
     # Test that the ensemble of two identical models
     # behalves like twice a single model.
-    # independent of the contact matrix
+    # Only for the independent (ie. diagonal) case
+    # Note: this test would fail if a fixed contact_matrix
+    # is passed which happens to be the identity matrix
+    # The difference is that when specified as independent
+    # each model is booted independently
+    # If a contact matrix is specified, then the boot goal
+    # is the combined total of all models. So there will be a different starting point.
     test_a = Model.open_file(path_model_v44)
     test_a.name = 'test_a'
     test_b = Model.open_file(path_model_v44)
     test_b.name = 'test_b'
     test_b.parameters['alpha_0'].set_value(0.7)
+    test_c = Model.open_file(path_model_v44)
+    test_c.name = 'test_c'
+    test_d = Model.open_file(path_model_v44)
+    test_d.name = 'test_d'
+    test_d.parameters['alpha_0'].set_value(0.7)
     reference = Model.open_file(path_model_v44)
     reference.name = 'reference'
 
@@ -125,59 +137,21 @@ def test_Ensemble_properties_different():
     test_ensemble.define_cross_transmission('infection cycle', 'infected',
                                             'susceptible', 'total',
                                             'contagious', 'alpha',
-                                            diagonal=True)
+                                            contact_type='diagonal')
 
     n_days = 100
+    test_c.reset()
+    test_c.evolve_expectations(n_days)
+    test_d.reset()
+    test_d.evolve_expectations(n_days)
     test_ensemble.reset()
     test_ensemble.evolve_expectations(n_days)
-    test_a.reset()
-    test_a.evolve_expectations(n_days)
-    test_b.reset()
-    test_b.evolve_expectations(n_days)
     for pop_name in test_ensemble.populations:
         pop = test_ensemble.populations[pop_name]
         if pop.show_sim:
             ens_hist = test_ensemble.populations[pop_name].history
-            ta_hist = test_a.populations[pop_name].history
-            tb_hist = test_b.populations[pop_name].history
+            tc_hist = test_c.populations[pop_name].history
+            td_hist = test_d.populations[pop_name].history
             for i in range(len(ens_hist)):
-                ratio = ens_hist[i] / (ta_hist[i] + tb_hist[i])
-                assert np.abs(ratio - 1.) < 0.001
-
-
-def test_Ensemble_properties_different2():
-    """tests to ensure the properties of Ensemble with different sub models"""
-    # Test that the ensemble of two identical models
-    # behalves like twice a single model.
-    # independent of the contact matrix
-    test_a = Model.open_file(path_model_v44)
-    test_a.name = 'test_a'
-    test_b = Model.open_file(path_model_v44)
-    test_b.name = 'test_b'
-    test_b.parameters['alpha_0'].set_value(0.7)
-    reference = Model.open_file(path_model_v44)
-    reference.name = 'reference'
-
-    test_ensemble = Ensemble('test_ensemble', reference)
-    test_ensemble.upload_models([test_a, test_b])
-    test_ensemble.define_cross_transmission('infection cycle', 'infected',
-                                            'susceptible', 'total',
-                                            'contagious', 'alpha',
-                                            contact=[[1., 0.3], [0.5, 1.]])
-
-    n_days = 100
-    test_ensemble.reset()
-    test_ensemble.evolve_expectations(n_days)
-    test_a.reset()
-    test_a.evolve_expectations(n_days)
-    test_b.reset()
-    test_b.evolve_expectations(n_days)
-    for pop_name in test_ensemble.populations:
-        pop = test_ensemble.populations[pop_name]
-        if pop.show_sim:
-            ens_hist = test_ensemble.populations[pop_name].history
-            ta_hist = test_a.populations[pop_name].history
-            tb_hist = test_b.populations[pop_name].history
-            for i in range(60, len(ens_hist)):
-                ratio = ens_hist[i] / (ta_hist[i] + tb_hist[i])
-                assert np.abs(ratio - 1.) > 0.01
+                ratio = ens_hist[i] / (tc_hist[i] + td_hist[i])
+                assert np.abs(ratio - 1.) < 0.01

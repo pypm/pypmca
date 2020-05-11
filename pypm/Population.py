@@ -103,6 +103,7 @@ class Population:
     def set_initial_value(self, initial_value):
         if isinstance(initial_value, (float, int)):
             self.history = [initial_value]
+            self.__initialization_by_parameter = False
             if 'init_value' in self.parameters:
                 self.parameters.pop('init_value')
         elif isinstance(initial_value, Parameter):
