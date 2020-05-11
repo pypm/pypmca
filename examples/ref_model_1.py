@@ -1,10 +1,8 @@
 # -*- coding: utf-8 -*-
 """
-Version 4 reference model
+pypm reference model #1
 
-Modified version of the bc model, now with proper treatment of ICU
-(allows it to lag from contagious, not after proceeding through the
- long reporting chain)
+Includes a reporting chain
 
 @author: karlen
 """
@@ -14,7 +12,7 @@ from pypm import Model, Population, Delay, Parameter, Multiplier, Propagator, \
 
 # Test by building a population model for BC
 
-bc_model = Model('model v4.2')
+bc_model = Model('ref_model_1')
 bc_model.set_t0(2020, 3, 1)
 
 # Initialization
@@ -142,7 +140,7 @@ symptomatic_delay_pars = {
     'mean': Parameter('symptomatic_delay_mean', 2., 0., 50.,
                       'mean time from becoming contagious to having symptoms'),
     'sigma': Parameter('symptomatic_delay_sigma', 1., 0.01, 20.,
-                       'std dev of times from from becoming contagious to having symptoms')
+                       'std dev of times from becoming contagious to having symptoms')
 }
 symptomatic_delay = Delay('symptomatic_delay', 'norm', symptomatic_delay_pars,
                           bc_model)
@@ -176,7 +174,7 @@ tested_delay_pars = {
                       'mean time from having symptoms to getting tested',
                       hidden=False),
     'sigma': Parameter('tested_delay_sigma', 1., 0.01, 20.,
-                       'standard deviation of times from from having symptoms to getting tested')
+                       'standard deviation of times from having symptoms to getting tested')
 }
 tested_delay = Delay('tested_delay', 'norm', tested_delay_pars, bc_model)
 
@@ -454,54 +452,4 @@ bc_model.add_transition(
 bc_model.boot_setup(contagious_pop, 1,
                     exclusion_populations=[total_pop, susceptible_pop])
 
-# bootstrap the model:
-# - start from just 1 contagious person and run until goal is reached
-# (in this case, the number of contagious people reaches a set value)
-# - histories (beyond current) are removed and
-# histories and futures are scaled to correspond to the goal
-
-# goal_cont_0 = initial_contagious_par.get_value()
-# contagious_pop.history[-1] = 1
-
-###
-### DEBUG
-###
-# infected_pop.future=[1]
-# contagious_pop.history[-1] = 0
-
-# last_cont = -1
-# while contagious_pop.history[-1] < goal_cont_0 and \
-#    contagious_pop.history[-1] >= last_cont:
-#    last_cont = contagious_pop.history[-1]
-#    bc_model.evolve_expectations(1)
-
-# scale = goal_cont_0/contagious_pop.history[-1]
-
-# bc_model.reboot(scale, exclusions=[total_pop, susceptible_pop])
-
-# 'symptomatic_frac'
-
-# bc_model.parameters['symptomatic_frac'].set_value(0.9)
-# bc_model.boot()
-# bc_model.evolve_expectations(200)
-# print(bc_model.populations['non_quarantined'].history[-1])
-
-# bc_model.parameters['symptomatic_frac'].set_value(0.09)
-# bc_model.boot()
-# bc_model.evolve_expectations(200)
-# print(bc_model.populations['non_quarantined'].history[-1])
-
-# bc_model.boot()
-# bc_model.evolve_expectations(200)
-# bc_model.generate_data(200)
-
-# recover_delay_pars['mean'].set_value(4.)
-
-i = 1
-# bc_model.update_lists()
-i = 2
-
-# with open('model.pickle', 'wb') as f:
-#    pickle.dump(bc_model, f, pickle.HIGHEST_PROTOCOL)#
-
-bc_model.save_file('model_v4_2.pypm')
+bc_model.save_file('ref_model_1.pypm')

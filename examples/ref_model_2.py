@@ -1,13 +1,16 @@
 # -*- coding: utf-8 -*-
 """
-Version 4.4 reference model
+pypm reference model #2
 
-To make the critical parameters less dependent of each other, break measured
+To make the critical parameters less dependent of each other, break the measured
 populations into separate paths.
 
-Modified version of the bc model, now with proper treatment of ICU
-(allows it to lag from contagious, not after proceeding through the
- long reporting chain)
+Reduced the lag time between contagious and reported, (as compared to reference model #1)
+to better match the situation in BC and elsewhere - transitions now occur where they should
+
+Add a contact tracing population, to allow another mechanism to remove people from
+the contagious population early. Initial value has p=0, so it does not act until it
+is switched on.
 
 @author: karlen
 """
@@ -17,7 +20,7 @@ from pypm import Model, Population, Delay, Parameter, Multiplier, Propagator, \
 
 # Test by building a population model for BC
 
-bc_model = Model('model v4.4')
+bc_model = Model('ref_model_2')
 bc_model.set_t0(2020, 3, 1)
 
 # Initialization
@@ -70,7 +73,9 @@ bc_model.add_connector(
                contagious_pop, contagious_frac, contagious_delay))
 
 # The contagious either recover or die
-# ooooooooooooooooooooooooooooooooooo
+# This split is only used to track the deaths.
+# The removal of recoveries/positive tests etc done in a separate path
+# oooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooo
 
 recovered_pop = Population('recovered', 0,
                            'People who have recovered from the illness ' +
@@ -99,9 +104,25 @@ bc_model.add_connector(
     Splitter('recovery', contagious_pop, [recovered_pop, deaths_pop],
              [recover_fraction], [recover_delay, death_delay]))
 
-# The newly contagious are split into two groups: symptomatic and
-# non-symptomatic. When the non-symptomatic recover thay are removed from
-# the contagious population.
+# The newly contagious are split into three groups:
+# contact-traced, symptomatic and non-symptomatic.
+# contact-traced are removed when then are identified: by adding them to the reported sample
+# symptomatic are sampled by a testing path: those receiving a positive test are removed
+# When the non-symptomatic recover thay are removed from the contagious population.
+
+contact_traced_pop = Population('contact_traced', 0,
+                                'People identified through contact tracing', color='coral')
+contact_traced_fraction = Parameter('contact_traced_frac', 0., 0., 1.,
+                                    'fraction of contagious people who are identified first ' +
+                                    'through contact tracing', hidden=False)
+contact_traced_delay_pars = {
+    'mean': Parameter('contact_traced_delay_mean', 2., 0., 50.,
+                      'mean time from becoming contagious to being contact traced', hidden=False),
+    'sigma': Parameter('contact_traced_delay_sigma', 1., 0.01, 20.,
+                       'std dev of times from becoming contagious to being contact traced')
+}
+contact_traced_delay = Delay('contact_traced_delay', 'norm', contact_traced_delay_pars,
+                             bc_model)
 
 symptomatic_pop = Population('symptomatic', 0,
                              'People who have shown symptoms', color='chocolate')
@@ -112,7 +133,7 @@ symptomatic_delay_pars = {
     'mean': Parameter('symptomatic_delay_mean', 2., 0., 50.,
                       'mean time from becoming contagious to having symptoms'),
     'sigma': Parameter('symptomatic_delay_sigma', 1., 0.01, 20.,
-                       'std dev of times from from becoming contagious to having symptoms')
+                       'std dev of times from becoming contagious to having symptoms')
 }
 symptomatic_delay = Delay('symptomatic_delay', 'norm', symptomatic_delay_pars,
                           bc_model)
@@ -124,14 +145,15 @@ asymptomatic_delay_pars = {
     'mean': Parameter('asymp_rec_delay_mean', 12., 0., 50.,
                       'mean time from becoming contagious to recovery (without symptoms)'),
     'sigma': Parameter('asymp_rec_delay_sigma', 4., 0.01, 20.,
-                       'std dev of times from from becoming contagious to recovery with no symptoms')
+                       'std dev of times from becoming contagious to recovery with no symptoms')
 }
 asymptomatic_delay = Delay('asymp_rec_delay', 'norm', asymptomatic_delay_pars,
                            bc_model)
 
 bc_model.add_connector(
-    Splitter('symptoms', contagious_pop, [symptomatic_pop, asymptomatic_recovered_pop],
-             [symptomatic_fraction], [symptomatic_delay, asymptomatic_delay]))
+    Splitter('symptoms', contagious_pop, [contact_traced_pop, symptomatic_pop, asymptomatic_recovered_pop],
+             [contact_traced_fraction, symptomatic_fraction],
+             [contact_traced_delay, symptomatic_delay, asymptomatic_delay]))
 
 bc_model.add_connector(
     Subtractor('remove asymptomatic recoveries', contagious_pop, asymptomatic_recovered_pop))
@@ -153,7 +175,7 @@ unreported_delay_pars = {
                       'mean time from symptoms to recovery for unreported',
                       hidden=False),
     'sigma': Parameter('unrep_rec_delay_sigma', 4., 0.01, 20.,
-                       'standard deviation of times from from having symptoms to recovery for unreported')
+                       'standard deviation of times from having symptoms to recovery for unreported')
 }
 unreported_delay = Delay('unreported_delay', 'norm', unreported_delay_pars, bc_model)
 
@@ -174,6 +196,10 @@ reported_delay = Delay('reported_delay', 'norm', reported_delay_pars, bc_model)
 bc_model.add_connector(
     Splitter('testing', symptomatic_pop, [reported_pop, unreported_recovered_pop],
              [reported_fraction], [reported_delay, unreported_delay]))
+
+# include those being contact_traced as getting a positive report
+bc_model.add_connector(
+    Adder('report contact_traced', contact_traced_pop, reported_pop))
 
 bc_model.add_connector(
     Subtractor('remove those reported', contagious_pop, reported_pop))
@@ -411,6 +437,20 @@ bc_model.add_transition(
     Modifier('trans_rate_3', 'rel_days', trans_rate_3_time, trans_rate,
              trans_rate_2, trans_rate_3, enabled=False, model=bc_model))
 
+trans_traced_1_time = Parameter('trans_trace_1_time', 100, 0, 300,
+                                'number of days before contact traced fraction changes',
+                                parameter_type='int', hidden=False)
+
+trans_traced_0 = Parameter('trans_traced_0', 0., 0., 1.,
+                           'initial contact traced fraction')
+
+trans_traced_1 = Parameter('trans_traced_1', 0.1, 0., 1.,
+                         'contact traced fraction after transition', hidden=False)
+
+bc_model.add_transition(
+    Modifier('trans_traced_1', 'rel_days', trans_traced_1_time, contact_traced_fraction,
+             trans_traced_0, trans_traced_1, enabled=False, model=bc_model))
+
 outbreak_pop = Population('outbreaks', 0,
                           'Infection outbreaks')
 
@@ -471,54 +511,4 @@ bc_model.add_transition(
 bc_model.boot_setup(contagious_pop, 1,
                     exclusion_populations=[total_pop, susceptible_pop])
 
-# bootstrap the model:
-# - start from just 1 contagious person and run until goal is reached
-# (in this case, the number of contagious people reaches a set value)
-# - histories (beyond current) are removed and
-# histories and futures are scaled to correspond to the goal
-
-# goal_cont_0 = initial_contagious_par.get_value()
-# contagious_pop.history[-1] = 1
-
-###
-### DEBUG
-###
-# infected_pop.future=[1]
-# contagious_pop.history[-1] = 0
-
-# last_cont = -1
-# while contagious_pop.history[-1] < goal_cont_0 and \
-#    contagious_pop.history[-1] >= last_cont:
-#    last_cont = contagious_pop.history[-1]
-#    bc_model.evolve_expectations(1)
-
-# scale = goal_cont_0/contagious_pop.history[-1]
-
-# bc_model.reboot(scale, exclusions=[total_pop, susceptible_pop])
-
-# 'symptomatic_frac'
-
-# bc_model.parameters['symptomatic_frac'].set_value(0.9)
-# bc_model.boot()
-# bc_model.evolve_expectations(200)
-# print(bc_model.populations['non_quarantined'].history[-1])
-
-# bc_model.parameters['symptomatic_frac'].set_value(0.09)
-# bc_model.boot()
-# bc_model.evolve_expectations(200)
-# print(bc_model.populations['non_quarantined'].history[-1])
-
-# bc_model.boot()
-# bc_model.evolve_expectations(200)
-# bc_model.generate_data(200)
-
-# recover_delay_pars['mean'].set_value(4.)
-
-i = 1
-# bc_model.update_lists()
-i = 2
-
-# with open('model.pickle', 'wb') as f:
-#    pickle.dump(bc_model, f, pickle.HIGHEST_PROTOCOL)#
-
-bc_model.save_file('model_v4_4.pypm')
+bc_model.save_file('ref_model_2.pypm')

@@ -84,8 +84,9 @@ def modifier_table(model, width=120):
         if type(trans).__name__ == 'Modifier':
             row = [str(trans), str(trans.transition_time),
                    trans.transition_time.get_value(), trans.time_spec,
-                   str(trans.parameter_before), trans.parameter_before.get_value(),
-                   str(trans.parameter_after), trans.parameter_after.get_value()]
+                   str(trans.parameter),
+                   str(trans.parameter_before),
+                   str(trans.parameter_after)]
             rows.append(row)
 
     table.add_rows(rows)
@@ -372,8 +373,3 @@ def delay_table(model, width=120):
 
     table.add_rows(rows)
     return table.draw()
-
-
-my_model = Model.open_file('../examples/model_v4_4.pypm')
-print(delay_table(my_model))
-# print_all(my_model)

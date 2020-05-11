@@ -11,15 +11,15 @@ import copy
 from pathlib import Path
 
 example_dir = Path('../../examples/').resolve()
-path_model_v44 = example_dir / 'model_v4_4.pypm'
-path_model_v42 = example_dir / 'model_v4_2.pypm'
+path_model_2 = example_dir / 'ref_model_2.pypm'
+path_model_1 = example_dir / 'ref_model_1.pypm'
 
 def test_Model_properties():
     """tests to ensure the properties of Model"""
-    test_model44 = Model.open_file(path_model_v44)
-    test_model42 = Model.open_file(path_model_v42)
+    ref_model_2 = Model.open_file(path_model_2)
+    ref_model_1 = Model.open_file(path_model_1)
 
-    for test_model in [test_model44, test_model42]:
+    for test_model in [ref_model_1, ref_model_2]:
         # check simple scaling of initial contagious population
         # Will not be exact due to bootstrap
         EPS = 0.01
@@ -37,7 +37,7 @@ def test_Model_properties():
 
     # check that the mean of many data runs is near expectation
 
-    ref_model = Model.open_file(path_model_v44)
+    ref_model = Model.open_file(path_model_2)
     ref_model.reset()
     n_days = 60
     ref_model.evolve_expectations(n_days)
@@ -66,13 +66,13 @@ def test_Ensemble_properties_identical():
     # Test that the ensemble of two identical models
     # behalves like twice a single model.
     # independent of the contact matrix
-    test_a = Model.open_file(path_model_v44)
+    test_a = Model.open_file(path_model_2)
     test_a.name = 'test_a'
-    test_b = Model.open_file(path_model_v44)
+    test_b = Model.open_file(path_model_2)
     test_b.name = 'test_b'
-    reference = Model.open_file(path_model_v44)
+    reference = Model.open_file(path_model_2)
     reference.name = 'reference'
-    single = Model.open_file(path_model_v44)
+    single = Model.open_file(path_model_2)
     single.name = 'single'
 
     test_ensemble = Ensemble('test_ensemble', reference)
@@ -119,17 +119,17 @@ def test_Ensemble_properties_different():
     # each model is booted independently
     # If a contact matrix is specified, then the boot goal
     # is the combined total of all models. So there will be a different starting point.
-    test_a = Model.open_file(path_model_v44)
+    test_a = Model.open_file(path_model_2)
     test_a.name = 'test_a'
-    test_b = Model.open_file(path_model_v44)
+    test_b = Model.open_file(path_model_2)
     test_b.name = 'test_b'
     test_b.parameters['alpha_0'].set_value(0.7)
-    test_c = Model.open_file(path_model_v44)
+    test_c = Model.open_file(path_model_2)
     test_c.name = 'test_c'
-    test_d = Model.open_file(path_model_v44)
+    test_d = Model.open_file(path_model_2)
     test_d.name = 'test_d'
     test_d.parameters['alpha_0'].set_value(0.7)
-    reference = Model.open_file(path_model_v44)
+    reference = Model.open_file(path_model_2)
     reference.name = 'reference'
 
     test_ensemble = Ensemble('test_ensemble', reference)
