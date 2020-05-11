@@ -61,5 +61,6 @@ class Subtractor(Connector):
         """
         Subtract new population going into to_population from from_population
         """
-        reduction = -1 * self.to_population.future[0]
-        self.from_population.update_future_fast(reduction)
+        if len(self.to_population.future) > 0:
+            reduction = -1 * self.to_population.future[0]
+            self.from_population.update_future_fast(reduction)
