@@ -1,13 +1,14 @@
 # -*- coding: utf-8 -*-
 """
-pypm reference model #1
+pyPM.ca reference model #1
 
-Includes a reporting chain
+Includes a reporting chain. The default lag to reporting is longer than most regions, so the
+effects of transitions (changes to social distancing, or outbreaks) on case reports may be delayed.
 
 @author: karlen
 """
 
-from pypm import Model, Population, Delay, Parameter, Multiplier, Propagator, \
+from pypmca import Model, Population, Delay, Parameter, Multiplier, Propagator, \
     Splitter, Adder, Subtractor, Chain, Modifier, Injector
 
 # Test by building a population model for BC

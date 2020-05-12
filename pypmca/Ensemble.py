@@ -29,7 +29,7 @@ from scipy import stats
 import copy
 
 import pickle
-from pypm import Model, Parameter, Population
+from pypmca import Model, Parameter, Population
 
 
 class Ensemble(Model):
@@ -54,7 +54,7 @@ class Ensemble(Model):
             in_model = Model.open_file(model)
         else:
             raise TypeError('Error creating ensemble. The model argument needs to be a model object ' +
-                            'or a .pypm filename')
+                            'or have a .pypm filename')
 
         # to avoid the possibility that the reference model is subsequently modified, make a copy
         # that will not be as exposed to tampering
@@ -714,7 +714,7 @@ class Ensemble(Model):
         Before saving, the model futures are removed, and the initial_values
         are set to the current values for all parameters.
 
-        If no extension is provided, the default extension, .pypm is added.
+        If no extension is provided, the default extension, .pypm_e is added.
 
         Parameters
         ----------

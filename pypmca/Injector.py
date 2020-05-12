@@ -6,9 +6,9 @@ a specific point in the evolution
 @author:karlen
 """
 
-from pypm.Parameter import Parameter
-from pypm.Population import Population
-from pypm.Transition import Transition
+from pypmca.Parameter import Parameter
+from pypmca.Population import Population
+from pypmca.Transition import Transition
 
 
 class Injector(Transition):

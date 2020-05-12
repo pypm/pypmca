@@ -8,11 +8,11 @@ accumulating the remainder for a new population
 from scipy import stats
 import numpy as np
 
-from pypm.Connector import Connector
-from pypm.Delay import Delay
-from pypm.Parameter import Parameter
-from pypm.Population import Population
-from pypm.Propagator import Propagator
+from pypmca.Connector import Connector
+from pypmca.Delay import Delay
+from pypmca.Parameter import Parameter
+from pypmca.Population import Population
+from pypmca.Propagator import Propagator
 
 
 class Chain(Connector):

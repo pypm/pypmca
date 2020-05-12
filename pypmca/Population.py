@@ -17,7 +17,7 @@ simulated data (integers).
 
 from scipy import stats
 
-from pypm.Parameter import Parameter
+from pypmca.Parameter import Parameter
 
 
 class Population:

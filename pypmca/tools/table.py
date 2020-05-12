@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 """
-Show the details of a pypm model by a set of tables for:
+Show the details of a pyPM.ca model by a set of tables for:
     - connectors
     - populations
     - parameters (fixed and variable)
@@ -14,7 +14,7 @@ Show the details of a pypm model by a set of tables for:
 """
 from texttable import Texttable
 
-from pypm import Model, Parameter
+from pypmca import Model, Parameter
 
 
 def print_all(model):

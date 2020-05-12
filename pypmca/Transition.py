@@ -8,7 +8,7 @@ The derived classes must define the action methods
 @author:karlen
 """
 
-from pypm.Parameter import Parameter
+from pypmca.Parameter import Parameter
 
 
 class Transition:

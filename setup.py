@@ -6,18 +6,20 @@ from setuptools import setup, find_packages
 import versioneer
 
 descr = """
-The pyPM population modeller (pyPM.ca) is a general framework for building models 
-of virus spread using discrete-time difference equations.  
+The ``pyPM.ca`` population modeller (www.pyPM.ca) describes connected systems with
+discrete-time difference equations. It was developed specifically
+to understand and characterize the CoViD-19 epidemic.
 
-A pyPM model consists of a set ofpopulation objects connected by connector 
-objects, allowing expectations and simulateddata for time histories (such as 
-positive tests and ICU admissions) to be produced. Propa-gation from one 
-population to another is done with realistic time lags, defined by normaldelay 
-distributions, with the mean and standard deviation specified for each connector. 
-Itis important to note that models based on ODEs (ordinary differential 
-equations), popularin the virus modelling community perhaps for historical 
-reasons, are not able to correctlymodel the propagation of infectious bursts to 
-the reporting stage.
+A ``pyPM.ca`` model is built by connecting a set of population objects with
+connector objects. The connectors represent either a transfer that occurs
+immediately at the next time step
+or one which is delayed and distributed in time. Each
+population object retains a record of its size at each time step, and also
+maintains a list of future contributions, arising from delayed transfers
+from other populations.
+Calculations of population size are done either in terms of expectation values 
+or simulated data,
+allowing the model to be used for both analysis and simulation.
 """
 
 requirements = ['scipy', 'numpy']
@@ -46,14 +48,14 @@ setup(
         license="GNU General Public License v3",
         long_description=descr,
         include_package_data=True,
-        keywords='pypm',
-        name='pypm',
+        keywords='pypmca',
+        name='pypmca',
         version=versioneer.get_version(),
-        packages=find_packages(include=['pypm', 'pypm.*']),
+        packages=find_packages(include=['pypmca', 'pypmca.*']),
         setup_requires=setup_requirements,
         test_suite='tests',
         tests_require=test_requirements,
-        url='https://github.com/pypm/pypm',
+        url='https://github.com/pypm/pypmca',
         zip_safe=False,
         cmdclass=versioneer.get_cmdclass()
         )

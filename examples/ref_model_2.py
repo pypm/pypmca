@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 """
-pypm reference model #2
+pyPM.ca reference model #2
 
 To make the critical parameters less dependent of each other, break the measured
 populations into separate paths.
@@ -15,7 +15,7 @@ is switched on.
 @author: karlen
 """
 
-from pypm import Model, Population, Delay, Parameter, Multiplier, Propagator, \
+from pypmca import Model, Population, Delay, Parameter, Multiplier, Propagator, \
     Splitter, Adder, Subtractor, Chain, Modifier, Injector
 
 # Test by building a population model for BC

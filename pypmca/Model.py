@@ -10,10 +10,10 @@ either by updating expectations or simulated data.
 from datetime import date
 import pickle
 from pathlib import Path
-from pypm.Connector import Connector
-from pypm.Population import Population
-from pypm.Transition import Transition
-from pypm.Parameter import Parameter
+from pypmca.Connector import Connector
+from pypmca.Population import Population
+from pypmca.Transition import Transition
+from pypmca.Parameter import Parameter
 
 class Model:
     """

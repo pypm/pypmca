@@ -7,9 +7,9 @@ population to n others, either in the next time step or distributed in time.
 """
 from scipy import stats
 
-from pypm.Connector import Connector
-from pypm.Delay import Delay
-from pypm.Parameter import Parameter
+from pypmca.Connector import Connector
+from pypmca.Delay import Delay
+from pypmca.Parameter import Parameter
 
 
 class Splitter(Connector):

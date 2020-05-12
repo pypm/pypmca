@@ -1,10 +1,10 @@
 #!/usr/bin/env python
 
-"""Tests for `pypm` package."""
+"""Tests for `pypmca` package."""
 
 import pytest
 
-from pypm import Model, Population, Delay, Parameter, Multiplier, Propagator, \
+from pypmca import Model, Population, Delay, Parameter, Multiplier, Propagator, \
     Splitter, Adder, Subtractor, Chain, Modifier, Injector
 import numpy as np
 

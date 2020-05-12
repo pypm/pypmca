@@ -2,7 +2,7 @@
 Usage
 =====
 
-To use pypm in a project::
+To use pyPM.ca in a project::
 
-    import pypm
+    import pypmca
 

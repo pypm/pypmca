@@ -10,7 +10,7 @@ single population or a list of populations.
 @author:karlen
 """
 
-from pypm.Population import Population
+from pypmca.Population import Population
 
 
 class Connector:
