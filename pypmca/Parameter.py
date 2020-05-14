@@ -146,16 +146,6 @@ class Parameter:
                             self.parameter_type + ')')
         self.__value = new_value
 
-        if new_value > self.parameter_max:
-            raise ValueError('Parameter (' + self.name +
-                             ') cannot be set to ' + str(new_value) +
-                             ' since it exceeds the maximum allowed: ' + str(self.parameter_max))
-
-        if new_value < self.parameter_min:
-            raise ValueError('Parameter (' + self.name +
-                             ') cannot be set to ' + str(new_value) +
-                             ' since it is less than the minimum allowed: ' + str(self.parameter_min))
-
         # if this parameter is used for delay - do a recalculation of the distribution
         if self.must_update:
             for parent in self.parents:
