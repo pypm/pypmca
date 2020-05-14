@@ -123,7 +123,7 @@ def test_class_Adder():
 def test_class_Injector():
     """tests to ensure the behaviour class Injector"""
     test_model = Model('test_model')
-    number = 0.05
+    number = 50.
     inject = Parameter('inject', number, parameter_min=0., parameter_max=1000.)
     time = 5
     trans_time = Parameter('time', time, parameter_type='int', parameter_min=0, parameter_max=1000)
@@ -134,7 +134,7 @@ def test_class_Injector():
         test_model.set_time_step(time_step)
         to_pop.reset()
         test_injector.take_action()
-        assert to_pop.future[0] == number*1000.
+        assert to_pop.future[0] == number
         assert np.abs(test_injector.trigger_step - time / time_step) < 0.1
 
 

@@ -260,7 +260,7 @@ class Model:
             self.boot(expectations=True)
 
         for step in range(n_step):
-            self.do_transitions(step, expectations=False)
+            self.do_transitions(step, expectations=True)
 
             # calculate future expectations
             self.calculate_future(expectations=True)

@@ -458,8 +458,8 @@ outbreak_1_time = Parameter('outbreak_1_time', 14, 0, 100,
                             'number of days since t0 when outbreak_1 established',
                             parameter_type='int', hidden=False)
 
-outbreak_1_number = Parameter('outbreak_1_number', 0.1, 0., 50.,
-                              'number of infections in outbreak_1/1000',
+outbreak_1_number = Parameter('outbreak_1_number', 10., 0., 50000.,
+                              'number of infections in outbreak_1',
                               hidden=False)
 
 bc_model.add_transition(
@@ -472,7 +472,7 @@ outbreak_delay_pars = {
     'mean': Parameter('outbreak_delay_mean', 7., 0., 50.,
                       'mean delay time for outbreak', hidden=False),
     'sigma': Parameter('outbreak_delay_sigma', 1., 0.01, 20.,
-                       'standard deviation of loutbreak times',
+                       'standard deviation of outbreak times',
                        hidden=False)
 }
 outbreak_delay = Delay('outbreak_delay', 'norm', outbreak_delay_pars, bc_model)
@@ -485,8 +485,8 @@ outbreak_2_time = Parameter('outbreak_2_time', 21, 0, 100,
                             'number of days since t0 when outbreak_2 established',
                             parameter_type='int', hidden=False)
 
-outbreak_2_number = Parameter('outbreak_2_number', 0.1, 0., 50.,
-                              'number of infections in outbreak_2/1000',
+outbreak_2_number = Parameter('outbreak_2_number', 10., 0., 50000.,
+                              'number of infections in outbreak_2',
                               hidden=False)
 
 bc_model.add_transition(
@@ -497,8 +497,8 @@ outbreak_3_time = Parameter('outbreak_3_time', 41, 0, 100,
                             'number of days since t0 when outbreak_3 established',
                             parameter_type='int', hidden=False)
 
-outbreak_3_number = Parameter('outbreak_3_number', 0.1, 0., 50.,
-                              'number of infections in outbreak_3/1000',
+outbreak_3_number = Parameter('outbreak_3_number', 10., 0., 50000.,
+                              'number of infections in outbreak_3',
                               hidden=False)
 
 bc_model.add_transition(
