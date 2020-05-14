@@ -25,6 +25,10 @@ class Injector(Transition):
 
     In all cases, the time is specified by a Parameter object
 
+    Because the fitter program scipy.optimize.curve_fit cannot handle parameters whose
+    values >> 1, the number of individuals injected is 1000x the parameter specified.
+    (Since v0.1.2)
+
     """
 
     def __init__(self, transition_name: str, time_spec: str, transition_time: Parameter,
@@ -56,8 +60,9 @@ class Injector(Transition):
     def take_action(self, expectations=True):
         """
         Inject the population
+        Scaled by 1000. to keep the parameter in the working range of scipy.optimize.curve_fit
         """
-        value = self.injection.get_value()
+        value = self.injection.get_value() * 1000.
         if expectations:
             self.to_population.update_future_fast(value)
         else:

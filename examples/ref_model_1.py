@@ -400,8 +400,8 @@ outbreak_1_time = Parameter('outbreak_1_time', 14, 0, 100,
                             'number of days since t0 when outbreak_1 established',
                             parameter_type='int', hidden=False)
 
-outbreak_1_number = Parameter('outbreak_1_number', 10., 0., 50000.,
-                              'number of infections in outbreak_1',
+outbreak_1_number = Parameter('outbreak_1_number', 0.1, 0., 50.,
+                              'number of infections in outbreak_1/1000',
                               hidden=False)
 
 bc_model.add_transition(
@@ -427,8 +427,8 @@ outbreak_2_time = Parameter('outbreak_2_time', 21, 0, 100,
                             'number of days since t0 when outbreak_2 established',
                             parameter_type='int', hidden=False)
 
-outbreak_2_number = Parameter('outbreak_2_number', 10., 0., 50000.,
-                              'number of infections in outbreak_2',
+outbreak_2_number = Parameter('outbreak_2_number', 0.1, 0., 50.,
+                              'number of infections in outbreak_2/1000',
                               hidden=False)
 
 bc_model.add_transition(
@@ -439,8 +439,8 @@ outbreak_3_time = Parameter('outbreak_3_time', 41, 0, 100,
                             'number of days since t0 when outbreak_3 established',
                             parameter_type='int', hidden=False)
 
-outbreak_3_number = Parameter('outbreak_3_number', 10., 0., 50000.,
-                              'number of infections in outbreak_3',
+outbreak_3_number = Parameter('outbreak_3_number', 0.1, 0., 50.,
+                              'number of infections in outbreak_3/1000',
                               hidden=False)
 
 bc_model.add_transition(
