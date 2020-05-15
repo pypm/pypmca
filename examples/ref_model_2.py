@@ -312,7 +312,7 @@ non_vent_icu_delay = Delay('in_icu_delay', 'norm', non_vent_icu_delay_pars, bc_m
 
 bc_model.add_connector(
     Splitter('ventilator', icu_pop, [ventilated_pop, non_ventilated_rel_pop],
-             [to_icu_fraction], [to_icu_delay, non_vent_icu_delay]))
+             [to_icu_fraction], [to_vent_delay, non_vent_icu_delay]))
 
 # VENTILATOR -> RELEASED
 ########################
