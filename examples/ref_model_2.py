@@ -312,7 +312,7 @@ non_vent_icu_delay = Delay('in_icu_delay', 'norm', non_vent_icu_delay_pars, bc_m
 
 bc_model.add_connector(
     Splitter('ventilator', icu_pop, [ventilated_pop, non_ventilated_rel_pop],
-             [to_icu_fraction], [to_vent_delay, non_vent_icu_delay]))
+             [icu_vent_fraction], [to_vent_delay, non_vent_icu_delay]))
 
 # VENTILATOR -> RELEASED
 ########################
@@ -328,7 +328,7 @@ in_vent_delay = Delay('in_vent_delay', 'norm', in_vent_delay_pars, bc_model)
 ventilated_rel_pop = Population('ventilated_rel', 0,
                                 'ICU ventilated released', color='aqua')
 
-vent_rel_fraction = Parameter('vent_frac', 1., 1., 1.,
+vent_rel_fraction = Parameter('vent_rel_frac', 1., 1., 1.,
                               'fraction of those on ventialators eventually released == 1')
 
 bc_model.add_connector(
