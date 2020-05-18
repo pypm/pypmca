@@ -259,7 +259,7 @@ def variable_parameter_table(model, width=120):
     table = table_setup(model, width)
 
     header = ['Parameter', 'Description', 'min', 'max', 'prior', 'prior_mean', 'prior_w', 'mcmc_step', 'Init', 'Value']
-    table.set_cols_dtype(['t', 't', 'a', 'a', 't', 'a', 'a', 'a', 'a', 'a'])
+    table.set_cols_dtype(['t', 't', 'a', 'a', 't', 'e', 'e', 'e', 'a', 'a'])
     table.set_header_align(['l', 'l', 'l', 'l', 'l', 'l', 'l', 'l', 'l', 'l'])
 
     par_dict = {}
