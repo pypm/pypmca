@@ -522,7 +522,8 @@ class Model:
                 self.delays[key] = delay
 
     def copy_values_from(self, from_model):
-        """Copy the parameter values and transition states from another model to this one"""
+        """Copy the parameter values and transition states from another model to this one
+           Also copy model.name and description"""
         if not isinstance(from_model, Model):
             raise ValueError('Error in copy_values_from. Argument must be a model object')
 
@@ -549,6 +550,9 @@ class Model:
             if tran_name in self.transitions:
                 tran = self.transitions[tran_name]
                 tran.enabled = from_tran.enabled
+
+        self.name = 'copy: '+from_model.name
+        self.description = from_model.description
 
     def save_file(self, filename):
         """
