@@ -11,3 +11,8 @@ History
 * 0.1.3 - remove min/max parameter check
 * 0.1.4 - revised the likelihood calculation for MCMC (now shape and normalization treated separately)
 
+0.2 (2020-05-19)
+----------------
+
+* beta release on PyPI
+  (includes new reference model 2.1, and copy methods)

@@ -33,8 +33,8 @@ setup(
         author_email='karlen@uvic.ca',
         python_requires='>=3.5',
         classifiers=[
-            'Development Status :: 2 - Pre-Alpha',
-            'Intended Audience :: Developers',
+            'Development Status :: 4 - Beta',
+            'Intended Audience :: End Users/Desktop',
             'License :: OSI Approved :: GNU General Public License v3 (GPLv3)',
             'Natural Language :: English',
             'Programming Language :: Python :: 3',
@@ -43,7 +43,7 @@ setup(
             'Programming Language :: Python :: 3.7',
             'Programming Language :: Python :: 3.8',
             ],
-        description="population modeller",
+        description="pyPM.ca population modeller",
         install_requires=requirements,
         license="GNU General Public License v3",
         long_description=descr,
@@ -55,7 +55,7 @@ setup(
         setup_requires=setup_requirements,
         test_suite='tests',
         tests_require=test_requirements,
-        url='https://github.com/pypm/pypmca',
+        url='https://www.pypm.ca',
         zip_safe=False,
         cmdclass=versioneer.get_cmdclass()
         )
