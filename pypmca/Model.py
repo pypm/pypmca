@@ -9,6 +9,7 @@ either by updating expectations or simulated data.
 """
 from datetime import date
 import pickle
+import copy
 from pathlib import Path
 from pypmca.Connector import Connector
 from pypmca.Population import Population
@@ -519,6 +520,35 @@ class Model:
                                      delay.name)
             else:
                 self.delays[key] = delay
+
+    def copy_values_from(self, from_model):
+        """Copy the parameter values and transition states from another model to this one"""
+        if not isinstance(from_model, Model):
+            raise ValueError('Error in copy_values_from. Argument must be a model object')
+
+        for par_name in from_model.parameters:
+            from_par = from_model.parameters[par_name]
+            if par_name in self.parameters:
+                par = self.parameters[par_name]
+                par.set_value(from_par.get_value())
+                par.initial_value = from_par.initial_value
+                if from_par.prior_function is not None:
+                    prior_function = copy.copy(from_par.prior_function)
+                if from_par.prior_parameters is not None:
+                    prior_parameters = copy.deepcopy(from_par.prior_parameters)
+                if from_par.get_status() == 'variable':
+                    par.set_variable(prior_function, prior_parameters)
+                else:
+                    if from_par.prior_function is not None:
+                        par.prior_function = prior_function
+                    if from_par.prior_parameters is not None:
+                        par.prior_parameters = prior_parameters
+
+        for tran_name in from_model.transitions:
+            from_tran = from_model.transitions[tran_name]
+            if tran_name in self.transitions:
+                tran = self.transitions[tran_name]
+                tran.enabled = from_tran.enabled
 
     def save_file(self, filename):
         """

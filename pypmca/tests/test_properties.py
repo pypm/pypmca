@@ -14,6 +14,28 @@ example_dir = Path('../../examples/').resolve()
 path_model_2 = example_dir / 'ref_model_2.pypm'
 path_model_1 = example_dir / 'ref_model_1.pypm'
 
+def test_Model_copy_values_from():
+    ref_model_2 = Model.open_file(path_model_2)
+    alberta_model_2 = Model.open_file('ab_2_0514.pypm')
+
+    ref_model_2.copy_values_from(alberta_model_2)
+
+    ref_model_2.reset()
+    ref_model_2.evolve_expectations(80)
+    alberta_model_2.reset()
+    alberta_model_2.evolve_expectations(80)
+
+    for pop_name in ref_model_2.populations:
+        pop = ref_model_2.populations[pop_name]
+        # Bug fixed in ref_model_2, not in alberta_model_2 accounts for small differences in icu
+        if 'vent' not in pop.name and 'in_' not in pop.name:
+            ref_hist = pop.history
+            alberta_hist = alberta_model_2.populations[pop_name].history
+            for i in range(len(ref_hist)):
+                if np.abs(ref_hist[i] - alberta_hist[i]) > 0.0001:
+                    print(pop.name, i, ref_hist[i], alberta_hist[i], np.abs(ref_hist[i] - alberta_hist[i]))
+                assert np.abs(ref_hist[i] - alberta_hist[i]) < 0.001
+
 def test_Model_properties():
     """tests to ensure the properties of Model"""
     ref_model_2 = Model.open_file(path_model_2)
