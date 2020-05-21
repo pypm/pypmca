@@ -5,6 +5,8 @@ pyPM.ca reference model #1
 Includes a reporting chain. The default lag to reporting is longer than most regions, so the
 effects of transitions (changes to social distancing, or outbreaks) on case reports may be delayed.
 
+update: May 21, 2020. Fix error: need to remove "departed ventillator" from "in_icu"
+
 @author: karlen
 """
 
@@ -329,6 +331,9 @@ bc_model.add_connector(
 
 bc_model.add_connector(
     Subtractor('remove ventilator departures', on_ventilator_pop, depart_vent_pop))
+
+bc_model.add_connector(
+    Subtractor('remove ventilator departures from ICU', in_icu_pop, depart_vent_pop))
 
 # bc_model.add_connector(
 #    Subtractor('remove ICU departures from hospital', in_hospital_pop, depart_icu_pop))
