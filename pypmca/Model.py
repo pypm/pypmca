@@ -491,6 +491,8 @@ class Model:
             else:
                 self.populations[key] = pop
                 self.__update_parameter_list(pop)
+                # inform the population of its parent model - to get t0 and timestep information
+                pop.set_model(self)
 
     def __update_delay_list(self, connector):
         # make a list of delays involved in this connector
