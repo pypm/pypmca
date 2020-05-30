@@ -75,6 +75,7 @@ import copy
 from scipy.optimize import curve_fit
 from scipy import stats
 import numpy as np
+from datetime import timedelta
 
 
 class Optimizer:
@@ -104,7 +105,10 @@ class Optimizer:
         self.accept_fraction = 0.
         self.auto_cov = None
         self.chi2_lists = None
+        self.opt_lists = None
         self.calc_chi2f = False
+        self.calc_chi2s = False
+        self.fit_statistics = None
 
     def func_setup(self):
         # find the variable parameters and return the bounds
@@ -154,6 +158,8 @@ class Optimizer:
         diff = []
         for i in range(1, len(cumul)):
             diff.append(cumul[i] - cumul[i - 1])
+        # first daily value is repeated since val(t0-1) is unknown
+        diff.insert(0,diff[0])
         return diff
 
     def i_fit(self):
@@ -188,8 +194,7 @@ class Optimizer:
         return scan_dict
 
     def fit(self, with_cov=False):
-        """ work out point estimate. Note that this does not seem to work
-            well if the auto_covariance is used - perhaps bug in curve_fit
+        """ work out point estimate. Experience shows small bias when auto_cov is used - turn off by default
         """
 
         def func(x, *params):
@@ -223,7 +228,8 @@ class Optimizer:
             popt, pcov = curve_fit(func, xdata, self.data[self.data_range[0]:self.data_range[1]],
                                    p0=par_0, bounds=bounds)
         else:
-            popt, pcov = curve_fit(func, xdata, self.data[self.data_range[0]:self.data_range[1]],
+            # with new autocovariance, last point is used for normalization remove from fit
+            popt, pcov = curve_fit(func, xdata[:-1], self.data[self.data_range[0]:self.data_range[1]-1],
                                    p0=par_0, bounds=bounds, sigma=self.auto_cov)
 
         i = -1
@@ -235,15 +241,75 @@ class Optimizer:
         self.model.reset()
         self.model.evolve_expectations(self.data_range[1])
         # report the naive chi^2 (no autocovariance) for shape only.
-        # the model is scaled so that it matches the data on the final point
+        # the model is scaled so that it matches the data on the final point (for cumulative fits)
         # see description at top of this file
-        scale = self.data[xdata[-1]] / self.model.populations[self.population_name].history[xdata[-1]]
+        scale = 1.
+        if self.population_type == 'total':
+            scale = self.data[xdata[-1]] / self.model.populations[self.population_name].history[xdata[-1]]
         self.chi2d = 0.
         for x in xdata[:-1]:
             resid = self.data[x] - self.model.populations[self.population_name].history[x] * scale
             self.chi2d += resid ** 2 / (self.model.populations[self.population_name].history[x] * scale)
 
+        # report the chi^2 for the fit to daily data and the auto correlation of residuals to the next day
+        # if reporting_days is not all days, then do not include non-reporting days or the following day
+        # for either statistic
+        data = self.data
+        expectation = self.model.populations[self.population_name].history
+        end_point = self.data_range[1]
+        if self.population_type == 'total':
+            data = self.delta(self.data)
+            expectation = self.delta(np.array(expectation)*scale)
+
+        self.fit_statistics = self.get_fit_statistics(self.model, self.population_name, data, expectation, self.data_range[0], end_point)
+
         return popt, pcov
+
+    def get_fit_statistics(self, model, pop_name, data, expectation, start_point, end_point):
+        # work out days of week to include:
+        # if reporting_days is not all days, then do not include non-reporting days or the previous or following day
+        all_days = True
+        include_day = [True]*7
+        try:
+            report_noise, report_noise_par, report_days = model.populations[pop_name].get_report_noise()
+        except:
+            report_noise = False
+            report_days = 127
+        if report_noise and report_days != 127:
+            for day_of_week in range(7):
+                if report_days.get_value() & 2 ** day_of_week == 0:
+                    include_day[day_of_week] = False
+                    day_after = (day_of_week+1)%7
+                    include_day[day_after] = False
+                    day_before = (day_of_week+6)%7
+                    include_day[day_before] = False
+                    all_days = False
+
+        chi2 = 0.
+        sum_0 = 0.
+        sum_1 = 0.
+        count = 0
+        for t in range(start_point, end_point):
+            include_i = True
+            if not all_days:
+                # check that today should be included
+                t0 = model.t0
+                days_after = timedelta(days=int((t + 0.5) * model.get_time_step()))
+                today = t0 + days_after
+                day_of_week = today.weekday()
+                include_i = include_day[day_of_week]
+            if include_i:
+                if len(data) > t + 1 and len(expectation) > t + 1:
+                    chi2 += (data[t] - expectation[t])**2 / expectation[t]
+                    sum_0 += (data[t] - expectation[t])**2
+                    sum_1 += (data[t] - expectation[t]) * (data[t + 1] - expectation[t + 1])
+                    count += 1
+        cov = 0.
+        acor = 0.
+        if count > 0:
+            cov = sum_0/count
+            acor = sum_1/sum_0
+        return {'ndof':count, 'chi2':chi2, 'cov':cov, 'acor':acor}
 
     def calc_auto_covariance(self, n_rep=100):
         """ Calculate the autocovariance matrix. Do that by generating simulated datasets.
@@ -286,6 +352,7 @@ class Optimizer:
             chi2m: naive unfitted
             chi2f: naive fitted
             chi2s: unfitted (with autocovariance)
+            chi2n: normalization
         """
 
         sim_model = copy.deepcopy(self.model)
@@ -299,12 +366,16 @@ class Optimizer:
         chi2_m_list = []
         chi2_f_list = []
         chi2_n_list = []
+        popt_list = []
+        pcov_list = []
+        fit_stat_list = []
 
         xdata = np.arange(self.data_range[0], self.data_range[1], 1)
         # last point not included: since its residual is zero by definition:
         n_p = len(xdata) - 1
         zeros = [0. for i in range(n_p)]
-        lpdf_zero = stats.multivariate_normal.logpdf(zeros, cov=self.auto_cov)
+        if self.calc_chi2s:
+            lpdf_zero = stats.multivariate_normal.logpdf(zeros, cov=self.auto_cov)
         for i in range(n_rep):
             sim_model.reset()
             sim_model.generate_data(self.data_range[1])
@@ -322,21 +393,24 @@ class Optimizer:
             chi2_n = delta ** 2 / (ref_population.history[xdata[-1]])
             chi2_n_list.append(chi2_n)
 
-            lpdf = stats.multivariate_normal.logpdf(resid, cov=self.auto_cov)
-            # empirically it is found that the statistic follows a chi^2 distribution if the formula
-            # is altered by changing the nominal 2 in this formula to 1:
-            chi2_s_list.append(1. * (lpdf_zero - lpdf))
+            if self.calc_chi2s:
+                lpdf = stats.multivariate_normal.logpdf(resid, cov=self.auto_cov)
+                # empirically it is found that the statistic follows a chi^2 distribution if the formula
+                # is altered by changing the nominal 2 in this formula to 1:
+                chi2_s_list.append(1. * (lpdf_zero - lpdf))
 
             if self.calc_chi2f:
                 # do a fit to this dataset to see the naive gof for a fitted simulation sample
-                # this needs to be turned on by the inquisitive user
+                # this needs to be turned on when estimating the properties of the estimators
                 # ----------------------------------------------------------------------------
                 sim_optimizer = Optimizer(sim_fit_model, self.full_population_name, sim_population.history,
                                           self.data_range)
                 sim_optimizer.reset_variables()
                 sim_popt, sim_pcov = sim_optimizer.fit()
-                sim_ref_population = sim_fit_model.populations[self.population_name]
+                popt_list.append(sim_popt)
+                pcov_list.append(sim_pcov)
 
+                sim_ref_population = sim_fit_model.populations[self.population_name]
                 # calculate residuals (data-expectation) for cov and chi^2
                 resid_f = []
                 scale_f = sim_population.history[xdata[-1]] / sim_ref_population.history[xdata[-1]]
@@ -349,6 +423,17 @@ class Optimizer:
 
                 chi2_f_list.append(chi2_f)
 
+                # report the chi^2 for the fit to daily data and the auto correlation of residuals to the next day
+                data = sim_population.history
+                expectation = sim_ref_population.history
+                end_point = self.data_range[1]
+                if self.population_type == 'total':
+                    data = self.delta(self.data)
+                    expectation = self.delta(np.array(expectation) * scale)
+
+                fit_stat_list.append(self.get_fit_statistics(sim_fit_model, self.population_name, data, expectation,
+                                                         self.data_range[0], end_point))
+
         self.chi2m = np.mean(chi2_m_list)
         self.chi2m_sd = np.std(chi2_m_list)
         self.chi2n = np.mean(chi2_n_list)
@@ -356,10 +441,13 @@ class Optimizer:
         if self.calc_chi2f:
             self.chi2f = np.mean(chi2_f_list)
             self.chi2f_sd = np.std(chi2_f_list)
-        self.chi2s = np.mean(chi2_s_list)
-        self.chi2s_sd = np.std(chi2_s_list)
+        if self.calc_chi2s:
+            self.chi2s = np.mean(chi2_s_list)
+            self.chi2s_sd = np.std(chi2_s_list)
         # for further study of gof distributions:
         self.chi2_lists = {'m': chi2_m_list, 'f': chi2_f_list, 's': chi2_s_list, 'n': chi2_n_list}
+        self.opt_lists = {'opt':popt_list, 'cov':pcov_list}
+        self.fit_stat_list = fit_stat_list
 
     def mcmc(self, n_dof, chi2n_mean, n_MCMC):
         """ Make a MCMC chain (n_MCMC points) assuming n_dof defines gof statistic for data.
