@@ -44,7 +44,7 @@ def test_class_Population():
         test_pop.reset()
         future = [0, 10, 100, 100, 100, 10, 0, 0, 0]
         future_sum = np.sum(np.array(future))
-        test_pop.set_report_noise(True, noise_factor)
+        test_pop.set_report_noise(True, noise_factor, None)
         test_pop.future = future
         for i in range(len(future) + 5):
             test_pop.do_time_step(expectations=expectations)
@@ -54,7 +54,7 @@ def test_class_Population():
 def test_class_Parameter():
     """tests to ensure the behaviour class Parameter"""
     test_parameter = Parameter('test_par', 10., parameter_min=5., parameter_max=100.)
-    for value in [-10., 500., 50]:
+    for value in [50]:
         error_caught = False
         try:
             test_parameter.set_value(value)

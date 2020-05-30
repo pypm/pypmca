@@ -6,11 +6,13 @@ import pytest
 
 from pypmca import Model, Population, Delay, Parameter, Multiplier, Propagator, \
     Splitter, Adder, Subtractor, Chain, Modifier, Injector, Ensemble
+from pypmca.analysis.Optimizer import Optimizer
 import numpy as np
 import copy
 from pathlib import Path
 
 example_dir = Path('../../examples/').resolve()
+path_model_2_2 = example_dir / 'ref_model_2_2.pypm'
 path_model_2 = example_dir / 'ref_model_2.pypm'
 path_model_1 = example_dir / 'ref_model_1.pypm'
 
@@ -177,3 +179,197 @@ def test_Ensemble_properties_different():
             for i in range(len(ens_hist)):
                 ratio = ens_hist[i] / (tc_hist[i] + td_hist[i])
                 assert np.abs(ratio - 1.) < 0.01
+
+def test_point_estimate():
+    start_day = 12
+    end_day = 60
+    ref_2 = Model.open_file(path_model_2_2)
+    sim_2 = Model.open_file(path_model_2_2)
+
+    # do fit of alpha_0, alpha_1, cont_0, trans_rate_1_time
+    for par_name in ['alpha_0', 'alpha_1', 'cont_0']:
+        par = ref_2.parameters[par_name]
+        par.set_variable(None, None)
+
+    par = ref_2.parameters['trans_rate_1_time']
+    par.set_variable(None, None)
+    par.set_min(13)
+    par.set_max(19)
+
+    sim_2.reset()
+    sim_2.generate_data(end_day)
+    optimizer = Optimizer(ref_2, 'total reported', sim_2.populations['reported'].history, [start_day, end_day])
+    optimizer.reset_variables()
+
+    scan_dict = optimizer.i_fit()
+    assert ref_2.parameters['trans_rate_1_time'].get_value() in [15,16,17]
+
+    par = ref_2.parameters['trans_rate_1_time']
+    par.set_fixed()
+
+    popt, pcov = optimizer.fit()
+    assert np.abs(ref_2.parameters['alpha_0'].get_value()-ref_2.parameters['alpha_0'].initial_value) < 0.06
+    assert np.abs(ref_2.parameters['alpha_1'].get_value() - ref_2.parameters['alpha_1'].initial_value) < 0.02
+    assert np.abs(ref_2.parameters['cont_0'].get_value() - ref_2.parameters['cont_0'].initial_value) < 20.
+
+def test_point_estimates_repeated():
+    start_day = 12
+    end_day = 60
+    ref_2 = Model.open_file(path_model_2_2)
+    sim_2 = Model.open_file(path_model_2_2)
+
+    # do fit of alpha_0, alpha_1, cont_0
+    par_names = ['alpha_0', 'alpha_1', 'cont_0']
+    sums = {}
+    sum2s = {}
+    for par_name in par_names:
+        par = ref_2.parameters[par_name]
+        par.set_variable(None, None)
+        sums[par_name] = 0.
+        sum2s[par_name] = 0.
+
+    n_rep = 10
+    fit_stat_list = []
+    for i in range(n_rep):
+        sim_2.reset()
+        sim_2.generate_data(end_day)
+        optimizer = Optimizer(ref_2, 'total reported', sim_2.populations['reported'].history, [start_day, end_day])
+        optimizer.reset_variables()
+        popt, pcov = optimizer.fit()
+        fit_stat_list.append(optimizer.fit_statistics)
+        for par_name in par_names:
+            value = ref_2.parameters[par_name].get_value()
+            sums[par_name] += value
+            sum2s[par_name] += value**2
+
+    ass_std = {}
+    ass_std['alpha_0'] = 0.03
+    ass_std['alpha_1'] = 0.01
+    ass_std['cont_0'] = 10.
+
+    means = {}
+    std = {}
+    for par_name in par_names:
+        means[par_name] = sums[par_name]/n_rep
+        std[par_name] = np.sqrt(sum2s[par_name]/n_rep - means[par_name]**2)
+        assert std[par_name] < ass_std[par_name]
+        truth = ref_2.parameters[par_name].initial_value
+        assert np.abs((means[par_name]-truth)/std[par_name]/np.sqrt(1.*n_rep)) < 3.
+
+    ndof = fit_stat_list[0]['ndof']
+    chi2_list = [fit_stat_list[i]['chi2'] for i in range(n_rep)]
+    chi2_mean = np.mean(chi2_list)
+    assert np.abs(chi2_mean - ndof) < 8.
+    acor_list = [fit_stat_list[i]['acor'] for i in range(n_rep)]
+    acor_mean = np.mean(acor_list)
+    assert np.abs(acor_mean) < 0.1
+
+def test_report_noise():
+    start_day = 12
+    end_day = 80
+    ref_2 = Model.open_file(path_model_2_2)
+    ref_2.parameters['report_noise'].set_value(0.1)
+    sim_2 = copy.deepcopy(ref_2)
+
+    # do fit of alpha_0, alpha_1, cont_0
+    par_names = ['alpha_0', 'alpha_1', 'cont_0']
+    sums = {}
+    sum2s = {}
+    for par_name in par_names:
+        par = ref_2.parameters[par_name]
+        par.set_variable(None, None)
+        sums[par_name] = 0.
+        sum2s[par_name] = 0.
+
+    n_rep = 10
+    fit_stat_list = []
+    for i in range(n_rep):
+        sim_2.reset()
+        sim_2.generate_data(end_day)
+        optimizer = Optimizer(ref_2, 'total reported', sim_2.populations['reported'].history, [start_day, end_day])
+        optimizer.reset_variables()
+        popt, pcov = optimizer.fit()
+        fit_stat_list.append(optimizer.fit_statistics)
+        for par_name in par_names:
+            value = ref_2.parameters[par_name].get_value()
+            sums[par_name] += value
+            sum2s[par_name] += value**2
+
+    ass_std = {}
+    ass_std['alpha_0'] = 0.03
+    ass_std['alpha_1'] = 0.01
+    ass_std['cont_0'] = 10.
+
+    means = {}
+    std = {}
+    for par_name in par_names:
+        means[par_name] = sums[par_name]/n_rep
+        std[par_name] = np.sqrt(sum2s[par_name]/n_rep - means[par_name]**2)
+    for par_name in par_names:
+        assert std[par_name] < ass_std[par_name]
+        truth = ref_2.parameters[par_name].initial_value
+        assert np.abs((means[par_name]-truth)/std[par_name]/np.sqrt(1.*n_rep)) < 3.
+
+    ndof = fit_stat_list[0]['ndof']
+    chi2_list = [fit_stat_list[i]['chi2'] for i in range(n_rep)]
+    chi2_mean = np.mean(chi2_list)
+    assert chi2_mean - ndof > 100.
+    acor_list = [fit_stat_list[i]['acor'] for i in range(n_rep)]
+    acor_mean = np.mean(acor_list)
+    assert acor_mean < -0.3
+
+def test_report_noise_days():
+    start_day = 12
+    end_day = 80
+    ref_2 = Model.open_file(path_model_2_2)
+    ref_2.parameters['report_noise'].set_value(0.1)
+    # BC: no reporting on Sundays
+    ref_2.parameters['report_days'].set_value(63)
+    sim_2 = copy.deepcopy(ref_2)
+
+    # do fit of alpha_0, alpha_1, cont_0
+    par_names = ['alpha_0', 'alpha_1', 'cont_0']
+    sums = {}
+    sum2s = {}
+    for par_name in par_names:
+        par = ref_2.parameters[par_name]
+        par.set_variable(None, None)
+        sums[par_name] = 0.
+        sum2s[par_name] = 0.
+
+    n_rep = 10
+    fit_stat_list = []
+    for i in range(n_rep):
+        sim_2.reset()
+        sim_2.generate_data(end_day)
+        optimizer = Optimizer(ref_2, 'total reported', sim_2.populations['reported'].history, [start_day, end_day])
+        optimizer.reset_variables()
+        popt, pcov = optimizer.fit()
+        fit_stat_list.append(optimizer.fit_statistics)
+        for par_name in par_names:
+            value = ref_2.parameters[par_name].get_value()
+            sums[par_name] += value
+            sum2s[par_name] += value ** 2
+
+    ass_std = {}
+    ass_std['alpha_0'] = 0.05
+    ass_std['alpha_1'] = 0.01
+    ass_std['cont_0'] = 10.
+
+    means = {}
+    std = {}
+    for par_name in par_names:
+        means[par_name] = sums[par_name] / n_rep
+        std[par_name] = np.sqrt(sum2s[par_name] / n_rep - means[par_name] ** 2)
+    for par_name in par_names:
+        assert std[par_name] < ass_std[par_name]
+        truth = ref_2.parameters[par_name].initial_value
+        assert np.abs((means[par_name] - truth) / std[par_name] / np.sqrt(1. * n_rep)) < 3.
+
+    ndof = fit_stat_list[0]['ndof']
+    chi2_list = [fit_stat_list[i]['chi2'] for i in range(n_rep)]
+    chi2_mean = np.mean(chi2_list)
+    assert chi2_mean/ndof > 2.5
+    acor_list = [fit_stat_list[i]['acor'] for i in range(n_rep)]
+    acor_mean = np.mean(acor_list)
+    assert acor_mean < -0.2
