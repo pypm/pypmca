@@ -265,6 +265,7 @@ class Ensemble(Model):
             for cont in contact:
                 if not isinstance(cont, Parameter):
                     raise TypeError('The contact argument must be a list containing a Parameter object')
+            self.contact = contact[0]
         elif contact_type == 'symmetric':
             if not isinstance(contact, list):
                 raise TypeError('The contact argument must be a list of Parameters')
@@ -274,6 +275,7 @@ class Ensemble(Model):
             for cont in contact:
                 if not isinstance(cont, Parameter):
                     raise TypeError('The contact argument must be a list of Parameter objects')
+            self.contact = contact
         elif contact_type not in ['diagonal', 'independent', 'equality']:
             raise ValueError('Contact matrix type not recognized.')
 
