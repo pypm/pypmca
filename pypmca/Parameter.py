@@ -88,6 +88,7 @@ class Parameter:
         self.hidden = hidden
 
         self.mcmc_step = mcmc_step
+        self.std_estimator = None
 
     def __str__(self):
         return self.name
