@@ -246,7 +246,7 @@ class Model:
         if not expectations:
             boot_pop.history[-1] = int(goal_value)
 
-    def evolve_expectations(self, n_step):
+    def evolve_expectations(self, n_step, from_step=0):
         """
         First check if a boot is needed: this is required if
         reset_populations is called
@@ -260,7 +260,7 @@ class Model:
         if self.boot_needed:
             self.boot(expectations=True)
 
-        for step in range(n_step):
+        for step in range(from_step, n_step+from_step):
             self.do_transitions(step, expectations=True)
 
             # calculate future expectations
@@ -269,14 +269,14 @@ class Model:
             # make one time step
             self.do_time_step(expectations=True)
 
-    def generate_data(self, n_step):
+    def generate_data(self, n_step, from_step=0):
         """
         Produce data
         """
         if self.boot_needed:
             self.boot(expectations=False)
 
-        for step in range(n_step):
+        for step in range(from_step, n_step+from_step):
             self.do_transitions(step, expectations=False)
 
             # calculate future data

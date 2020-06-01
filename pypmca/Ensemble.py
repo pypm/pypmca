@@ -523,7 +523,7 @@ class Ensemble(Model):
                 model_boot_pop = model.populations[model.boot_pars['boot_population']]
                 model_boot_pop.history[-1] = int(goal_values[model_name])
 
-    def evolve_expectations(self, n_step):
+    def evolve_expectations(self, n_step, from_step=0):
         """
         First check if a boot is needed: this is required if
         reset_populations is called
@@ -537,7 +537,7 @@ class Ensemble(Model):
         if self.boot_needed:
             self.do_boot(expectations=True)
 
-        for step in range(n_step):
+        for step in range(from_step, n_step+from_step):
             self.do_transitions(step, expectations=False)
 
             # calculate influence between models
@@ -552,14 +552,14 @@ class Ensemble(Model):
         # add up the histories and put in local population objects
         self.__combine_histories()
 
-    def generate_data(self, n_step):
+    def generate_data(self, n_step, from_step):
         """
         Produce data
         """
         if self.boot_needed:
             self.do_boot(expectations=False)
 
-        for step in range(n_step):
+        for step in range(from_step, n_step+from_step):
             self.do_transitions(step, expectations=False)
 
             # calculate influence between models
