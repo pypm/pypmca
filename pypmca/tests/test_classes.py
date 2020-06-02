@@ -39,12 +39,13 @@ def test_class_Population():
     # Expectations are not effected - data should be
     # but the total reported should be the same after all reporting complete
     noise_factor = Parameter('noise_factor', 0.3)
+    backlog_factor = Parameter('backlog_factor', 0.8)
     # restart - back to initial value
     for expectations in [True, False]:
         test_pop.reset()
-        future = [0, 10, 100, 100, 100, 10, 0, 0, 0]
+        future = [0, 10, 100, 100, 100, 10, 0, 0, 0, 0, 0, 0, 0]
         future_sum = np.sum(np.array(future))
-        test_pop.set_report_noise(True, noise_factor, None)
+        test_pop.set_report_noise(True, noise_factor, backlog_factor, None)
         test_pop.future = future
         for i in range(len(future) + 5):
             test_pop.do_time_step(expectations=expectations)

@@ -7,6 +7,7 @@ import pytest
 from pypmca import Model, Population, Delay, Parameter, Multiplier, Propagator, \
     Splitter, Adder, Subtractor, Chain, Modifier, Injector, Ensemble
 from pypmca.analysis.Optimizer import Optimizer
+from pypmca.analysis.Trajectory import Trajectory
 import numpy as np
 import copy
 from pathlib import Path
@@ -264,6 +265,39 @@ def test_point_estimates_repeated():
     acor_mean = np.mean(acor_list)
     assert np.abs(acor_mean) < 0.1
 
+def test_sim_gof():
+    start_day = 12
+    end_day = 60
+    ref_2 = Model.open_file(path_model_2_2)
+    sim_2 = Model.open_file(path_model_2_2)
+
+    # do fit of alpha_0, alpha_1, cont_0
+    par_names = ['alpha_0', 'alpha_1', 'cont_0']
+    for par_name in par_names:
+        par = ref_2.parameters[par_name]
+        par.set_variable(None, None)
+
+    sim_2.reset()
+    sim_2.generate_data(end_day)
+    optimizer = Optimizer(ref_2, 'total reported', sim_2.populations['reported'].history, [start_day, end_day])
+    optimizer.reset_variables()
+    popt, pcov = optimizer.fit()
+    fit_statistics = optimizer.fit_statistics
+
+    optimizer.calc_chi2s = False
+    optimizer.calc_chi2f = True
+    n_rep = 10
+    optimizer.calc_sim_gof(n_rep)
+
+    fit_stat_list = optimizer.fit_stat_list
+    ndof = fit_stat_list[0]['ndof']
+    chi2_list = [fit_stat_list[i]['chi2'] for i in range(n_rep)]
+    chi2_mean = np.mean(chi2_list)
+    assert np.abs(chi2_mean - ndof) < 8.
+    acor_list = [fit_stat_list[i]['acor'] for i in range(n_rep)]
+    acor_mean = np.mean(acor_list)
+    assert np.abs(acor_mean) < 0.1
+
 def test_report_noise():
     start_day = 12
     end_day = 80
@@ -373,3 +407,14 @@ def test_report_noise_days():
     acor_list = [fit_stat_list[i]['acor'] for i in range(n_rep)]
     acor_mean = np.mean(acor_list)
     assert acor_mean < -0.2
+
+def test_trajectory():
+    ref_2 = Model.open_file(path_model_2_2)
+    trajectory = Trajectory(ref_2, 'contagious', 'trans_rate_1', [0.03, 0.75])
+    alpha_c = trajectory.get_alpha(0.)
+    gamma_1 = trajectory.get_gamma(0.1)
+    gamma_2 = trajectory.get_gamma(0.2)
+    assert np.abs(alpha_c - 0.152) < 0.001
+    assert np.abs(trajectory.get_gamma(alpha_c)) < 0.00001
+    assert np.abs(gamma_1 + 0.0513) < 0.0001
+    assert np.abs(gamma_2-0.0389) < 0.0001
