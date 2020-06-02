@@ -412,9 +412,9 @@ def test_trajectory():
     ref_2 = Model.open_file(path_model_2_2)
     trajectory = Trajectory(ref_2, 'contagious', 'trans_rate_1', [0.03, 0.75])
     alpha_c = trajectory.get_alpha(0.)
-    gamma_1 = trajectory.get_gamma(0.1)
-    gamma_2 = trajectory.get_gamma(0.2)
+    delta_1 = trajectory.get_delta(0.1)
+    delta_2 = trajectory.get_delta(0.2)
     assert np.abs(alpha_c - 0.152) < 0.001
-    assert np.abs(trajectory.get_gamma(alpha_c)) < 0.00001
-    assert np.abs(gamma_1 + 0.0513) < 0.0001
-    assert np.abs(gamma_2-0.0389) < 0.0001
+    assert np.abs(trajectory.get_delta(alpha_c)) < 0.00001
+    assert np.abs(delta_1 + 0.0513) < 0.0001
+    assert np.abs(delta_2-0.0389) < 0.0001

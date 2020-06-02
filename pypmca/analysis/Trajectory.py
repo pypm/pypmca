@@ -1,15 +1,15 @@
 # -*- coding: utf-8 -*-
 """
 Trajectory: Given a model: characterize the relation between the model transmission rate parameter (alpha) and the
-infection trajectory growth rate (gamma: fractional growth per day).
+infection trajectory growth rate (delta: fractional growth per day).
 
 This is evaluated by running the model for different values of the growth rate parameter.
 
 After doing so, the following methods can be called:
-- get_gamma(alpha)
-- get_alpha(gamma)
+- get_delta(alpha)
+- get_alpha(delta)
 
-It is assumed that the model has a consistent relation between alpha and gamma throughout (time delays not changing)
+It is assumed that the model has a consistent relation between alpha and delta throughout (time delays not changing)
 
 @author: karlen
 """
@@ -28,13 +28,13 @@ class Trajectory:
         self.rate_modifier_name = rate_modifier_name
         self.rate_range = rate_range
         self.alphas = None
-        self.gammas = None
-        self.gamma_inter = None
+        self.deltas = None
+        self.delta_inter = None
         self.alpha_inter = None
 
-        self.calc_gammas()
+        self.calc_deltas()
 
-    def calc_gammas(self):
+    def calc_deltas(self):
         # use 100 points for the interpolation
         n_point = 100
         length = self.rate_range[1] - self.rate_range[0]
@@ -56,20 +56,20 @@ class Trajectory:
         # run the simulation 20 steps after the transition - use the last points to work out growth rate
         n_step = rate_step + 20
 
-        self.gammas = []
+        self.deltas = []
         for alpha in self.alphas:
             rate_par.set_value(alpha)
             tr_model.reset()
             tr_model.evolve_expectations(n_step)
             ratio = tr_model.populations[self.contagious_pop_name].history[n_step] / tr_model.populations[self.contagious_pop_name].history[n_step-1]
-            gamma = ratio - 1
-            self.gammas.append(gamma)
+            delta = ratio - 1
+            self.deltas.append(delta)
 
-        self.alpha_inter = interp1d(self.gammas, self.alphas, kind='cubic')
-        self.gamma_inter = interp1d(self.alphas, self.gammas, kind='cubic')
+        self.alpha_inter = interp1d(self.deltas, self.alphas, kind='cubic')
+        self.delta_inter = interp1d(self.alphas, self.deltas, kind='cubic')
 
-    def get_gamma(self, alpha):
-        return self.gamma_inter(alpha)
+    def get_delta(self, alpha):
+        return self.delta_inter(alpha)
 
-    def get_alpha(self, gamma):
-        return self.alpha_inter(gamma)
+    def get_alpha(self, delta):
+        return self.alpha_inter(delta)
