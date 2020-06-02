@@ -28,9 +28,12 @@ class Population:
         - color: color to plot
         - show_sim: is it appropriate to show simulated data for this distribution?
         - report_noise: should simulated data include additional noise due to reporting?
-        - if True, then supply the lower limit of range [low,1] for which a uniform
+        - if True, then report_noise_par is the lower limit of range [low,1] for which a uniform
           random number is drawn to select the number from today that are reported today
-          the remaining will be in tomorrows report (along with some fraction of tomorrows report)
+          the remaining will be in future report (along with some fraction of tomorrows report)
+        - if True, then report_backlog_par is the lower limit of range [low,1] for which a uniform
+          random number is drawn to select the number from the backlog that are reported today
+          the remaining will be in a future report
         - if True, and the integer parameter report_days is provided, use that to determine which
           days of week that reports are produced. In BC, reports are zero on Sunday and included in the
           next reporting day. Bit encoded, with Monday = bit 0... Sunday = bit 6. BC: report_days = 63
@@ -38,7 +41,7 @@ class Population:
 
     def __init__(self, population_name: str, initial_value, description: str = '',
                  hidden: bool = True, color: str = 'black', show_sim: bool = False, report_noise: bool = False,
-                 report_noise_par: Parameter = None, report_days: Parameter = None):
+                 report_noise_par: Parameter = None, report_backlog_par: Parameter = None, report_days: Parameter = None):
         """
         Constructor
 
@@ -80,15 +83,16 @@ class Population:
 
         self.__report_noise = None
         self.__report_noise_par = None
+        self.__report_backlog_par = None
         self.__report_days = None
-        self.set_report_noise(report_noise, report_noise_par, report_days)
+        self.set_report_noise(report_noise, report_noise_par, report_backlog_par, report_days)
 
     def set_model(self, model):
         # when a connector is added to a model, the populations are informed of the parent model
         # in order to get t0 and step size information
         self.model = model
 
-    def set_report_noise(self, report_noise, report_noise_par, report_days):
+    def set_report_noise(self, report_noise, report_noise_par, report_backlog_par, report_days):
 
         self.__report_noise = report_noise
         if report_noise and (report_noise_par is None or
@@ -96,6 +100,12 @@ class Population:
             raise TypeError('Error setting report_noise_par in population (' +
                             self.name + ') - it must be a Parameter object')
         self.__report_noise_par = report_noise_par
+        if report_noise and report_backlog_par is not None:
+            if not isinstance(report_backlog_par, Parameter):
+                raise TypeError('Error setting report_backlog_par in population (' +
+                                self.name + ') - it must be a Parameter object')
+            self.__report_backlog_par = report_backlog_par
+            self.parameters['backlog_par'] = self.__report_backlog_par
         if report_noise and report_days is not None:
             if not isinstance(report_days, Parameter):
                 raise TypeError('Error setting report_days in population (' +
@@ -112,6 +122,8 @@ class Population:
         else:
             if 'noise_par' in self.parameters:
                 self.parameters.pop('noise_par')
+            if 'backlog_par' in self.parameters:
+                self.parameters.pop('backlog_par')
             if 'report_days' in self.parameters:
                 self.parameters.pop('report_days')
         # in case parameter changed, update the model list of parameters
@@ -119,7 +131,10 @@ class Population:
         # self.model.update_lists()
 
     def get_report_noise(self):
-        return self.__report_noise, self.__report_noise_par, self.__report_days
+        return {'report_noise':self.__report_noise,
+                'report_noise_par':self.__report_noise_par,
+                'report_backlog_par':self.__report_backlog_par,
+                'report_days':self.__report_days}
 
     def set_initial_value(self, initial_value):
         if isinstance(initial_value, (float, int)):
@@ -174,9 +189,18 @@ class Population:
                     frac_report = stats.uniform.rvs(loc=low_edge, scale=1. - low_edge)
                     n_report = stats.binom.rvs(incoming, frac_report)
 
-                    next_value = self.missed_yesterday
-                    self.missed_yesterday = incoming - n_report
-                    next_value += n_report
+                    # how many will be reported from the backlog?
+                    try:
+                        low_edge = self.__report_backlog_par.get_value()
+                        frac_backlog = stats.uniform.rvs(loc=low_edge, scale=1. - low_edge)
+                        n_backlog = stats.binom.rvs(self.missed_yesterday, frac_backlog)
+                    except:
+                        n_backlog = self.missed_yesterday
+
+                    next_value = n_report + n_backlog
+
+                    self.missed_yesterday -= n_backlog
+                    self.missed_yesterday += incoming - n_report
                 else:
                     self.missed_yesterday += incoming
                     next_value = 0
