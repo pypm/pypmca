@@ -36,6 +36,7 @@ class Model:
         self.delays = {}
         self.lnl = None
         self.population_mcmc_time_step_range = {}
+        self.user_dict = {}
 
         self.boot_pars = {}
         self.boot_needed = True
