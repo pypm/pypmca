@@ -262,6 +262,8 @@ class Optimizer:
             expectation = self.delta(np.array(expectation)*scale)
 
         self.fit_statistics = self.get_fit_statistics(self.model, self.population_name, data, expectation, self.data_range[0], end_point)
+        # in addition include the fit statistic for the cumulative
+        self.fit_statistics['chi2_c'] = self.chi2d
 
         return popt, pcov
 
@@ -356,11 +358,7 @@ class Optimizer:
         """
 
         sim_model = copy.deepcopy(self.model)
-        sim_population = sim_model.populations[self.population_name]
         ref_population = self.model.populations[self.population_name]
-
-        # Make a copy for fitting simulated data
-        sim_fit_model = copy.deepcopy(self.model)
 
         chi2_s_list = []
         chi2_m_list = []
@@ -379,6 +377,7 @@ class Optimizer:
         for i in range(n_rep):
             sim_model.reset()
             sim_model.generate_data(self.data_range[1])
+            sim_population = sim_model.populations[self.population_name]
 
             scale = sim_population.history[xdata[-1]] / ref_population.history[xdata[-1]]
             resid = []
@@ -403,9 +402,12 @@ class Optimizer:
                 # do a fit to this dataset to see the naive gof for a fitted simulation sample
                 # this needs to be turned on when estimating the properties of the estimators
                 # ----------------------------------------------------------------------------
+                # Make a copy for fitting simulated data - always start with same initial values...
+                sim_fit_model = copy.deepcopy(self.model)
                 sim_optimizer = Optimizer(sim_fit_model, self.full_population_name, sim_population.history,
                                           self.data_range)
-                sim_optimizer.reset_variables()
+                # following is needed only if re-using optimizer for a new fit...
+                #sim_optimizer.reset_variables()
                 sim_popt, sim_pcov = sim_optimizer.fit()
                 popt_list.append(sim_popt)
                 pcov_list.append(sim_pcov)
@@ -422,17 +424,7 @@ class Optimizer:
                     chi2_f += delta ** 2 / (sim_ref_population.history[x] * scale_f)
 
                 chi2_f_list.append(chi2_f)
-
-                # report the chi^2 for the fit to daily data and the auto correlation of residuals to the next day
-                data = sim_population.history
-                expectation = sim_ref_population.history
-                end_point = self.data_range[1]
-                if self.population_type == 'total':
-                    data = self.delta(self.data)
-                    expectation = self.delta(np.array(expectation) * scale)
-
-                fit_stat_list.append(self.get_fit_statistics(sim_fit_model, self.population_name, data, expectation,
-                                                         self.data_range[0], end_point))
+                fit_stat_list.append(sim_optimizer.fit_statistics)
 
         self.chi2m = np.mean(chi2_m_list)
         self.chi2m_sd = np.std(chi2_m_list)
