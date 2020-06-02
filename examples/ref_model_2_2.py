@@ -22,7 +22,8 @@ Version 2.2:
  - add 3 additional rate transitions
  - add an additional outbreak
  - add an addition reporting anomaly
- - include parameter to specify days of week which have no reporting (cases reported the following day
+ - include parameter to specify low edge of fraction of report backlog that is cleared
+ - include parameter to specify days of week which have no reporting (cases are included the next day)
 
 @author: karlen
 """
@@ -32,7 +33,7 @@ from pypmca import Model, Population, Delay, Parameter, Multiplier, Propagator, 
 
 # Test by building a population model for BC
 
-bc_model = Model('ref_model_2_2')
+bc_model = Model('ref_model_2_2v2')
 bc_model.set_t0(2020, 3, 1)
 
 # Initialization
@@ -198,6 +199,9 @@ unreported_delay = Delay('unreported_delay', 'norm', unreported_delay_pars, bc_m
 report_noise_par = Parameter('report_noise', 1., 0., 1.,
                              'Report noise parameter')
 
+report_backlog_par = Parameter('report_backlog', 1., 0., 1.,
+                             'Report backlog parameter')
+
 report_days = Parameter('report_days', 127, 0, 127, 'days of week with reporting (bit encoded)',
                         parameter_type='int')
 
@@ -209,7 +213,7 @@ reported_pop = Population('reported', 0,
                           'Symptomatic people who received a positive test report',
                           hidden=False, color='forestgreen', show_sim=True,
                           report_noise=True, report_noise_par=report_noise_par,
-                          report_days=report_days)
+                          report_backlog_par= report_backlog_par, report_days=report_days)
 
 reported_fraction = Parameter('reported_frac', 0.8, 0., 1.,
                               'fraction of symptomatic people who will ' + \
