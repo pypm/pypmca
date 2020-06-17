@@ -16,8 +16,9 @@ History
 
 * 0.2.1 beta release on PyPI
   (includes new reference model 2.1, and copy methods)
-* 0.2.2
-  - fix issue with in_icu for reference model #1
-  - allow no reports on some days of week (eg. BC: Sundays)
-  - add fit statistics to help tune reporting noise
-  - fix bugs in Ensemble
+* 0.2.2 (2020-06-16)
+
+  * fix issue with in_icu for reference model #1
+  * allow no reports on some days of week (eg. BC: Sundays)
+  * add fit statistics to help tune reporting noise
+  * fix bugs in Ensemble
