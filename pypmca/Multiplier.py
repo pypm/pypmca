@@ -119,7 +119,7 @@ class Multiplier(Connector):
                 p = 0.999
             r = scale * p / (1. - p)
             n = 0
-            if r >= 0.:
+            if r > 0.:
                 n = stats.nbinom.rvs(r, p)
             self.to_population.update_future_data(n, self.delay)
 

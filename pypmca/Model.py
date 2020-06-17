@@ -526,7 +526,7 @@ class Model:
 
     def copy_values_from(self, from_model):
         """Copy the parameter values and transition states from another model to this one
-           Also copy model.name and description"""
+           Also copy model.name and description. Also copy parameter/population hidden info"""
         if not isinstance(from_model, Model):
             raise ValueError('Error in copy_values_from. Argument must be a model object')
 
@@ -536,6 +536,8 @@ class Model:
                 par = self.parameters[par_name]
                 par.set_value(from_par.get_value())
                 par.initial_value = from_par.initial_value
+                par.hidden = from_par.hidden
+                par.mcmc_step = from_par.mcmc_step
                 if from_par.prior_function is not None:
                     prior_function = copy.copy(from_par.prior_function)
                 if from_par.prior_parameters is not None:
@@ -553,6 +555,12 @@ class Model:
             if tran_name in self.transitions:
                 tran = self.transitions[tran_name]
                 tran.enabled = from_tran.enabled
+
+        for pop_name in from_model.populations:
+            from_pop = from_model.populations[pop_name]
+            if pop_name in self.populations:
+                pop = self.populations[pop_name]
+                pop.hidden = from_pop.hidden
 
         self.name = 'copy: '+from_model.name
         self.description = from_model.description

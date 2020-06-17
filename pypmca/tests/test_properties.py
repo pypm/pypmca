@@ -13,6 +13,7 @@ import copy
 from pathlib import Path
 
 example_dir = Path('../../examples/').resolve()
+path_model_2_3 = example_dir / 'ref_model_2_3.pypm'
 path_model_2_2 = example_dir / 'ref_model_2_2.pypm'
 path_model_2 = example_dir / 'ref_model_2.pypm'
 path_model_1 = example_dir / 'ref_model_1.pypm'
@@ -263,7 +264,7 @@ def test_point_estimates_repeated():
     assert np.abs(chi2_mean - ndof) < 8.
     acor_list = [fit_stat_list[i]['acor'] for i in range(n_rep)]
     acor_mean = np.mean(acor_list)
-    assert np.abs(acor_mean) < 0.1
+    assert np.abs(acor_mean) < 0.2
 
 def test_sim_gof():
     start_day = 12
@@ -296,7 +297,7 @@ def test_sim_gof():
     assert np.abs(chi2_mean - ndof) < 8.
     acor_list = [fit_stat_list[i]['acor'] for i in range(n_rep)]
     acor_mean = np.mean(acor_list)
-    assert np.abs(acor_mean) < 0.1
+    assert np.abs(acor_mean) < 0.2
 
 def test_report_noise():
     start_day = 12

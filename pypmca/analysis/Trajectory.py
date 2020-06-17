@@ -69,7 +69,7 @@ class Trajectory:
         self.delta_inter = interp1d(self.alphas, self.deltas, kind='cubic')
 
     def get_delta(self, alpha):
-        return self.delta_inter(alpha)
+        return self.delta_inter(alpha).item()
 
     def get_alpha(self, delta):
-        return self.alpha_inter(delta)
+        return self.alpha_inter(delta).item()

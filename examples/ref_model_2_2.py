@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 """
-pyPM.ca reference model #2.1
+pyPM.ca reference model #2.2
 
 To make the critical parameters less dependent of each other, break the measured
 populations into separate paths.
