@@ -182,7 +182,8 @@ class Model:
         trans_list.reverse()
         for trans_step in trans_list:
             trans = trans_dict[trans_step]
-            trans.reset()
+            if trans.enabled:
+                trans.reset()
 
         self.boot_needed = True
 
