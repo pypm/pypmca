@@ -302,7 +302,10 @@ class Optimizer:
                 include_i = include_day[day_of_week]
             if include_i:
                 if len(data) > t + 1 and len(expectation) > t + 1:
-                    chi2 += (data[t] - expectation[t])**2 / expectation[t]
+                    denom = expectation[t]
+                    if denom == 0.:
+                        denom = 0.01
+                    chi2 += (data[t] - expectation[t])**2 / denom
                     sum_0 += (data[t] - expectation[t])**2
                     sum_1 += (data[t] - expectation[t]) * (data[t + 1] - expectation[t + 1])
                     count += 1
