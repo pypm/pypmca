@@ -82,16 +82,17 @@ class Optimizer:
     """ Optimizer: point estimator and covariance
     """
 
-    def __init__(self, model, full_population_name, data, data_range):
+    def __init__(self, model, full_population_name, data, data_range, cumul_reset=False):
         self.model = model
         self.full_population_name = full_population_name
         self.population_name = full_population_name[6:]
         self.population_type = full_population_name[:5]
         self.data = data
         self.data_range = data_range
-        self.variable_names = []  # float ype variable parameters
+        self.cumul_reset = cumul_reset  # if True, use the cumulative starting at data_range[0]
+        self.variable_names = []  # float type variable parameters
         self.variable_initial_values = None
-        self.i_variable_names = []  # float ype variable parameters
+        self.i_variable_names = []  # integer type variable parameters
         self.i_variable_initial_values = None
         self.chi2d = 0.
         self.chi2m = 0.
@@ -209,9 +210,12 @@ class Optimizer:
             pop = self.model.populations[self.population_name]
             func_values = []
             if self.population_type == 'total':
+                cumul_offset = 0
+                if self.cumul_reset:
+                    cumul_offset = pop.history[self.data_range[0]]
                 for xi in x:
                     i = int(round(xi))
-                    func_values.append(pop.history[i])
+                    func_values.append(pop.history[i]-cumul_offset)
             else:
                 diff = self.delta(pop.history)
                 for xi in x:
@@ -225,12 +229,24 @@ class Optimizer:
         popt = None
         pcov = None
         if not with_cov:
-            popt, pcov = curve_fit(func, xdata, self.data[self.data_range[0]:self.data_range[1]],
-                                   p0=par_0, bounds=bounds)
+            if self.population_type == 'total' and self.cumul_reset:
+                cumul_offset = self.data[self.data_range[0]]
+                mod_data = [self.data[i] - cumul_offset for i in range(self.data_range[0],self.data_range[1])]
+                popt, pcov = curve_fit(func, xdata, mod_data,
+                                       p0=par_0, bounds=bounds)
+            else:
+                popt, pcov = curve_fit(func, xdata, self.data[self.data_range[0]:self.data_range[1]],
+                                       p0=par_0, bounds=bounds)
         else:
             # with new autocovariance, last point is used for normalization remove from fit
-            popt, pcov = curve_fit(func, xdata[:-1], self.data[self.data_range[0]:self.data_range[1]-1],
-                                   p0=par_0, bounds=bounds, sigma=self.auto_cov)
+            if self.population_type == 'total' and self.cumul_reset:
+                cumul_offset = self.data[self.data_range[0]]
+                mod_data = [self.data[i] - cumul_offset for i in range(self.data_range[0],self.data_range[1]-1)]
+                popt, pcov = curve_fit(func, xdata[:-1], mod_data,
+                                       p0=par_0, bounds=bounds, sigma=self.auto_cov)
+            else:
+                popt, pcov = curve_fit(func, xdata[:-1], self.data[self.data_range[0]:self.data_range[1]-1],
+                                        p0=par_0, bounds=bounds, sigma=self.auto_cov)
 
         i = -1
         for par_val in popt:
@@ -303,7 +319,7 @@ class Optimizer:
             if include_i:
                 if len(data) > t + 1 and len(expectation) > t + 1:
                     denom = expectation[t]
-                    if denom == 0.:
+                    if denom <= 0.:
                         denom = 0.01
                     chi2 += (data[t] - expectation[t])**2 / denom
                     sum_0 += (data[t] - expectation[t])**2
