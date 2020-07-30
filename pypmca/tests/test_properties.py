@@ -13,6 +13,7 @@ import copy
 from pathlib import Path
 
 example_dir = Path('../../examples/').resolve()
+path_model_2_4 = example_dir / 'ref_model_2_4.pypm'
 path_model_2_3 = example_dir / 'ref_model_2_3.pypm'
 path_model_2_2 = example_dir / 'ref_model_2_2.pypm'
 path_model_2 = example_dir / 'ref_model_2.pypm'
@@ -419,3 +420,22 @@ def test_trajectory():
     assert np.abs(trajectory.get_delta(alpha_c)) < 0.00001
     assert np.abs(delta_1 + 0.0513) < 0.0001
     assert np.abs(delta_2-0.0389) < 0.0001
+
+def test_linear_modifier():
+    ref_2_4 = Model.open_file(path_model_2_4)
+    trajectory = Trajectory(ref_2_4, 'contagious', 'trans_rate_1', [0.02, 2.0])
+    alpha_c = trajectory.get_alpha(0.)
+    ref_2_4.parameters['alpha_1'].set_value(alpha_c)
+    ref_2_4.parameters['to_icu_delay_mean'].set_value(0.5)
+    ref_2_4.parameters['to_icu_delay_sigma'].set_value(0.5)
+    ref_2_4.transitions['mod_icu_frac'].enabled = True
+    ref_2_4.parameters['icu_frac_time'].set_value(60)
+    ref_2_4.parameters['icu_frac_0'].set_value(0.1)
+    ref_2_4.parameters['icu_frac_slope'].set_value(0.01)
+    ref_2_4.parameters['icu_frac_nstep'].set_value(10)
+    ref_2_4.reset()
+    ref_2_4.evolve_expectations(100)
+    pop_hist = ref_2_4.populations['icu admissions'].history
+    assert np.abs(pop_hist[55]-pop_hist[54]-pop_hist[50]+pop_hist[49]) < 0.01
+    assert np.abs(pop_hist[75] - pop_hist[74] - pop_hist[70] + pop_hist[69]) < 0.1
+    assert np.abs((pop_hist[75] - pop_hist[74])/(pop_hist[55]-pop_hist[54]) - 2.) < 0.1

@@ -290,9 +290,19 @@ class Model:
     def do_transitions(self, step, expectations=True):
         for transition_name in self.transitions:
             transition = self.transitions[transition_name]
-            if step == transition.trigger_step:
-                if transition.enabled:
-                    transition.take_action(expectations)
+            if transition.enabled:
+                linear = getattr(transition,'linear',False)
+                if linear:
+                    if step >= transition.trigger_step:
+                        n_step_par = getattr(transition,'n_step',None)
+                        n_step = -1
+                        if n_step_par is not None:
+                            n_step = n_step_par.get_value()
+                        if n_step <0 or n_step > step - transition.trigger_step:
+                            transition.take_action(expectations)
+                else:
+                    if step == transition.trigger_step:
+                        transition.take_action(expectations)
 
     def calculate_future(self, expectations=True):
         for connector_name in self.connector_list:
@@ -438,6 +448,8 @@ class Model:
             self.__add_to_parameter_list(obj.transition_time)
             self.__add_to_parameter_list(obj.parameter_before)
             self.__add_to_parameter_list(obj.parameter_after)
+            if obj.n_step is not None:
+                self.__add_to_parameter_list(obj.n_step)
 
         elif isinstance(obj, Connector):
             con = obj

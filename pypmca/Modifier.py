@@ -29,12 +29,16 @@ class Modifier(Transition):
 
     The transition time is specified by a Parameter object.
 
+    If linear = True - the parameter is modified in a linear fashion: parameter_after defines the slope (change per step)
+    If n_step is not None and has a value >0, the modification stops after n_steps
+
     Transitions are not applied during the model "boot"
 
     """
 
     def __init__(self, transition_name: str, time_spec: str, transition_time: Parameter, parameter: Parameter,
-                 parameter_before: Parameter, parameter_after: Parameter, enabled: bool = True, model=None):
+                 parameter_before: Parameter, parameter_after: Parameter, enabled: bool = True, model=None,
+                 linear: bool=False, n_step = None):
         """Constructor
         """
         super().__init__(transition_name, time_spec, transition_time, enabled, model)
@@ -72,11 +76,29 @@ class Modifier(Transition):
         self.parameters[str(parameter_after)] = parameter_after
         self.parameters[str(parameter_before)] = parameter_before
 
+        self.linear = linear
+        if n_step is not None:
+            if not isinstance(n_step, Parameter):
+                raise TypeError('Error in constructing transition (' + self.name +
+                                '): n_step must be a Parameter object')
+        self.n_step = n_step
+
     def take_action(self, expectations=True):
         """
         Modify the value of the parameter
         """
-        self.parameter.set_value(self.parameter_after.get_value())
+        linear = getattr(self,'linear',False)
+
+        if linear:
+            current_value = self.parameter.get_value()
+            new_value = current_value+self.parameter_after.get_value()
+            if new_value > self.parameter.get_max():
+                new_value = self.parameter.get_max()
+            if new_value < self.parameter.get_min():
+                new_value = self.parameter.get_min()
+            self.parameter.set_value(new_value)
+        else:
+            self.parameter.set_value(self.parameter_after.get_value())
 
     def reset(self):
         """
