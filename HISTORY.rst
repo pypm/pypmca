@@ -22,3 +22,12 @@ History
   * allow no reports on some days of week (eg. BC: Sundays)
   * add fit statistics to help tune reporting noise
   * fix bugs in Ensemble
+
+* 0.2.3 (2020-07-30)
+
+  * allow cumulative to start from 0 at first point in fit
+  * allow modifier to change parameter linearly with time
+  * add code for submitting .csv file for US Forecast Hub
+  * do interpolation with log(alpha)
+  * fix bugs
+
