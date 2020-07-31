@@ -31,3 +31,6 @@ History
   * do interpolation with log(alpha)
   * fix bugs
 
+* 0.2.4 (2020-07-31)
+
+  * minor bug fix
