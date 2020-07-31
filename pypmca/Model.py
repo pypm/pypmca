@@ -448,7 +448,7 @@ class Model:
             self.__add_to_parameter_list(obj.transition_time)
             self.__add_to_parameter_list(obj.parameter_before)
             self.__add_to_parameter_list(obj.parameter_after)
-            if obj.n_step is not None:
+            if getattr(obj,'n_step',None) is not None:
                 self.__add_to_parameter_list(obj.n_step)
 
         elif isinstance(obj, Connector):
