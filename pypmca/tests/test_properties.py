@@ -134,6 +134,66 @@ def test_Ensemble_properties_identical():
                     ratio = ens_hist[i] / single_hist[i]
                     assert np.abs(ratio - 2.) < 0.001
 
+def test_Ensemble_properties_equality():
+    """tests to ensure the properties of Ensemble"""
+    # Test that the ensemble of two identical models, with different scales
+    # and equality contact matrix behaves like the same ensemble
+    # with independent contact matrix
+    test_a1 = Model.open_file(path_model_2_3)
+    test_a1.name = 'test_a1'
+    test_b1 = Model.open_file(path_model_2_3)
+    test_b1.name = 'test_b1'
+    reference1 = Model.open_file(path_model_2_3)
+    reference1.name = 'reference1'
+    cont_0 = test_b1.parameters['cont_0'].get_value()
+    test_b1.parameters['cont_0'].set_value(cont_0*2.)
+    N_0 = test_b1.parameters['N_0'].get_value()
+    test_b1.parameters['N_0'].set_value(N_0*2)
+
+    test_ensemble1 = Ensemble('test_ensemble1', reference1)
+    test_ensemble1.upload_models([test_a1, test_b1])
+
+    test_ensemble1.define_cross_transmission('infection cycle', 'infected',
+                                            'susceptible', 'total',
+                                            'contagious', 'alpha',
+                                            contact_type='diagonal')
+
+    test_a2 = Model.open_file(path_model_2_3)
+    test_a2.name = 'test_a2'
+    test_b2 = Model.open_file(path_model_2_3)
+    test_b2.name = 'test_b2'
+    reference2 = Model.open_file(path_model_2_3)
+    reference2.name = 'reference2'
+    cont_0 = test_b2.parameters['cont_0'].get_value()
+    test_b2.parameters['cont_0'].set_value(cont_0*2.)
+    N_0 = test_b2.parameters['N_0'].get_value()
+    test_b2.parameters['N_0'].set_value(N_0*2)
+
+    test_ensemble2 = Ensemble('test_ensemble2', reference2)
+    test_ensemble2.upload_models([test_a2, test_b2])
+
+    test_ensemble2.define_cross_transmission('infection cycle', 'infected',
+                                            'susceptible', 'total',
+                                            'contagious', 'alpha',
+                                            contact_type='equality')
+
+    n_days = 100
+
+    test_ensemble1.reset()
+    test_ensemble1.evolve_expectations(n_days)
+
+    test_ensemble2.reset()
+    test_ensemble2.evolve_expectations(n_days)
+
+    for pop_name in test_ensemble1.populations:
+        pop1 = test_ensemble1.populations[pop_name]
+        if pop1.show_sim:
+            pop1h = test_ensemble1.populations[pop_name].history
+            pop2h = test_ensemble2.populations[pop_name].history
+            for i in range(len(pop1h)):
+                if pop2h[i] > 0.:
+                    ratio = pop1h[i]/pop2h[i]
+                    assert np.abs(ratio - 1.) < 0.03
 
 def test_Ensemble_properties_different():
     """tests to ensure the properties of Ensemble with different sub models"""

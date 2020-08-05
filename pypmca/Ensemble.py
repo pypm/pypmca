@@ -461,7 +461,7 @@ class Ensemble(Model):
             exclusions = model.boot_pars['exclusion_populations']
             exc_vals = {}
             for exc_pop_name in exclusions:
-                exc_pop = self.populations[exc_pop_name]
+                exc_pop = model.populations[exc_pop_name]
                 exc_vals[exc_pop_name] = exc_pop.history[-1]
             model_exclusions[model_name] = exc_vals
 
