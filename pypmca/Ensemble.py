@@ -266,6 +266,7 @@ class Ensemble(Model):
                 if not isinstance(cont, Parameter):
                     raise TypeError('The contact argument must be a list containing a Parameter object')
             self.contact = contact[0]
+            self.__add_to_parameter_list(contact[0])
         elif contact_type == 'symmetric':
             if not isinstance(contact, list):
                 raise TypeError('The contact argument must be a list of Parameters')
@@ -275,9 +276,19 @@ class Ensemble(Model):
             for cont in contact:
                 if not isinstance(cont, Parameter):
                     raise TypeError('The contact argument must be a list of Parameter objects')
+                self.__add_to_parameter_list(cont)
             self.contact = contact
         elif contact_type not in ['diagonal', 'independent', 'equality']:
             raise ValueError('Contact matrix type not recognized.')
+
+    def __add_to_parameter_list(self, obj):
+        # check that the name of the parameter is unique
+        if str(obj) in self.parameters:
+            par = self.parameters[str(obj)]
+            if obj != par:
+                raise ValueError('Two parameters share the same name: ' + str(obj))
+        else:
+            self.parameters[str(obj)] = obj
 
     def reset_cross_transmission(self):
         self.infected_name = None
