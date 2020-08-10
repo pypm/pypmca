@@ -125,7 +125,7 @@ class Forecast_hub:
         path_model_2 = self.model_dir / 'ref_model_2.pypm'
         ref_model_2 = Model.open_file(path_model_2)
 
-    def get_csv(self,forecast_date):
+    def get_csv(self,forecast_date,us_deaths):
         t0 = datetime.date(2020, 3, 1)
         forecast_date_text = forecast_date.isoformat()
         day_of_week = forecast_date.weekday()
@@ -151,12 +151,13 @@ class Forecast_hub:
             us_inc_periods_dict[dict_name] = {}
         us_cum_point_est_dict['death'] = {}
         us_cum_periods_dict['death'] = {}
+        state_deaths = 0
 
         for state in self.fips_code:
         #for state in ['TX','SC','FL']:
             abbrev = state.lower()
             location = self.fips_code[state]
-            deaths = self.pd_dict['usa-pypm.csv'][abbrev.upper() + '-dt'].fillna(0).values
+            deaths = self.pd_dict['usa-jhu-pypm.csv'][abbrev.upper() + '-dt'].fillna(0).values
 
             success = False
             for model_name in self.model_names:
@@ -204,6 +205,8 @@ class Forecast_hub:
                 for inc_type in inc_types:
                     # for cum record (so far, only deaths needs this)
                     sum = deaths[first_sunday-1]
+                    if inc_type == 'cum':
+                        state_deaths += sum
                     for i_period in point_est_dict:
                         index = int(i_period) - 1
                         target = i_period+' '+periods[i]+' ahead '+inc_type+' '+names[i]
@@ -263,6 +266,10 @@ class Forecast_hub:
                                 us_cum_periods_dict[dict_names[i]][i_period] = [cum_periods[i_rep] for i_rep in range(len(cum_periods))]
 
         # return 'US' summary:
+        # there are additional regions used to define total US deaths Need to correct by adding the additional deaths here
+        additional_deaths = us_deaths - state_deaths
+        print('US total: additional deaths included:', additional_deaths)
+
         location = 'US'
         for i in range(3):
             inc_types = inc_types_list[i]
@@ -283,7 +290,7 @@ class Forecast_hub:
                     # point estimates
                     value = us_inc_point_est_dict[dict_names[i]][i_period]
                     if inc_type == 'cum':
-                        value = us_cum_point_est_dict[dict_names[i]][i_period]
+                        value = us_cum_point_est_dict[dict_names[i]][i_period] + additional_deaths
                     self.add_record(forecast_date_text, target, target_end_date, location, 'point', 'NA', value)
 
                     # quantiles
@@ -296,7 +303,7 @@ class Forecast_hub:
 
                     elif inc_type == 'cum':
                         for quant in quants:
-                            value = np.percentile(us_cum_periods_dict[dict_names[i]][i_period], float(quant) * 100.)
+                            value = np.percentile(us_cum_periods_dict[dict_names[i]][i_period], float(quant) * 100.) + additional_deaths
                             quant_text = '{0:0.3f}'.format(quant)
                             self.add_record(forecast_date_text, target, target_end_date, location, 'quantile', quant_text,
                                             value)
@@ -310,8 +317,10 @@ class Forecast_hub:
         record.append('{0:0.1f}'.format(value))
         self.buff.append(record)
 
-my_forecast = Forecast_hub('/Users/karlen/pypm-temp/usa', ['_2_3_0724'])
-my_csv = my_forecast.get_csv(datetime.date(2020, 7, 26))
+my_forecast = Forecast_hub('/Users/karlen/pypm-temp/usa', ['_2_3_0809'])
+# Indicate the total US deaths (up to and including Saturday) here:
+us_deaths = 162423
+my_csv = my_forecast.get_csv(datetime.date(2020, 8, 9), us_deaths)
 pass
 with open('/Users/karlen/pypm-temp/test-forecast.csv','w') as out:
     for line in my_csv:
