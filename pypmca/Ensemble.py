@@ -627,13 +627,13 @@ class Ensemble(Model):
                 row[i] = 1.
                 self.contact_matrix.append(row)
         elif self.contact_type == 'symmetric':
-            self.contact_matrix = [[0.] * n_model] * n_model
+            self.contact_matrix = [[0. for i in range(n_model) ] for i in range(n_model)]
             i_pnt = 0
             for i in range(n_model):
                 self.contact_matrix[i][i] = 1.
-                for j in (i + 1, n_model):
+                for j in range(i + 1, n_model):
                     self.contact_matrix[i][j] = self.contact[i_pnt].get_value()
-                    self.contact_matrix[i][j] = self.contact[i_pnt].get_value()
+                    self.contact_matrix[j][i] = self.contact[i_pnt].get_value()
                     i_pnt += 1
 
     def __cross_model_transmission(self, expectations=True):
