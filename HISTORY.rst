@@ -34,3 +34,8 @@ History
 * 0.2.4 (2020-07-31)
 
   * minor bug fix
+
+* 0.2.5 (2020-09-11)
+
+  * bug fixes for ensemble
+  * updates for forecast hub
