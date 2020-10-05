@@ -100,7 +100,8 @@ class Multiplier(Connector):
         future_expectations
         """
         scale = self.__get_scale()
-        self.to_population.update_future_expectation(scale, self.delay)
+        if scale > 0:
+            self.to_population.update_future_expectation(scale, self.delay)
 
     def update_data(self):
         """
@@ -108,31 +109,36 @@ class Multiplier(Connector):
         future_expectations
         """
         scale = self.__get_scale()
-        if self.__distribution == 'poisson':
-            n = stats.poisson.rvs(scale)
-            self.to_population.update_future_data(n, self.delay)
-        else:
-            p = self.__nbinom_par.get_value()
-            if p < 0.001:
-                p = 0.001
-            if p > 0.999:
-                p = 0.999
-            r = scale * p / (1. - p)
-            n = 0
-            if r > 0.:
-                n = stats.nbinom.rvs(r, p)
-            self.to_population.update_future_data(n, self.delay)
+        if scale > 0:
+            if self.__distribution == 'poisson':
+                n = stats.poisson.rvs(scale)
+                self.to_population.update_future_data(n, self.delay)
+            else:
+                p = self.__nbinom_par.get_value()
+                if p < 0.001:
+                    p = 0.001
+                if p > 0.999:
+                    p = 0.999
+                r = scale * p / (1. - p)
+                n = 0
+                if r > 0.:
+                    n = stats.nbinom.rvs(r, p)
+                self.to_population.update_future_data(n, self.delay)
 
     def __get_scale(self):
         """
         Calculate expected number to be sent to "to_population"
         """
-        denom = 1.
-        if len(self.from_population) == 3 and \
-                self.from_population[2].history[-1] > 0:
-            denom = self.from_population[2].history[-1]
+        scale = 0.
+        if self.from_population[0].history[-1] > 0 and self.from_population[1].history[-1] > 0:
+            denom = 1.
+            if len(self.from_population) == 3 and \
+                    self.from_population[2].history[-1] > 0:
+                denom = self.from_population[2].history[-1]
 
-        ratio = 1. * self.from_population[0].history[-1] / denom
-        scale = self.scale_parameter.get_value() * ratio * self.from_population[1].history[-1]
-        scale *= self.model.get_time_step()
+            ratio = 1. * self.from_population[0].history[-1] / denom
+            scale = self.scale_parameter.get_value() * ratio * self.from_population[1].history[-1]
+            scale *= self.model.get_time_step()
+        else:
+            iii=1
         return scale
