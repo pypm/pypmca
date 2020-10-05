@@ -39,3 +39,7 @@ History
 
   * bug fixes for ensemble
   * updates for forecast hub
+
+* 0.2.6 (2020-10-04)
+
+ * addition functionality to model vaccination
