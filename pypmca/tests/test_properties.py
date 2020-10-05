@@ -13,6 +13,7 @@ import copy
 from pathlib import Path
 
 example_dir = Path('../../examples/').resolve()
+path_model_2_5 = example_dir / 'ref_model_2_5.pypm'
 path_model_2_4 = example_dir / 'ref_model_2_4.pypm'
 path_model_2_3 = example_dir / 'ref_model_2_3.pypm'
 path_model_2_2 = example_dir / 'ref_model_2_2.pypm'
@@ -499,3 +500,34 @@ def test_linear_modifier():
     assert np.abs(pop_hist[55]-pop_hist[54]-pop_hist[50]+pop_hist[49]) < 0.01
     assert np.abs(pop_hist[75] - pop_hist[74] - pop_hist[70] + pop_hist[69]) < 0.1
     assert np.abs((pop_hist[75] - pop_hist[74])/(pop_hist[55]-pop_hist[54]) - 2.) < 0.1
+
+def test_model_2_5():
+    ref_2_5 = Model.open_file(path_model_2_5)
+    ref_2_3 = Model.open_file(path_model_2_3)
+    #ref_2_5.transitions['vaccination'].enabled = True
+    #ref_2_5.parameters['vaccination_number'].set_value(10000.)
+    ref_2_5.reset()
+    ref_2_5.evolve_expectations(200)
+    ref_2_3.reset()
+    ref_2_3.evolve_expectations(200)
+
+    for pop_name in ref_2_3.populations:
+        pop = ref_2_3.populations[pop_name]
+        if pop.show_sim:
+            print(pop_name)
+            hist_2_3 = ref_2_3.populations[pop_name].history
+            hist_2_5 = ref_2_5.populations[pop_name].history
+            for i in range(len(hist_2_3)):
+                if hist_2_3[i] > 0:
+                    ratio = hist_2_5[i] / hist_2_3[i]
+                    assert np.abs(ratio - 1.) < 0.001
+
+def test_max_mult():
+    ref_2_5 = Model.open_file(path_model_2_5)
+    ref_2_5.transitions['vaccination'].enabled = True
+    ref_2_5.parameters['vaccination_number'].set_value(800000.)
+    ref_2_5.parameters['vaccination_time'].set_value(5)
+    ref_2_5.reset()
+    ref_2_5.boot(expectations=True)
+    ref_2_5.evolve_expectations(200)
+    i=1

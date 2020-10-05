@@ -110,16 +110,45 @@ def test_class_Delay():
 
 def test_class_Adder():
     """tests to ensure the behaviour class Adder"""
-    from_init = 20
-    to_init = 10
-    from_pop = Population('from_pop', from_init)
-    from_next = 40
-    from_pop.future = [from_next]
-    to_pop = Population('to_pop', to_init)
-    test_adder = Adder('test_add', from_pop, to_pop)
-    test_adder.update_expectation()
-    assert to_pop.future[0] == from_next
-
+    for itest in range(5):
+        f_over_t = 2
+        to_init = 10
+        from_init = f_over_t * to_init
+        from_pop = Population('from_pop', from_init)
+        from_next = 40
+        from_pop.future = [from_next]
+        to_pop = Population('to_pop', to_init)
+        if itest == 0:
+            test_adder = Adder('test_add', from_pop, to_pop)
+            test_adder.update_expectation()
+            assert to_pop.future[0] == from_next
+        elif itest == 1:
+            sf = 2.
+            scale_factor = Parameter('scale_factor', sf, 0., 10.)
+            test_adder = Adder('test_add', from_pop, to_pop, scale_factor=scale_factor)
+            test_adder.update_expectation()
+            assert to_pop.future[0] == from_next*sf
+        elif itest == 2:
+            sf = 3.
+            ratio_pops = [from_pop, to_pop]
+            scale_factor = Parameter('scale_factor', sf, 0., 10.)
+            test_adder = Adder('test_add', from_pop, to_pop, scale_factor=scale_factor, ratio_populations=ratio_pops)
+            test_adder.update_expectation()
+            assert to_pop.future[0] == from_next*sf*f_over_t
+        elif itest == 3:
+            sf = 3
+            ratio_pops = [from_pop, to_pop]
+            scale_factor = Parameter('scale_factor', sf, 0, 10,' ','int')
+            test_adder = Adder('test_add', from_pop, to_pop, scale_factor=scale_factor, ratio_populations=ratio_pops)
+            test_adder.update_data()
+            assert to_pop.future[0] == from_next*sf*f_over_t
+        elif itest == 4:
+            sf = 3.1
+            ratio_pops = [from_pop, to_pop]
+            scale_factor = Parameter('scale_factor', sf, 0., 10.)
+            test_adder = Adder('test_add', from_pop, to_pop, scale_factor=scale_factor, ratio_populations=ratio_pops)
+            test_adder.update_data()
+            assert to_pop.future[0] >= from_next*int(sf)*f_over_t
 
 def test_class_Injector():
     """tests to ensure the behaviour class Injector"""
