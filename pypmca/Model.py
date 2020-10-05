@@ -578,6 +578,16 @@ class Model:
         self.name = 'copy: '+from_model.name
         self.description = from_model.description
 
+        self.t0 = from_model.t0
+        self.set_time_step(from_model.get_time_step())
+        if getattr(from_model, "user_dict", None) is not None:
+            self.user_dict = from_model.user_dict
+
+        self.boot_pars['boot_population'] = from_model.boot_pars['boot_population']
+        self.boot_pars['boot_value'] = from_model.boot_pars['boot_value']
+        # self.boot_pars['exclusion_populations'] = exc_pop_list
+        self.boot_needed = True
+
     def save_file(self, filename):
         """
         Save a copy of the current model to a file. The model can be restored
