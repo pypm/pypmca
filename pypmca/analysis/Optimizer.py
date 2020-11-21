@@ -374,6 +374,13 @@ class Optimizer:
             chi2f: naive fitted
             chi2s: unfitted (with autocovariance)
             chi2n: normalization
+
+            This also calculates the properties of estimators: bias and variance
+
+            The ensemble of simulations should only include situations which is similar to expectation.
+            It is not useful to include a simulation which has the epidemic that dies out, for
+            example. A simple condition is applied: the increment to the population for the last 4 days in the simulation
+            should be within a factor of 2 of the expectation.
         """
 
         sim_model = copy.deepcopy(self.model)
@@ -387,6 +394,15 @@ class Optimizer:
         pcov_list = []
         fit_stat_list = []
 
+        condition_days = 5
+        condition_sum_expectation = 0
+        if ref_population.monotonic:
+            condition_sum_expectation = ref_population.history[self.data_range[1]] - \
+                                        ref_population.history[self.data_range[1]-condition_days]
+        else:
+            for day in range(condition_days):
+                condition_sum_expectation += ref_population.history[self.data_range[1]-condition_days]
+
         xdata = np.arange(self.data_range[0], self.data_range[1], 1)
         # last point not included: since its residual is zero by definition:
         n_p = len(xdata) - 1
@@ -394,9 +410,23 @@ class Optimizer:
         if self.calc_chi2s:
             lpdf_zero = stats.multivariate_normal.logpdf(zeros, cov=self.auto_cov)
         for i in range(n_rep):
-            sim_model.reset()
-            sim_model.generate_data(self.data_range[1])
-            sim_population = sim_model.populations[self.population_name]
+            # require the simulation to produce data similar in scale to that observed
+            condition_met = False
+            while not condition_met:
+                sim_model.reset()
+                sim_model.generate_data(self.data_range[1])
+                sim_population = sim_model.populations[self.population_name]
+
+                condition_sum_simulation = 0
+                if sim_population.monotonic:
+                    condition_sum_simulation = sim_population.history[self.data_range[1]] - \
+                                               sim_population.history[self.data_range[1] - condition_days]
+                else:
+                    for day in range(condition_days):
+                        condition_sum_simulation += sim_population.history[self.data_range[1] - condition_days]
+
+                condition_met = condition_sum_simulation < 2. * condition_sum_expectation and \
+                                condition_sum_simulation > 0.5 * condition_sum_expectation
 
             scale = sim_population.history[xdata[-1]] / ref_population.history[xdata[-1]]
             resid = []
