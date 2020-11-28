@@ -47,3 +47,7 @@ History
 * 0.2.7 (2020-11-21)
 
  * condition simulation ensembles
+
+* 0.2.8 (2020-11-28)
+
+ * add tool to make intervals
