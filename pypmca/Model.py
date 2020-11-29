@@ -551,6 +551,9 @@ class Model:
                 par.initial_value = from_par.initial_value
                 par.hidden = from_par.hidden
                 par.mcmc_step = from_par.mcmc_step
+                par.std_estimator = from_par.std_estimator
+                par.parameter_min = from_par.parameter_min
+                par.parameter_max = from_par.parameter_max
                 if from_par.prior_function is not None:
                     prior_function = copy.copy(from_par.prior_function)
                 if from_par.prior_parameters is not None:
