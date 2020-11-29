@@ -89,7 +89,10 @@ class IntervalMaker:
         elif category == 'hospitalization':
             population_name = 'hospitalized'
 
-        norm_day = days_after_t0
+        # norm_day is when the expectation propagation ends and the data generation begins
+        # back this up by a few days, so that reporting noise issues do not generate immediate
+        # negative bias (for daily reports)
+        norm_day = days_after_t0 - 4
 
         # quantile estimates
         # Do many repititions: each time use a new alpha_last and renormalize expectation
