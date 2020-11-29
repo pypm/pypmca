@@ -51,3 +51,7 @@ History
 * 0.2.8 (2020-11-28)
 
  * add tool to make intervals
+
+* 0.2.9 (2020-11-29)
+
+ * minor corrections and improvements
