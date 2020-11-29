@@ -1,8 +1,7 @@
 # -*- coding: utf-8 -*-
 """
-Produce .csv file suitable for submission to covid19-forecast-hub (https://github.com/reichlab/covid19-forecast-hub)
-
-
+Produce .csv file suitable for submission to the Germany covid19-forecast-hub
+(https://github.com/KITmetricslab/covid19-forecast-hub-de)
 
 @author: karlen
 """
@@ -35,63 +34,47 @@ class Forecast_hub:
         # number of days for death_normalization
         self.death_norm = 14
 
-        self.fips_code = {
-            'AL': '01',
-            'AK': '02',
-            'AZ': '04',
-            'AR': '05',
-            'CA': '06',
-            'CO': '08',
-            'CT': '09',
-            'DE': '10',
-            'DC': '11',
-            'FL': '12',
-            'GA': '13',
-            'HI': '15',
-            'ID': '16',
-            'IL': '17',
-            'IN': '18',
-            'IA': '19',
-            'KS': '20',
-            'KY': '21',
-            'LA': '22',
-            'ME': '23',
-            'MD': '24',
-            'MA': '25',
-            'MI': '26',
-            'MN': '27',
-            'MS': '28',
-            'MO': '29',
-            'MT': '30',
-            'NE': '31',
-            'NV': '32',
-            'NH': '33',
-            'NJ': '34',
-            'NM': '35',
-            'NY': '36',
-            'NC': '37',
-            'ND': '38',
-            'OH': '39',
-            'OK': '40',
-            'OR': '41',
-            'PA': '42',
-            'PR': '72',
-            'RI': '44',
-            'SC': '45',
-            'SD': '46',
-            'TN': '47',
-            'TX': '48',
-            'UT': '49',
-            'VT': '50',
-            'VA': '51',
-            'WA': '53',
-            'WV': '54',
-            'WI': '55',
-            'WY': '56'
+        self.regional_abbreviations = {
+            'Baden-Wurttemberg': 'bw',
+            'Bavaria': 'by',
+            'Berlin': 'be',
+            'Brandenburg': 'bb',
+            'Bremen': 'hb',
+            'Hamburg': 'hh',
+            'Hesse': 'he',
+            'Lower Saxony': 'ni',
+            'Mecklenburg-Vorpommern': 'mv',
+            'North Rhine-Westphalia': 'nw',
+            'Rhineland-Palatinate': 'rp',
+            'Saarland': 'sl',
+            'Saxony': 'sn',
+            'Saxony-Anhalt': 'st',
+            'Schleswig-Holstein': 'sh',
+            'Thuringia': 'th',
+        }
+
+        self.regional_locations = {
+            'Baden-Wurttemberg': 'GM01',
+            'Bavaria': 'GM02',
+            'Bremen': 'GM03',
+            'Hamburg': 'GM04',
+            'Hesse': 'GM05',
+            'Lower Saxony': 'GM06',
+            'North Rhine-Westphalia': 'GM07',
+            'Rhineland-Palatinate': 'GM08',
+            'Saarland': 'GM09',
+            'Schleswig-Holstein': 'GM10',
+            'Brandenburg': 'GM11',
+            'Mecklenburg-Vorpommern': 'GM12',
+            'Saxony': 'GM13',
+            'Saxony-Anhalt': 'GM14',
+            'Thuringia': 'GM15',
+            'Berlin': 'GM16',
+            'Germany': 'GM'
         }
 
     def get_data(self):
-        data_folder = 'data/covid19/USA'
+        data_folder = 'data/covid19/Germany'
 
         success = True
         pd_dict = {}
@@ -126,7 +109,7 @@ class Forecast_hub:
         path_model_2 = self.model_dir / 'ref_model_2.pypm'
         ref_model_2 = Model.open_file(path_model_2)
 
-    def get_csv(self,forecast_date,us_deaths):
+    def get_csv(self,forecast_date,de_deaths):
         t0 = datetime.date(2020, 3, 1)
         forecast_date_text = forecast_date.isoformat()
         day_of_week = forecast_date.weekday()
@@ -137,28 +120,27 @@ class Forecast_hub:
         elif day_of_week < 6:
             first_sunday += 6 - day_of_week
 
-        names = ['case', 'death', 'hosp']
-        dict_names = ['case', 'death', 'hospitalization']
-        periods = ['wk', 'wk', 'day']
-        inc_types_list = [['inc'], ['inc', 'cum'], ['inc']]
+        names = ['case', 'death']
+        dict_names = ['case', 'death']
+        periods = ['wk', 'wk']
+        inc_types_list = [['inc', 'cum'], ['inc', 'cum']]
 
-        # collect information for full US
-        us_inc_point_est_dict = {}
-        us_inc_periods_dict = {}
-        us_cum_point_est_dict = {}
-        us_cum_periods_dict = {}
+        # collect information for all Germany
+        de_inc_point_est_dict = {}
+        de_inc_periods_dict = {}
+        de_cum_point_est_dict = {}
+        de_cum_periods_dict = {}
         for dict_name in dict_names:
-            us_inc_point_est_dict[dict_name] = {}
-            us_inc_periods_dict[dict_name] = {}
-        us_cum_point_est_dict['death'] = {}
-        us_cum_periods_dict['death'] = {}
+            de_inc_point_est_dict[dict_name] = {}
+            de_inc_periods_dict[dict_name] = {}
+        de_cum_point_est_dict['death'] = {}
+        de_cum_periods_dict['death'] = {}
         state_deaths = 0
 
-        for state in self.fips_code:
-        #for state in ['TX','SC','FL']:
-            abbrev = state.lower()
-            location = self.fips_code[state]
-            deaths = self.pd_dict['usa-jhu-pypm.csv'][abbrev.upper() + '-dt'].fillna(0).values
+        for state in self.regional_abbreviations:
+            abbrev = self.regional_abbreviations[state]
+            location = self.regional_locations[state]
+            deaths = self.pd_dict['germany-rki-pypm.csv'][abbrev + '-dt'].fillna(0).values
 
             success = False
             for model_name in self.model_names:
@@ -179,22 +161,14 @@ class Forecast_hub:
                         break
                     except:
                         pass
-            for model_name in self.model_names:
-                for model_suffix in ['_h','']:
-                    try:
-                        filename = abbrev + model_name + model_suffix + '.pypm'
-                        path_model = self.model_dir / filename
-                        hosp_model = Model.open_file(path_model)
-                        break
-                    except:
-                        pass
+
             if not success:
                 raise RuntimeError('No model for: ', abbrev)
 
-            models = [case_model, death_model, hosp_model]
-            print(models[0].name, models[1].name, models[2].name)
+            models = [case_model, death_model]
+            print(models[0].name, models[1].name)
 
-            for i in range(3):
+            for i in range(2):
                 model = models[i]
                 inc_types = inc_types_list[i]
 
@@ -224,32 +198,32 @@ class Forecast_hub:
                             sum += point_est_dict[i_period]
                             value = sum
 
-                            if i_period in us_cum_point_est_dict['death']:
-                                us_cum_point_est_dict['death'][i_period] += sum
+                            if i_period in de_cum_point_est_dict['death']:
+                                de_cum_point_est_dict['death'][i_period] += sum
                             else:
-                                us_cum_point_est_dict['death'][i_period] = sum
+                                de_cum_point_est_dict['death'][i_period] = sum
 
                         self.add_record(forecast_date_text,target,target_end_date,location,'point','NA',value)
 
                         # quantiles
                         if inc_type == 'inc':
-                            if i_period in us_inc_point_est_dict[dict_names[i]]:
-                                us_inc_point_est_dict[dict_names[i]][i_period] += value
+                            if i_period in de_inc_point_est_dict[dict_names[i]]:
+                                de_inc_point_est_dict[dict_names[i]][i_period] += value
                             else:
-                                us_inc_point_est_dict[dict_names[i]][i_period] = value
+                                de_inc_point_est_dict[dict_names[i]][i_period] = value
 
                             for quant in quantile_dict[i_period]:
                                 value = quantile_dict[i_period][quant]
                                 self.add_record(forecast_date_text, target, target_end_date, location, 'quantile', quant, value)
 
-                            if i_period in us_inc_periods_dict[dict_names[i]]:
+                            if i_period in de_inc_periods_dict[dict_names[i]]:
                                 ip_len = len(inc_periods[index])
-                                for i_rep in range(len(us_inc_periods_dict[dict_names[i]][i_period])):
+                                for i_rep in range(len(de_inc_periods_dict[dict_names[i]][i_period])):
                                     # in case there are fewer repetitions, loop over others:
                                     ip_index = i_rep % ip_len
-                                    us_inc_periods_dict[dict_names[i]][i_period][i_rep] += inc_periods[index][ip_index]
+                                    de_inc_periods_dict[dict_names[i]][i_period][i_rep] += inc_periods[index][ip_index]
                             else:
-                                us_inc_periods_dict[dict_names[i]][i_period] = copy.copy(inc_periods[index])
+                                de_inc_periods_dict[dict_names[i]][i_period] = copy.copy(inc_periods[index])
                         elif inc_type == 'cum':
                             for i_rep in range(len(inc_periods[index])):
                                 cum_periods[i_rep] += inc_periods[index][i_rep]
@@ -257,29 +231,26 @@ class Forecast_hub:
                                 value = np.percentile(cum_periods, float(quant)*100.)
                                 self.add_record(forecast_date_text, target, target_end_date, location, 'quantile', quant, value)
 
-                            if i_period in us_cum_periods_dict[dict_names[i]]:
+                            if i_period in de_cum_periods_dict[dict_names[i]]:
                                 ip_len = len(cum_periods)
-                                for i_rep in range(len(us_cum_periods_dict[dict_names[i]][i_period])):
+                                for i_rep in range(len(de_cum_periods_dict[dict_names[i]][i_period])):
                                     # in case there are fewer repetitions, loop over others:
                                     ip_index = i_rep % ip_len
-                                    us_cum_periods_dict[dict_names[i]][i_period][i_rep] += cum_periods[ip_index]
+                                    de_cum_periods_dict[dict_names[i]][i_period][i_rep] += cum_periods[ip_index]
                             else:
-                                us_cum_periods_dict[dict_names[i]][i_period] = [cum_periods[i_rep] for i_rep in range(len(cum_periods))]
+                                de_cum_periods_dict[dict_names[i]][i_period] = [cum_periods[i_rep] for i_rep in range(len(cum_periods))]
 
-        # return 'US' summary:
-        # there are additional regions used to define total US deaths Need to correct by adding the additional deaths here
-        additional_deaths = us_deaths - state_deaths
-        print('US total: additional deaths included:', additional_deaths)
+        # return 'Germany' summary:
+        # there is a separate file with Germany wide deaths. Need to correct by adding the additional deaths here
+        additional_deaths = de_deaths - state_deaths
+        print('Germany total: additional deaths included:', additional_deaths)
 
-        location = 'US'
-        for i in range(3):
+        location = self.regional_locations['Germany']
+        quants = [0.01, 0.025] + [0.05 + 0.05 * i for i in range(19)] + [0.975, 0.99]
+        for i in range(2):
             inc_types = inc_types_list[i]
-            if dict_names[i] in ['case']:
-                quants = [0.025, 0.1, 0.25, 0.5, 0.75, 0.9, 0.975]
-            elif dict_names[i] in ['death', 'hospitalization']:
-                quants = [0.01, 0.025] + [0.05 + 0.05 * i for i in range(19)] + [0.975, 0.99]
             for inc_type in inc_types:
-                for i_period in us_inc_point_est_dict[dict_names[i]]:
+                for i_period in de_inc_point_est_dict[dict_names[i]]:
                     target = i_period + ' ' + periods[i] + ' ahead ' + inc_type + ' ' + names[i]
                     days = int(i_period)
                     if periods[i] == 'wk':
@@ -289,22 +260,22 @@ class Forecast_hub:
                     target_end_date = (t0 + timedelta(days=(first_sunday + days - 1))).isoformat()
 
                     # point estimates
-                    value = us_inc_point_est_dict[dict_names[i]][i_period]
+                    value = de_inc_point_est_dict[dict_names[i]][i_period]
                     if inc_type == 'cum':
-                        value = us_cum_point_est_dict[dict_names[i]][i_period] + additional_deaths
+                        value = de_cum_point_est_dict[dict_names[i]][i_period] + additional_deaths
                     self.add_record(forecast_date_text, target, target_end_date, location, 'point', 'NA', value)
 
                     # quantiles
                     if inc_type == 'inc':
                         for quant in quants:
-                            value = np.percentile(us_inc_periods_dict[dict_names[i]][i_period], float(quant)*100.)
+                            value = np.percentile(de_inc_periods_dict[dict_names[i]][i_period], float(quant)*100.)
                             quant_text = '{0:0.3f}'.format(quant)
                             self.add_record(forecast_date_text, target, target_end_date, location, 'quantile', quant_text,
                                             value)
 
                     elif inc_type == 'cum':
                         for quant in quants:
-                            value = np.percentile(us_cum_periods_dict[dict_names[i]][i_period], float(quant) * 100.) + additional_deaths
+                            value = np.percentile(de_cum_periods_dict[dict_names[i]][i_period], float(quant) * 100.) + additional_deaths
                             quant_text = '{0:0.3f}'.format(quant)
                             self.add_record(forecast_date_text, target, target_end_date, location, 'quantile', quant_text,
                                             value)
@@ -318,13 +289,13 @@ class Forecast_hub:
         record.append('{0:0.1f}'.format(value))
         self.buff.append(record)
 
-my_forecast = Forecast_hub('/Users/karlen/pypm-temp/usa', ['_2_3_1122'])
+my_forecast = Forecast_hub('/Users/karlen/pypm-temp/germany', ['_2_3_1122'])
 # Indicate the total US deaths (up to and including Saturday) here:
-us_deaths = 255861
+de_deaths = xxx
 
-my_csv = my_forecast.get_csv(datetime.date(2020, 11, 22), us_deaths)
+my_csv = my_forecast.get_csv(datetime.date(2020, 11, 22), de_deaths)
 pass
-with open('/Users/karlen/pypm-temp/test-forecast.csv','w') as out:
+with open('/Users/karlen/pypm-temp/test-germany-forecast.csv','w') as out:
     for line in my_csv:
         record = ','.join(line)
         out.write(record + '\n')

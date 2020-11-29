@@ -36,6 +36,8 @@ class IntervalMaker:
                 self.quant = [0.025, 0.1, 0.25, 0.5, 0.75, 0.9, 0.975]
             elif category in ['death', 'hospitalization']:
                 self.quant = [0.01, 0.025] + [0.05 + 0.05 * i for i in range(19)] + [0.975, 0.99]
+        if self.hub == 'Germany':
+            self.quant = [0.01, 0.025] + [0.05 + 0.05 * i for i in range(19)] + [0.975, 0.99]
 
     def append_user_dict(self, category, model):
         if 'forecast_hub' not in model.user_dict:
