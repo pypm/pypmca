@@ -109,7 +109,7 @@ class Forecast_hub:
         path_model_2 = self.model_dir / 'ref_model_2.pypm'
         ref_model_2 = Model.open_file(path_model_2)
 
-    def get_csv(self,forecast_date,de_deaths):
+    def get_csv(self, forecast_date, category):
         t0 = datetime.date(2020, 3, 1)
         forecast_date_text = forecast_date.isoformat()
         day_of_week = forecast_date.weekday()
@@ -120,21 +120,23 @@ class Forecast_hub:
         elif day_of_week < 6:
             first_sunday += 6 - day_of_week
 
-        names = ['case', 'death']
-        dict_names = ['case', 'death']
-        periods = ['wk', 'wk']
-        inc_types_list = [['inc', 'cum'], ['inc', 'cum']]
+        #names = ['case', 'death']
+        #dict_names = ['case', 'death']
+        #periods = ['wk', 'wk']
+        #inc_types_list = [['inc', 'cum'], ['inc', 'cum']]
+
+        period = 'wk'
+        inc_types = ['inc', 'cum']
 
         # collect information for all Germany
         de_inc_point_est_dict = {}
         de_inc_periods_dict = {}
         de_cum_point_est_dict = {}
         de_cum_periods_dict = {}
-        for dict_name in dict_names:
-            de_inc_point_est_dict[dict_name] = {}
-            de_inc_periods_dict[dict_name] = {}
-        de_cum_point_est_dict['death'] = {}
-        de_cum_periods_dict['death'] = {}
+        de_inc_point_est_dict[category] = {}
+        de_inc_periods_dict[category] = {}
+        de_cum_point_est_dict[category] = {}
+        de_cum_periods_dict[category] = {}
         state_deaths = 0
 
         for state in self.regional_abbreviations:
@@ -143,142 +145,142 @@ class Forecast_hub:
             deaths = self.pd_dict['germany-rki-pypm.csv'][abbrev + '-dt'].fillna(0).values
 
             success = False
-            for model_name in self.model_names:
-                try:
-                    filename = abbrev + model_name + '.pypm'
-                    path_model = self.model_dir / filename
-                    case_model = Model.open_file(path_model)
-                    success = True
-                    break
-                except:
-                    pass
-            for model_name in self.model_names:
-                for model_suffix in ['_d','_h','']:
+            model = None
+
+            if category == 'case':
+                for model_name in self.model_names:
                     try:
-                        filename = abbrev + model_name + model_suffix + '.pypm'
+                        filename = abbrev + model_name + '.pypm'
                         path_model = self.model_dir / filename
-                        death_model = Model.open_file(path_model)
+                        model = Model.open_file(path_model)
+                        success = True
                         break
                     except:
                         pass
+            elif category == 'death':
+                for model_name in self.model_names:
+                    for model_suffix in ['_d','_h','']:
+                        try:
+                            filename = abbrev + model_name + model_suffix + '.pypm'
+                            path_model = self.model_dir / filename
+                            model = Model.open_file(path_model)
+                            break
+                        except:
+                            pass
 
             if not success:
                 raise RuntimeError('No model for: ', abbrev)
 
-            models = [case_model, death_model]
-            print(models[0].name, models[1].name)
+            print(model.name)
 
-            for i in range(2):
-                model = models[i]
-                inc_types = inc_types_list[i]
-
-                hub_dict = model.user_dict['forecast_hub'][forecast_date][dict_names[i]]
-                point_est_dict = hub_dict['point_estimates']
-                quantile_dict = hub_dict['quantiles']
-                inc_periods = hub_dict['inc_periods']
-                cum_periods = [deaths[first_sunday-1]] * len(inc_periods[0])
-                for inc_type in inc_types:
-                    # for cum record (so far, only deaths needs this)
-                    sum = deaths[first_sunday-1]
-                    if inc_type == 'cum':
-                        state_deaths += sum
-                    for i_period in point_est_dict:
-                        index = int(i_period) - 1
-                        target = i_period+' '+periods[i]+' ahead '+inc_type+' '+names[i]
-                        days = int(i_period)
-                        if periods[i] == 'wk':
-                            days *= 7
-                        else:
-                            days += 1
-                        target_end_date = (t0 + timedelta(days=(first_sunday + days - 1))).isoformat()
-
-                        # point estimates
-                        value = point_est_dict[i_period]
-                        if inc_type == 'cum':
-                            sum += point_est_dict[i_period]
-                            value = sum
-
-                            if i_period in de_cum_point_est_dict['death']:
-                                de_cum_point_est_dict['death'][i_period] += sum
-                            else:
-                                de_cum_point_est_dict['death'][i_period] = sum
-
-                        self.add_record(forecast_date_text,target,target_end_date,location,'point','NA',value)
-
-                        # quantiles
-                        if inc_type == 'inc':
-                            if i_period in de_inc_point_est_dict[dict_names[i]]:
-                                de_inc_point_est_dict[dict_names[i]][i_period] += value
-                            else:
-                                de_inc_point_est_dict[dict_names[i]][i_period] = value
-
-                            for quant in quantile_dict[i_period]:
-                                value = quantile_dict[i_period][quant]
-                                self.add_record(forecast_date_text, target, target_end_date, location, 'quantile', quant, value)
-
-                            if i_period in de_inc_periods_dict[dict_names[i]]:
-                                ip_len = len(inc_periods[index])
-                                for i_rep in range(len(de_inc_periods_dict[dict_names[i]][i_period])):
-                                    # in case there are fewer repetitions, loop over others:
-                                    ip_index = i_rep % ip_len
-                                    de_inc_periods_dict[dict_names[i]][i_period][i_rep] += inc_periods[index][ip_index]
-                            else:
-                                de_inc_periods_dict[dict_names[i]][i_period] = copy.copy(inc_periods[index])
-                        elif inc_type == 'cum':
-                            for i_rep in range(len(inc_periods[index])):
-                                cum_periods[i_rep] += inc_periods[index][i_rep]
-                            for quant in quantile_dict[i_period]:
-                                value = np.percentile(cum_periods, float(quant)*100.)
-                                self.add_record(forecast_date_text, target, target_end_date, location, 'quantile', quant, value)
-
-                            if i_period in de_cum_periods_dict[dict_names[i]]:
-                                ip_len = len(cum_periods)
-                                for i_rep in range(len(de_cum_periods_dict[dict_names[i]][i_period])):
-                                    # in case there are fewer repetitions, loop over others:
-                                    ip_index = i_rep % ip_len
-                                    de_cum_periods_dict[dict_names[i]][i_period][i_rep] += cum_periods[ip_index]
-                            else:
-                                de_cum_periods_dict[dict_names[i]][i_period] = [cum_periods[i_rep] for i_rep in range(len(cum_periods))]
-
-        # return 'Germany' summary:
-        # there is a separate file with Germany wide deaths. Need to correct by adding the additional deaths here
-        additional_deaths = de_deaths - state_deaths
-        print('Germany total: additional deaths included:', additional_deaths)
-
-        location = self.regional_locations['Germany']
-        quants = [0.01, 0.025] + [0.05 + 0.05 * i for i in range(19)] + [0.975, 0.99]
-        for i in range(2):
-            inc_types = inc_types_list[i]
+            hub_dict = model.user_dict['forecast_hub'][forecast_date][category]
+            point_est_dict = hub_dict['point_estimates']
+            quantile_dict = hub_dict['quantiles']
+            inc_periods = hub_dict['inc_periods']
+            cum_periods = [deaths[first_sunday-1]] * len(inc_periods[0])
             for inc_type in inc_types:
-                for i_period in de_inc_point_est_dict[dict_names[i]]:
-                    target = i_period + ' ' + periods[i] + ' ahead ' + inc_type + ' ' + names[i]
+                # for cum record (so far, only deaths needs this)
+                sum = deaths[first_sunday-1]
+                if inc_type == 'cum':
+                    state_deaths += sum
+                for i_period in point_est_dict:
+                    index = int(i_period) - 1
+                    target = i_period+' '+period+' ahead '+inc_type+' '+category
                     days = int(i_period)
-                    if periods[i] == 'wk':
+                    if period == 'wk':
                         days *= 7
                     else:
                         days += 1
                     target_end_date = (t0 + timedelta(days=(first_sunday + days - 1))).isoformat()
 
                     # point estimates
-                    value = de_inc_point_est_dict[dict_names[i]][i_period]
+                    value = point_est_dict[i_period]
                     if inc_type == 'cum':
-                        value = de_cum_point_est_dict[dict_names[i]][i_period] + additional_deaths
-                    self.add_record(forecast_date_text, target, target_end_date, location, 'point', 'NA', value)
+                        sum += point_est_dict[i_period]
+                        value = sum
+
+                        if i_period in de_cum_point_est_dict['death']:
+                            de_cum_point_est_dict['death'][i_period] += sum
+                        else:
+                            de_cum_point_est_dict['death'][i_period] = sum
+
+                    self.add_record(forecast_date_text,target,target_end_date,location,'point','NA',value)
 
                     # quantiles
                     if inc_type == 'inc':
-                        for quant in quants:
-                            value = np.percentile(de_inc_periods_dict[dict_names[i]][i_period], float(quant)*100.)
-                            quant_text = '{0:0.3f}'.format(quant)
-                            self.add_record(forecast_date_text, target, target_end_date, location, 'quantile', quant_text,
-                                            value)
+                        if i_period in de_inc_point_est_dict[category]:
+                            de_inc_point_est_dict[category][i_period] += value
+                        else:
+                            de_inc_point_est_dict[category][i_period] = value
 
+                        for quant in quantile_dict[i_period]:
+                            value = quantile_dict[i_period][quant]
+                            self.add_record(forecast_date_text, target, target_end_date, location, 'quantile', quant, value)
+
+                        if i_period in de_inc_periods_dict[category]:
+                            ip_len = len(inc_periods[index])
+                            for i_rep in range(len(de_inc_periods_dict[category][i_period])):
+                                # in case there are fewer repetitions, loop over others:
+                                ip_index = i_rep % ip_len
+                                de_inc_periods_dict[category][i_period][i_rep] += inc_periods[index][ip_index]
+                        else:
+                            de_inc_periods_dict[category][i_period] = copy.copy(inc_periods[index])
                     elif inc_type == 'cum':
-                        for quant in quants:
-                            value = np.percentile(de_cum_periods_dict[dict_names[i]][i_period], float(quant) * 100.) + additional_deaths
-                            quant_text = '{0:0.3f}'.format(quant)
-                            self.add_record(forecast_date_text, target, target_end_date, location, 'quantile', quant_text,
-                                            value)
+                        for i_rep in range(len(inc_periods[index])):
+                            cum_periods[i_rep] += inc_periods[index][i_rep]
+                        for quant in quantile_dict[i_period]:
+                            value = np.percentile(cum_periods, float(quant)*100.)
+                            self.add_record(forecast_date_text, target, target_end_date, location, 'quantile', quant, value)
+
+                        if i_period in de_cum_periods_dict[category]:
+                            ip_len = len(cum_periods)
+                            for i_rep in range(len(de_cum_periods_dict[category][i_period])):
+                                # in case there are fewer repetitions, loop over others:
+                                ip_index = i_rep % ip_len
+                                de_cum_periods_dict[category][i_period][i_rep] += cum_periods[ip_index]
+                        else:
+                            de_cum_periods_dict[category][i_period] = [cum_periods[i_rep] for i_rep in range(len(cum_periods))]
+
+        # return 'Germany' summary:
+        # there is a separate file with Germany wide deaths. Need to correct by adding the additional deaths here
+        #additional_deaths = de_deaths - state_deaths
+        additional_deaths = 0
+        print('Germany total deaths included:',state_deaths)
+        #print('Germany total: additional deaths included:', additional_deaths)
+
+        location = self.regional_locations['Germany']
+        quants = [0.01, 0.025] + [0.05 + 0.05 * i for i in range(19)] + [0.975, 0.99]
+        #for i in range(2):
+        for inc_type in inc_types:
+            for i_period in de_inc_point_est_dict[category]:
+                target = i_period + ' ' + period + ' ahead ' + inc_type + ' ' + category
+                days = int(i_period)
+                if period == 'wk':
+                    days *= 7
+                else:
+                    days += 1
+                target_end_date = (t0 + timedelta(days=(first_sunday + days - 1))).isoformat()
+
+                # point estimates
+                value = de_inc_point_est_dict[category][i_period]
+                if inc_type == 'cum':
+                    value = de_cum_point_est_dict[category][i_period] + additional_deaths
+                self.add_record(forecast_date_text, target, target_end_date, location, 'point', 'NA', value)
+
+                # quantiles
+                if inc_type == 'inc':
+                    for quant in quants:
+                        value = np.percentile(de_inc_periods_dict[category][i_period], float(quant)*100.)
+                        quant_text = '{0:0.3f}'.format(quant)
+                        self.add_record(forecast_date_text, target, target_end_date, location, 'quantile', quant_text,
+                                        value)
+
+                elif inc_type == 'cum':
+                    for quant in quants:
+                        value = np.percentile(de_cum_periods_dict[category][i_period], float(quant) * 100.) + additional_deaths
+                        quant_text = '{0:0.3f}'.format(quant)
+                        self.add_record(forecast_date_text, target, target_end_date, location, 'quantile', quant_text,
+                                        value)
 
         return self.buff
 
@@ -291,9 +293,16 @@ class Forecast_hub:
 
 my_forecast = Forecast_hub('/Users/karlen/pypm-temp/germany', ['_2_3_1122'])
 # Indicate the total US deaths (up to and including Saturday) here:
-de_deaths = xxx
+#de_deaths = xxx
 
-my_csv = my_forecast.get_csv(datetime.date(2020, 11, 22), de_deaths)
+my_csv = my_forecast.get_csv(datetime.date(2020, 11, 22), 'case')
+pass
+with open('/Users/karlen/pypm-temp/test-germany-forecast-case.csv','w') as out:
+    for line in my_csv:
+        record = ','.join(line)
+        out.write(record + '\n')
+
+my_csv = my_forecast.get_csv(datetime.date(2020, 11, 22), 'death')
 pass
 with open('/Users/karlen/pypm-temp/test-germany-forecast.csv','w') as out:
     for line in my_csv:
