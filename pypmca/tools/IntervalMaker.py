@@ -23,21 +23,23 @@ class IntervalMaker:
         # forecast_date: intended date for forecast (typically upcoming Sunday): datetime.date object
         self.hub = hub
         self.forecast_date = forecast_date
-        self.quant = []
+        self.quantile_dict = self.def_quantile_dict()
         self.point_estimates = {}
         self.quantiles = {}
         self.inc_periods = None
         self.sim_alphas = []
 
-    def set_quantiles(self, category):
-        self.quant = None
+    def def_quantile_dict(self):
+        # defines the default quantiles to produce for each category
+        dict = {}
         if self.hub == 'USA':
-            if category in ['case']:
-                self.quant = [0.025, 0.1, 0.25, 0.5, 0.75, 0.9, 0.975]
-            elif category in ['death', 'hospitalization']:
-                self.quant = [0.01, 0.025] + [0.05 + 0.05 * i for i in range(19)] + [0.975, 0.99]
+            dict['case'] = [0.025, 0.1, 0.25, 0.5, 0.75, 0.9, 0.975]
+            for category in ['death', 'hospitalization']:
+                dict[category] = [0.01, 0.025] + [0.05 + 0.05 * i for i in range(19)] + [0.975, 0.99]
         if self.hub == 'Germany':
-            self.quant = [0.01, 0.025] + [0.05 + 0.05 * i for i in range(19)] + [0.975, 0.99]
+            for category in ['case','death']:
+                dict[category] = [0.01, 0.025] + [0.05 + 0.05 * i for i in range(19)] + [0.975, 0.99]
+        return dict
 
     def append_user_dict(self, category, model):
         if 'forecast_hub' not in model.user_dict:
@@ -79,7 +81,9 @@ class IntervalMaker:
         elif category in ['hospitalization']:
             n_days = days_after_t0 + n_periods
 
-        self.set_quantiles(category)
+        quant = None
+        if category in self.quantile_dict:
+            quant = self.quantile_dict[category]
 
         population_name = None
         if category == 'case':
@@ -197,7 +201,7 @@ class IntervalMaker:
                 self.point_estimates[str(week + 1)] = value
 
                 quant_dict = {}
-                for quantile in self.quant:
+                for quantile in quant:
                     value = np.percentile(self.inc_periods[week], quantile * 100.)
                     if value < 0.:
                         value = 0.
@@ -213,7 +217,7 @@ class IntervalMaker:
                 self.point_estimates[str(day + 1)] = value
 
                 quant_dict = {}
-                for quantile in self.quant:
+                for quantile in quant:
                     value = np.percentile(self.inc_periods[day], quantile * 100.)
                     if value < 0.:
                         value = 0.
