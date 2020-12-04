@@ -19,6 +19,7 @@ class Delay:
             - norm: delay_parameters are mean and standard deviation
             - uniform: delay_parameters are mean and half width
             - erlang: delay_parameters are mean and 'k' (number of ODE stages)
+            - gamma: delay_parameters are mean and standard deviation
         - delay_parameters: dictionary of Parameter objects. The units are days.
             - Can be None if delay_type is 'fast'
         - model: Model object that this delay is to be used with
@@ -26,10 +27,10 @@ class Delay:
               specified to access the model time_step
     """
 
-    DELAY_TYPES = ['fast', 'norm', 'uniform', 'erlang']
+    DELAY_TYPES = ['fast', 'norm', 'uniform', 'erlang', 'gamma']
     DELAY_PAR_KEYS = {'fast': [], 'norm': ['mean', 'sigma'],
                       'uniform': ['mean', 'half_width'],
-                      'erlang': ['mean', 'k']}
+                      'erlang': ['mean', 'k'], 'gamma': ['mean', 'sigma']}
     EPSILON = 0.0001  # futures assigned until cdf reaches (1.-EPS)
 
     def __init__(self, delay_name: str, delay_type: str,
@@ -118,12 +119,19 @@ class Delay:
                 sigma = self.delay_parameters['sigma'].get_value()
                 scale = sigma * day
                 dist = stats.norm
-            if self.delay_type == 'uniform':
+            elif self.delay_type == 'gamma':
+                loc = 0.
+                sigma = self.delay_parameters['sigma'].get_value()
+                mu = max(0.001,mean)
+                a = (mu/sigma)**2
+                scale = sigma**2/mu * day
+                dist = stats.gamma
+            elif self.delay_type == 'uniform':
                 half_width = self.delay_parameters['half_width'].get_value()
                 loc = mean * day - half_width * day
                 scale = 2. * half_width * day
                 dist = stats.uniform
-            if self.delay_type == 'erlang':
+            elif self.delay_type == 'erlang':
                 # this mimics an ODE type delay with # of stages = a 
                 loc = 0.
                 a = self.delay_parameters['k'].get_value()
@@ -132,19 +140,21 @@ class Delay:
 
             # use cdf with 0.5 time_step offsets
             cdf = 0.
-            if self.delay_type != 'erlang':
-                cdf = dist.cdf(0.5, loc=loc, scale=scale)
-            else:
+            if self.delay_type in ['gamma','erlang']:
                 cdf = dist.cdf(0.5, a, loc=loc, scale=scale)
+            else:
+                cdf = dist.cdf(0.5, loc=loc, scale=scale)
+
             future = [cdf]
             step = 0
             while cdf < (1 - self.EPSILON):
                 last_cdf = cdf
                 step += 1
-                if self.delay_type != 'erlang':
-                    cdf = dist.cdf(step + 0.5, loc=loc, scale=scale)
-                else:
+                if self.delay_type in ['gamma','erlang']:
                     cdf = dist.cdf(step + 0.5, a, loc=loc, scale=scale)
+                else:
+                    cdf = dist.cdf(step + 0.5, loc=loc, scale=scale)
+
                 increment = cdf - last_cdf
                 future.append(increment)
             missing = 1. - cdf
