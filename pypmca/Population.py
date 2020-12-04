@@ -37,11 +37,14 @@ class Population:
         - if True, and the integer parameter report_days is provided, use that to determine which
           days of week that reports are produced. In BC, reports are zero on Sunday and included in the
           next reporting day. Bit encoded, with Monday = bit 0... Sunday = bit 6. BC: report_days = 63
+        - if True and report_noise_weekly is True, then backlog is released on a weekly basis to model
+          states that have a large variance in their weekly death reports
     """
 
     def __init__(self, population_name: str, initial_value, description: str = '',
                  hidden: bool = True, color: str = 'black', show_sim: bool = False, report_noise: bool = False,
-                 report_noise_par: Parameter = None, report_backlog_par: Parameter = None, report_days: Parameter = None):
+                 report_noise_par: Parameter = None, report_backlog_par: Parameter = None,
+                 report_days: Parameter = None, report_noise_weekly: bool = False):
         """
         Constructor
 
@@ -85,6 +88,7 @@ class Population:
         self.__report_noise_par = None
         self.__report_backlog_par = None
         self.__report_days = None
+        self.report_noise_weekly = report_noise_weekly
         self.set_report_noise(report_noise, report_noise_par, report_backlog_par, report_days)
 
     def set_model(self, model):
@@ -160,6 +164,9 @@ class Population:
 
         if report_days is not None, then save all reports on non-reporting days for
         the next day
+
+        if self.report_noise_weekly is True, then release from backlog only
+        on the first reporting day each week
         """
         next_value = 0
         if self.future is not None:
@@ -171,18 +178,26 @@ class Population:
                 incoming = 0
                 if len(self.future) > 0:
                     incoming = self.future[0]
+
+                # check if today is a reporting day
+                t0 = self.model.t0
+                days_after = timedelta(days=int((len(self.history)+0.5)*self.model.get_time_step()))
+                today = t0 + days_after
+                day_of_week = today.weekday()
+
                 # are we reporting today? (new member added in ref model 2_2)
                 try:
                     reporting = self.__report_days is None
                 except:
                     reporting = True
+
                 if not reporting:
-                    # check if today is a reporting day
-                    t0 = self.model.t0
-                    days_after = timedelta(days=int((len(self.history)+0.5)*self.model.get_time_step()))
-                    today = t0 + days_after
-                    day_of_week = today.weekday()
-                    reporting = (self.__report_days.get_value() & 2**day_of_week) > 0
+                    report_days = self.__report_days.get_value()
+                    reporting = (report_days & 2**day_of_week) > 0
+                    # find lowest on bit: amazing hack
+                    first_reporting_day_of_week = (report_days & -report_days) == 2**day_of_week
+                else:
+                    first_reporting_day_of_week = day_of_week == 0
                 if reporting:
                     # how many will be reported from today?
                     low_edge = self.__report_noise_par.get_value()
@@ -190,12 +205,14 @@ class Population:
                     n_report = stats.binom.rvs(incoming, frac_report)
 
                     # how many will be reported from the backlog?
-                    try:
-                        low_edge = self.__report_backlog_par.get_value()
-                        frac_backlog = stats.uniform.rvs(loc=low_edge, scale=1. - low_edge)
-                        n_backlog = stats.binom.rvs(self.missed_yesterday, frac_backlog)
-                    except:
-                        n_backlog = self.missed_yesterday
+                    n_backlog = 0
+                    if not self.report_noise_weekly or first_reporting_day_of_week:
+                        try:
+                            low_edge = self.__report_backlog_par.get_value()
+                            frac_backlog = stats.uniform.rvs(loc=low_edge, scale=1. - low_edge)
+                            n_backlog = stats.binom.rvs(self.missed_yesterday, frac_backlog)
+                        except:
+                            n_backlog = self.missed_yesterday
 
                     next_value = n_report + n_backlog
 
