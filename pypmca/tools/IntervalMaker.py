@@ -1,6 +1,7 @@
 """
 Interval_maker:
- - produce simulated samples, with a distribution of transmission rates, to calculate quantiles
+ - produce simulated samples, with a distribution of transmission rates and other
+   smeering parameters to calculate quantiles
 
  - this analysis is required for inclusion into the forecast hub
  - adds necessary data into model file (user_dict['forecast_hub'])
@@ -11,7 +12,6 @@ import datetime
 import numpy as np
 from scipy import stats
 import copy
-from pypmca import Model
 
 
 class IntervalMaker:
@@ -94,9 +94,9 @@ class IntervalMaker:
             population_name = 'hospitalized'
 
         # norm_day is when the expectation propagation ends and the data generation begins
-        # back this up by a few days, so that reporting noise issues do not generate immediate
+        # back this up by a week, so that reporting noise issues do not generate immediate
         # negative bias (for daily reports)
-        norm_day = days_after_t0 - 4
+        norm_day = days_after_t0 - 7
 
         # quantile estimates
         # Do many repititions: each time use a new alpha_last and renormalize expectation
@@ -131,11 +131,6 @@ class IntervalMaker:
         # adjust alpha uncertainty
         alpha_err *= scale_std_alpha
 
-        # compare two methods
-        # #2 simulate expectations until just before last alpha transition - save that model
-        # Then, each repetition only simulate data from that point onwards (much less simulation needed)
-        # This is like a boot that brings state to the last alpha transition
-
         # run model with expectations to step before last alpha transition
         model.reset()
         model.evolve_expectations(last_time - 1)
@@ -160,6 +155,16 @@ class IntervalMaker:
             # start with expectations up until last transition day
             sim_model = copy.deepcopy(sim_model_ref)
             sim_model.parameters[alpha_name].set_value(sim_alpha)
+
+            # include independent variance from other sources
+            if 'interval_maker' in model.user_dict:
+                if 'smearing parameters' in model.user_dict['interval_maker']:
+                    for par_name in model.user_dict['interval_maker']['smearing parameters']:
+                        mean = model.parameters[par_name].get_value()
+                        sigma = model.parameters[par_name].std_estimator
+                        new_value = stats.norm.rvs(loc=mean, scale=sigma)
+                        sim_model.parameters[par_name].set_value(new_value)
+
             # evolve_expectations up until the renormalization day (just before forecast period)
             sim_model.evolve_expectations(norm_day - last_time + 1, from_step=last_time - 1)
 
