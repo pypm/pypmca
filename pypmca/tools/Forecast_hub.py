@@ -126,7 +126,7 @@ class Forecast_hub:
         path_model_2 = self.model_dir / 'ref_model_2.pypm'
         ref_model_2 = Model.open_file(path_model_2)
 
-    def get_csv(self,forecast_date,us_deaths):
+    def get_csv(self,forecast_date,us_deaths,cor_scale=1.):
         t0 = datetime.date(2020, 3, 1)
         forecast_date_text = forecast_date.isoformat()
         day_of_week = forecast_date.weekday()
@@ -296,18 +296,23 @@ class Forecast_hub:
 
                     # quantiles
                     if inc_type == 'inc':
+                        median = np.percentile(us_inc_periods_dict[dict_names[i]][i_period], 50.)
                         for quant in quants:
                             value = np.percentile(us_inc_periods_dict[dict_names[i]][i_period], float(quant)*100.)
+                            # increase the width of the interval for the US as a whole, to account for correlations between states
+                            scaled_value = cor_scale*(value-median) + median
                             quant_text = '{0:0.3f}'.format(quant)
                             self.add_record(forecast_date_text, target, target_end_date, location, 'quantile', quant_text,
-                                            value)
+                                            scaled_value)
 
                     elif inc_type == 'cum':
+                        median = np.percentile(us_cum_periods_dict[dict_names[i]][i_period], 50.) + additional_deaths
                         for quant in quants:
                             value = np.percentile(us_cum_periods_dict[dict_names[i]][i_period], float(quant) * 100.) + additional_deaths
+                            scaled_value = cor_scale * (value - median) + median
                             quant_text = '{0:0.3f}'.format(quant)
                             self.add_record(forecast_date_text, target, target_end_date, location, 'quantile', quant_text,
-                                            value)
+                                            scaled_value)
 
         return self.buff
 
@@ -318,11 +323,11 @@ class Forecast_hub:
         record.append('{0:0.1f}'.format(value))
         self.buff.append(record)
 
-my_forecast = Forecast_hub('/Users/karlen/pypm-temp/usa', ['_2_3_1122'])
+my_forecast = Forecast_hub('/Users/karlen/pypm-temp/usa', ['_2_5_1129'])
 # Indicate the total US deaths (up to and including Saturday) here:
-us_deaths = 255861
+us_deaths = 266047
 
-my_csv = my_forecast.get_csv(datetime.date(2020, 11, 22), us_deaths)
+my_csv = my_forecast.get_csv(datetime.date(2020, 11, 29), us_deaths, cor_scale=1.5)
 pass
 with open('/Users/karlen/pypm-temp/test-forecast.csv','w') as out:
     for line in my_csv:

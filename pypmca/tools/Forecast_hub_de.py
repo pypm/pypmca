@@ -109,7 +109,7 @@ class Forecast_hub:
         path_model_2 = self.model_dir / 'ref_model_2.pypm'
         ref_model_2 = Model.open_file(path_model_2)
 
-    def get_csv(self, forecast_date, category):
+    def get_csv(self, forecast_date, category,cor_scale=1.):
         t0 = datetime.date(2020, 3, 1)
         forecast_date_text = forecast_date.isoformat()
         day_of_week = forecast_date.weekday()
@@ -269,18 +269,23 @@ class Forecast_hub:
 
                 # quantiles
                 if inc_type == 'inc':
+                    median = np.percentile(de_inc_periods_dict[category][i_period], 50.)
                     for quant in quants:
                         value = np.percentile(de_inc_periods_dict[category][i_period], float(quant)*100.)
+                        # increase the width of the interval for the US as a whole, to account for correlations between states
+                        scaled_value = cor_scale * (value - median) + median
                         quant_text = '{0:0.3f}'.format(quant)
                         self.add_record(forecast_date_text, target, target_end_date, location, 'quantile', quant_text,
-                                        value)
+                                        scaled_value)
 
                 elif inc_type == 'cum':
+                    median = np.percentile(de_cum_periods_dict[category][i_period], 50.) + additional_deaths
                     for quant in quants:
                         value = np.percentile(de_cum_periods_dict[category][i_period], float(quant) * 100.) + additional_deaths
+                        scaled_value = cor_scale * (value - median) + median
                         quant_text = '{0:0.3f}'.format(quant)
                         self.add_record(forecast_date_text, target, target_end_date, location, 'quantile', quant_text,
-                                        value)
+                                        scaled_value)
 
         return self.buff
 
@@ -295,14 +300,14 @@ my_forecast = Forecast_hub('/Users/karlen/pypm-temp/germany', ['_2_3_1122'])
 # Indicate the total US deaths (up to and including Saturday) here:
 #de_deaths = xxx
 
-my_csv = my_forecast.get_csv(datetime.date(2020, 11, 22), 'case')
+my_csv = my_forecast.get_csv(datetime.date(2020, 11, 22), 'case',cor_scale=1.5)
 pass
 with open('/Users/karlen/pypm-temp/test-germany-forecast-case.csv','w') as out:
     for line in my_csv:
         record = ','.join(line)
         out.write(record + '\n')
 
-my_csv = my_forecast.get_csv(datetime.date(2020, 11, 22), 'death')
+my_csv = my_forecast.get_csv(datetime.date(2020, 11, 22), 'death',cor_scale=1.5)
 pass
 with open('/Users/karlen/pypm-temp/test-germany-forecast.csv','w') as out:
     for line in my_csv:
