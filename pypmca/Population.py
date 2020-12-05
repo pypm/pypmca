@@ -206,7 +206,7 @@ class Population:
 
                     # how many will be reported from the backlog?
                     n_backlog = 0
-                    if not self.report_noise_weekly or first_reporting_day_of_week:
+                    if not getattr(self,'report_noise_weekly',False) or first_reporting_day_of_week:
                         try:
                             low_edge = self.__report_backlog_par.get_value()
                             frac_backlog = stats.uniform.rvs(loc=low_edge, scale=1. - low_edge)
