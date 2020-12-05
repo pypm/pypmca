@@ -74,7 +74,7 @@ def test_class_Delay():
     std_dev = 4.
     half_width = float(std_dev * np.sqrt(12.) / 2.)
     k_vals = [1, 2, 3]
-    for delay_type in ['norm', 'uniform', 'erlang']:
+    for delay_type in ['norm', 'uniform', 'erlang', 'gamma']:
         k_s = [1]
         if delay_type == 'erlang':
             k_s = k_vals

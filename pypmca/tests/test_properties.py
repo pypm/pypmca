@@ -8,11 +8,14 @@ from pypmca import Model, Population, Delay, Parameter, Multiplier, Propagator, 
     Splitter, Adder, Subtractor, Chain, Modifier, Injector, Ensemble
 from pypmca.analysis.Optimizer import Optimizer
 from pypmca.analysis.Trajectory import Trajectory
+from pypmca.tools.IntervalMaker import IntervalMaker
 import numpy as np
 import copy
 from pathlib import Path
+import datetime
 
 example_dir = Path('../../examples/').resolve()
+path_model_2_6 = example_dir / 'ref_model_2_6.pypm'
 path_model_2_5 = example_dir / 'ref_model_2_5.pypm'
 path_model_2_4 = example_dir / 'ref_model_2_4.pypm'
 path_model_2_3 = example_dir / 'ref_model_2_3.pypm'
@@ -362,114 +365,125 @@ def test_sim_gof():
     assert np.abs(acor_mean) < 0.2
 
 def test_report_noise():
-    start_day = 12
-    end_day = 80
-    ref_2 = Model.open_file(path_model_2_2)
-    ref_2.parameters['report_noise'].set_value(0.1)
-    sim_2 = copy.deepcopy(ref_2)
+    for report_noise_weekly in [False, True]:
+        start_day = 12
+        end_day = 80
+        ref_2 = Model.open_file(path_model_2_2)
+        ref_2.parameters['report_noise'].set_value(0.1)
+        sim_2 = copy.deepcopy(ref_2)
+        sim_2.populations['reported'].report_noise_weekly = report_noise_weekly
 
-    # do fit of alpha_0, alpha_1, cont_0
-    par_names = ['alpha_0', 'alpha_1', 'cont_0']
-    sums = {}
-    sum2s = {}
-    for par_name in par_names:
-        par = ref_2.parameters[par_name]
-        par.set_variable(None, None)
-        sums[par_name] = 0.
-        sum2s[par_name] = 0.
-
-    n_rep = 10
-    fit_stat_list = []
-    for i in range(n_rep):
-        sim_2.reset()
-        sim_2.generate_data(end_day)
-        optimizer = Optimizer(ref_2, 'total reported', sim_2.populations['reported'].history, [start_day, end_day])
-        optimizer.reset_variables()
-        popt, pcov = optimizer.fit()
-        fit_stat_list.append(optimizer.fit_statistics)
+        # do fit of alpha_0, alpha_1, cont_0
+        par_names = ['alpha_0', 'alpha_1', 'cont_0']
+        sums = {}
+        sum2s = {}
         for par_name in par_names:
-            value = ref_2.parameters[par_name].get_value()
-            sums[par_name] += value
-            sum2s[par_name] += value**2
+            par = ref_2.parameters[par_name]
+            par.set_variable(None, None)
+            sums[par_name] = 0.
+            sum2s[par_name] = 0.
 
-    ass_std = {}
-    ass_std['alpha_0'] = 0.03
-    ass_std['alpha_1'] = 0.01
-    ass_std['cont_0'] = 10.
+        n_rep = 10
+        fit_stat_list = []
+        for i in range(n_rep):
+            sim_2.reset()
+            sim_2.generate_data(end_day)
+            optimizer = Optimizer(ref_2, 'total reported', sim_2.populations['reported'].history, [start_day, end_day])
+            optimizer.reset_variables()
+            popt, pcov = optimizer.fit()
+            fit_stat_list.append(optimizer.fit_statistics)
+            for par_name in par_names:
+                value = ref_2.parameters[par_name].get_value()
+                sums[par_name] += value
+                sum2s[par_name] += value**2
 
-    means = {}
-    std = {}
-    for par_name in par_names:
-        means[par_name] = sums[par_name]/n_rep
-        std[par_name] = np.sqrt(sum2s[par_name]/n_rep - means[par_name]**2)
-    for par_name in par_names:
-        assert std[par_name] < ass_std[par_name]
-        truth = ref_2.parameters[par_name].initial_value
-        assert np.abs((means[par_name]-truth)/std[par_name]/np.sqrt(1.*n_rep)) < 3.
+        ass_std = {}
+        if not report_noise_weekly:
+            ass_std['alpha_0'] = 0.03
+            ass_std['alpha_1'] = 0.01
+            ass_std['cont_0'] = 10.
+        else:
+            ass_std['alpha_0'] = 0.06
+            ass_std['alpha_1'] = 0.01
+            ass_std['cont_0'] = 10.
 
-    ndof = fit_stat_list[0]['ndof']
-    chi2_list = [fit_stat_list[i]['chi2'] for i in range(n_rep)]
-    chi2_mean = np.mean(chi2_list)
-    assert chi2_mean - ndof > 100.
-    acor_list = [fit_stat_list[i]['acor'] for i in range(n_rep)]
-    acor_mean = np.mean(acor_list)
-    assert acor_mean < -0.3
+        means = {}
+        std = {}
+        for par_name in par_names:
+            means[par_name] = sums[par_name]/n_rep
+            std[par_name] = np.sqrt(sum2s[par_name]/n_rep - means[par_name]**2)
+        for par_name in par_names:
+            assert std[par_name] < ass_std[par_name]
+            truth = ref_2.parameters[par_name].initial_value
+            assert np.abs((means[par_name]-truth)/std[par_name]/np.sqrt(1.*n_rep)) < 3.
+
+        ndof = fit_stat_list[0]['ndof']
+        chi2_list = [fit_stat_list[i]['chi2'] for i in range(n_rep)]
+        chi2_mean = np.mean(chi2_list)
+        assert chi2_mean - ndof > 100.
+        if not report_noise_weekly:
+            acor_list = [fit_stat_list[i]['acor'] for i in range(n_rep)]
+            acor_mean = np.mean(acor_list)
+            assert acor_mean < -0.3
 
 def test_report_noise_days():
-    start_day = 12
-    end_day = 80
-    ref_2 = Model.open_file(path_model_2_2)
-    ref_2.parameters['report_noise'].set_value(0.1)
-    # BC: no reporting on Sundays
-    ref_2.parameters['report_days'].set_value(63)
-    sim_2 = copy.deepcopy(ref_2)
+    for report_noise_weekly in [False, True]:
+        start_day = 12
+        end_day = 80
+        ref_2 = Model.open_file(path_model_2_2)
+        ref_2.parameters['report_noise'].set_value(0.1)
+        # BC: no reporting on Sundays
+        ref_2.parameters['report_days'].set_value(63)
+        sim_2 = copy.deepcopy(ref_2)
+        sim_2.populations['reported'].report_noise_weekly = report_noise_weekly
 
-    # do fit of alpha_0, alpha_1, cont_0
-    par_names = ['alpha_0', 'alpha_1', 'cont_0']
-    sums = {}
-    sum2s = {}
-    for par_name in par_names:
-        par = ref_2.parameters[par_name]
-        par.set_variable(None, None)
-        sums[par_name] = 0.
-        sum2s[par_name] = 0.
-
-    n_rep = 10
-    fit_stat_list = []
-    for i in range(n_rep):
-        sim_2.reset()
-        sim_2.generate_data(end_day)
-        optimizer = Optimizer(ref_2, 'total reported', sim_2.populations['reported'].history, [start_day, end_day])
-        optimizer.reset_variables()
-        popt, pcov = optimizer.fit()
-        fit_stat_list.append(optimizer.fit_statistics)
+        # do fit of alpha_0, alpha_1, cont_0
+        par_names = ['alpha_0', 'alpha_1', 'cont_0']
+        sums = {}
+        sum2s = {}
         for par_name in par_names:
-            value = ref_2.parameters[par_name].get_value()
-            sums[par_name] += value
-            sum2s[par_name] += value ** 2
+            par = ref_2.parameters[par_name]
+            par.set_variable(None, None)
+            sums[par_name] = 0.
+            sum2s[par_name] = 0.
 
-    ass_std = {}
-    ass_std['alpha_0'] = 0.05
-    ass_std['alpha_1'] = 0.01
-    ass_std['cont_0'] = 10.
+        n_rep = 10
+        fit_stat_list = []
+        for i in range(n_rep):
+            sim_2.reset()
+            sim_2.generate_data(end_day)
+            optimizer = Optimizer(ref_2, 'total reported', sim_2.populations['reported'].history, [start_day, end_day])
+            optimizer.reset_variables()
+            popt, pcov = optimizer.fit()
+            fit_stat_list.append(optimizer.fit_statistics)
+            for par_name in par_names:
+                value = ref_2.parameters[par_name].get_value()
+                sums[par_name] += value
+                sum2s[par_name] += value ** 2
 
-    means = {}
-    std = {}
-    for par_name in par_names:
-        means[par_name] = sums[par_name] / n_rep
-        std[par_name] = np.sqrt(sum2s[par_name] / n_rep - means[par_name] ** 2)
-    for par_name in par_names:
-        assert std[par_name] < ass_std[par_name]
-        truth = ref_2.parameters[par_name].initial_value
-        assert np.abs((means[par_name] - truth) / std[par_name] / np.sqrt(1. * n_rep)) < 3.
+        ass_std = {}
+        ass_std['alpha_0'] = 0.05
+        ass_std['alpha_1'] = 0.01
+        ass_std['cont_0'] = 10.
 
-    ndof = fit_stat_list[0]['ndof']
-    chi2_list = [fit_stat_list[i]['chi2'] for i in range(n_rep)]
-    chi2_mean = np.mean(chi2_list)
-    assert chi2_mean/ndof > 2.5
-    acor_list = [fit_stat_list[i]['acor'] for i in range(n_rep)]
-    acor_mean = np.mean(acor_list)
-    assert acor_mean < -0.2
+        means = {}
+        std = {}
+        for par_name in par_names:
+            means[par_name] = sums[par_name] / n_rep
+            std[par_name] = np.sqrt(sum2s[par_name] / n_rep - means[par_name] ** 2)
+        for par_name in par_names:
+            assert std[par_name] < ass_std[par_name]
+            truth = ref_2.parameters[par_name].initial_value
+            assert np.abs((means[par_name] - truth) / std[par_name] / np.sqrt(1. * n_rep)) < 3.
+
+        ndof = fit_stat_list[0]['ndof']
+        chi2_list = [fit_stat_list[i]['chi2'] for i in range(n_rep)]
+        chi2_mean = np.mean(chi2_list)
+        assert chi2_mean/ndof > 2.5
+        if not report_noise_weekly:
+            acor_list = [fit_stat_list[i]['acor'] for i in range(n_rep)]
+            acor_mean = np.mean(acor_list)
+            assert acor_mean < -0.2
 
 def test_trajectory():
     ref_2 = Model.open_file(path_model_2_2)
@@ -530,4 +544,24 @@ def test_max_mult():
     ref_2_5.reset()
     ref_2_5.boot(expectations=True)
     ref_2_5.evolve_expectations(200)
+    i=1
+
+def test_interval_maker():
+
+    hub_date = datetime.date(2020, 4, 1)
+    my_IntervalMaker = IntervalMaker("USA", hub_date)
+    category = 'case'
+    n_period = 5
+    n_rep = 100
+    scale_std_alpha = 2.
+    model = Model.open_file(path_model_2_6)
+    if 'interval_maker' not in model.user_dict:
+        model.user_dict['interval_maker'] = {}
+        model.user_dict['interval_maker']['smearing parameters'] = ['non_icu_hosp_frac','recover_frac']
+    model.parameters['non_icu_hosp_frac'].std_estimator = 0.002
+    model.parameters['recover_frac'].std_estimator = 0.0001
+
+    my_IntervalMaker.get_quantiles(category, n_period, model, n_rep=n_rep,
+                                               scale_std_alpha=scale_std_alpha)
+    my_IntervalMaker.append_user_dict(category, model)
     i=1
