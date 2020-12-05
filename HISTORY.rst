@@ -55,3 +55,10 @@ History
 * 0.2.9 (2020-11-29)
 
  * minor corrections and improvements
+
+* 0.2.10 (2020-12-04)
+
+ * allow gamma delay distributions
+ * new reference model
+ * smearing parameters for intervals
+ * weekly noise reporting
