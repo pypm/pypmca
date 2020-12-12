@@ -24,10 +24,11 @@ class IntervalMaker:
         self.hub = hub
         self.forecast_date = forecast_date
         self.quantile_dict = self.def_quantile_dict()
-        self.point_estimates = {}
-        self.quantiles = {}
+        self.point_estimates = None
+        self.quantiles = None
         self.inc_periods = None
-        self.sim_alphas = []
+        self.sim_alphas = None
+        self.population_name_dict = {'case':'reported', 'death':'deaths', 'hospitalization':'hospitalized'}
 
     def def_quantile_dict(self):
         # defines the default quantiles to produce for each category
@@ -47,18 +48,22 @@ class IntervalMaker:
         if self.forecast_date not in model.user_dict['forecast_hub']:
             model.user_dict['forecast_hub'][self.forecast_date] = {}
         model.user_dict['forecast_hub'][self.forecast_date][category] = {}
-        model.user_dict['forecast_hub'][self.forecast_date][category]['point_estimates'] = self.point_estimates
-        model.user_dict['forecast_hub'][self.forecast_date][category]['quantiles'] = self.quantiles
-        model.user_dict['forecast_hub'][self.forecast_date][category]['inc_periods'] = self.inc_periods
+        model.user_dict['forecast_hub'][self.forecast_date][category]['point_estimates'] = self.point_estimates[category]
+        model.user_dict['forecast_hub'][self.forecast_date][category]['quantiles'] = self.quantiles[category]
+        model.user_dict['forecast_hub'][self.forecast_date][category]['inc_periods'] = self.inc_periods[category]
         model.user_dict['forecast_hub'][self.forecast_date][category]['sim_alphas'] = self.sim_alphas
 
-    def get_quantiles(self, category, n_periods, model, n_rep=10, scale_std_alpha=1.):
-        # category: 'case', 'death', 'hospitalization'
-        # n_periods: number of weeks for case/death and number of days for hospitalizations
+    def get_quantiles(self, categories, n_periods_dict, model, n_rep=10, scale_std_alpha=1.):
+        # categories: an array containing a combination of 'case', 'death', 'hospitalization'
+        # n_periods_for_categories: a dictionary containing number of weeks for case/death and number of days for hospitalizations
         # n_rep: number of repetitions to produce quantiles
+        # scale_std_alpha: if necessary the alpha parameter variation can be adjusted by this scaling factor
+        
+        # The following are dictionaries indexed by categories
         self.point_estimates = {}
         self.quantiles = {}
-        self.inc_periods = None
+        self.inc_periods = {}
+        
         self.sim_alphas = []
 
         if scale_std_alpha != 1.:
@@ -75,23 +80,19 @@ class IntervalMaker:
         elif day_of_week < 6:
             first_sunday += 6 - day_of_week
 
+        # find maximum number of days of simulation required
         n_days = 0
-        if category in ['case', 'death']:
-            n_days = first_sunday + n_periods * 7
-        elif category in ['hospitalization']:
-            n_days = days_after_t0 + n_periods
+        for category in categories:
+            if category in ['case', 'death']:
+                n_days_c = first_sunday + n_periods_dict[category] * 7
+                n_days = max(n_days, n_days_c)
+            elif category in ['hospitalization']:
+                n_days_c = days_after_t0 + n_periods_dict[category]
+                n_days = max(n_days, n_days_c)
 
-        quant = None
-        if category in self.quantile_dict:
-            quant = self.quantile_dict[category]
-
-        population_name = None
-        if category == 'case':
-            population_name = 'reported'
-        elif category == 'death':
-            population_name = 'deaths'
-        elif category == 'hospitalization':
-            population_name = 'hospitalized'
+            self.point_estimates[category] = {}
+            self.quantiles[category] = {}
+            self.inc_periods[category] = [[] for i in range(n_periods_dict[category])]
 
         # norm_day is when the expectation propagation ends and the data generation begins
         # back this up by a week, so that reporting noise issues do not generate immediate
@@ -139,16 +140,14 @@ class IntervalMaker:
         # run model with expectations to normalization day
         model.evolve_expectations(norm_day - last_time + 1, from_step=last_time - 1)
 
-        self.inc_periods = [[] for i in range(n_periods)]
-
         for i_rep in range(n_rep):
             sim_alpha = stats.norm.rvs(loc=alpha, scale=alpha_err)
             sim_trial = sim_alpha
 
-            # protect against alphas outside of observed range (for case only)
-            if category == 'case':
-                sim_alpha = max(sim_alpha, alpha_min * 0.9)
-                sim_alpha = min(sim_alpha, alpha_max * 1.1)
+            # protect against alphas far outside of observed range
+            #if category == 'case':
+            sim_alpha = max(sim_alpha, alpha_min * 0.9)
+            sim_alpha = min(sim_alpha, alpha_max * 1.1)
             if sim_trial != sim_alpha:
                 print('simulated alpha truncated: from', sim_trial, 'to', sim_alpha)
 
@@ -179,54 +178,66 @@ class IntervalMaker:
             # now generate data starting from norm_day
             sim_model.generate_data(n_days - 1 - norm_day, from_step=norm_day)
 
-            sim_population_history = sim_model.populations[population_name].history
-            if category in ['case', 'death']:
-                for week in range(n_periods):
-                    end_epiweek = first_sunday - 1 + 7 * (week + 1)
-                    inc_week = (sim_population_history[end_epiweek] -
-                                sim_population_history[end_epiweek - 7])
-                    self.inc_periods[week].append(inc_week)
-            elif category in ['hospitalization']:
-                for day in range(n_periods):
-                    end_day = days_after_t0 + day
-                    inc_day = (sim_population_history[end_day] -
-                               sim_population_history[end_day - 1])
-                    self.inc_periods[day].append(inc_day)
+            for category in categories:
+                population_name = self.population_name_dict[category]
+
+                sim_population_history = sim_model.populations[population_name].history
+                if category in ['case', 'death']:
+                    for week in range(n_periods_dict[category]):
+                        end_epiweek = first_sunday - 1 + 7 * (week + 1)
+                        inc_week = (sim_population_history[end_epiweek] -
+                                    sim_population_history[end_epiweek - 7])
+                        self.inc_periods[category][week].append(inc_week)
+                elif category in ['hospitalization']:
+                    for day in range(n_periods_dict[category]):
+                        end_day = days_after_t0 + day
+                        inc_day = (sim_population_history[end_day] -
+                                   sim_population_history[end_day - 1])
+                        self.inc_periods[category][day].append(inc_day)
+
             self.sim_alphas.append(sim_alpha)
 
         # point estimates
         model.reset()
         model.evolve_expectations(n_days - 1)
 
-        if category in ['case', 'death']:
-            for week in range(n_periods):
-                population_history = model.populations[population_name].history
-                end_epiweek = first_sunday - 1 + 7 * (week + 1)
-                value = population_history[end_epiweek] - population_history[end_epiweek - 7]
-                self.point_estimates[str(week + 1)] = value
+        #        quant = None
+        #        if category in self.quantile_dict:
+        #            quant = self.quantile_dict[category]
 
-                quant_dict = {}
-                for quantile in quant:
-                    value = np.percentile(self.inc_periods[week], quantile * 100.)
-                    if value < 0.:
-                        value = 0.
-                    quantile_text = '{0:0.3f}'.format(quantile)
-                    quant_dict[quantile_text] = value
-                self.quantiles[str(week + 1)] = quant_dict
+        for category in categories:
+            population_name = self.population_name_dict[category]
+            quant = self.quantile_dict[category]
 
-        elif category in ['hospitalization']:
-            for day in range(n_periods):
-                population_history = model.populations[population_name].history
-                end_day = days_after_t0 + day
-                value = population_history[end_day] - population_history[end_day - 1]
-                self.point_estimates[str(day + 1)] = value
-
-                quant_dict = {}
-                for quantile in quant:
-                    value = np.percentile(self.inc_periods[day], quantile * 100.)
-                    if value < 0.:
-                        value = 0.
-                    quantile_text = '{0:0.3f}'.format(quantile)
-                    quant_dict[quantile_text] = value
-                self.quantiles[str(day + 1)] = quant_dict
+            if category in ['case', 'death']:
+                for week in range(n_periods_dict[category]):
+                    population_history = model.populations[population_name].history
+                    end_epiweek = first_sunday - 1 + 7 * (week + 1)
+                    value = population_history[end_epiweek] - population_history[end_epiweek - 7]
+                    self.point_estimates[category][str(week + 1)] = value
+    
+                    quant_dict = {}
+                    for quantile in quant:
+                        value = np.percentile(self.inc_periods[category][week], quantile * 100.)
+                        if value < 0.:
+                            value = 0.
+                        quantile_text = '{0:0.3f}'.format(quantile)
+                        quant_dict[quantile_text] = value
+                    self.quantiles[category][str(week + 1)] = quant_dict
+    
+            elif category in ['hospitalization']:
+                for day in range(n_periods_dict[category]):
+                    population_history = model.populations[population_name].history
+                    end_day = days_after_t0 + day
+                    value = population_history[end_day] - population_history[end_day - 1]
+                    self.point_estimates[category][str(day + 1)] = value
+    
+                    quant_dict = {}
+                    for quantile in quant:
+                        value = np.percentile(self.inc_periods[category][day], quantile * 100.)
+                        if value < 0.:
+                            value = 0.
+                        quantile_text = '{0:0.3f}'.format(quantile)
+                        quant_dict[quantile_text] = value
+                    self.quantiles[category][str(day + 1)] = quant_dict
 
