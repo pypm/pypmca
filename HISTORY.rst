@@ -62,3 +62,7 @@ History
  * new reference model
  * smearing parameters for intervals
  * weekly noise reporting
+
+* 0.2.11 (2020-12-12)
+
+ * produce intervals for multiple categories at once
