@@ -550,8 +550,8 @@ def test_interval_maker():
 
     hub_date = datetime.date(2020, 4, 1)
     my_IntervalMaker = IntervalMaker("USA", hub_date)
-    category = 'case'
-    n_period = 5
+    categories = ['case','death','hospitalization']
+    n_period_dict = {'case':5, 'death':5, 'hospitalization':30}
     n_rep = 100
     scale_std_alpha = 2.
     model = Model.open_file(path_model_2_6)
@@ -561,7 +561,8 @@ def test_interval_maker():
     model.parameters['non_icu_hosp_frac'].std_estimator = 0.002
     model.parameters['recover_frac'].std_estimator = 0.0001
 
-    my_IntervalMaker.get_quantiles(category, n_period, model, n_rep=n_rep,
+    my_IntervalMaker.get_quantiles(categories, n_period_dict, model, n_rep=n_rep,
                                                scale_std_alpha=scale_std_alpha)
-    my_IntervalMaker.append_user_dict(category, model)
+    for category in categories:
+        my_IntervalMaker.append_user_dict(category, model)
     i=1
