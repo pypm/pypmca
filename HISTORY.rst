@@ -66,3 +66,9 @@ History
 * 0.2.11 (2020-12-12)
 
  * produce intervals for multiple categories at once
+
+* 0.2.12 (2020-12-27)
+
+ * add AgeModeller tool to automatically fit age groups
+ * improve functionality of IntervalMaker
+ * fix chi^2 for cumul_reset = True
