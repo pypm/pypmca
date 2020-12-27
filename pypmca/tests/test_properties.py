@@ -559,7 +559,8 @@ def test_interval_maker():
         model.user_dict['interval_maker'] = {}
         model.user_dict['interval_maker']['smearing parameters'] = ['non_icu_hosp_frac','recover_frac']
     model.parameters['non_icu_hosp_frac'].std_estimator = 0.002
-    model.parameters['recover_frac'].std_estimator = 0.0001
+    model.parameters['recover_frac'].set_value(0.99)
+    model.parameters['recover_frac'].std_estimator = 0.01
 
     my_IntervalMaker.get_quantiles(categories, n_period_dict, model, n_rep=n_rep,
                                                scale_std_alpha=scale_std_alpha)
