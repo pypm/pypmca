@@ -261,10 +261,17 @@ class Optimizer:
         # see description at top of this file
         scale = 1.
         if self.population_type == 'total':
-            scale = self.data[xdata[-1]] / self.model.populations[self.population_name].history[xdata[-1]]
+            if self.cumul_reset:
+                cumul_offset = self.data[self.data_range[0]]
+                scale = (self.data[xdata[-1]] - cumul_offset) / self.model.populations[self.population_name].history[xdata[-1]]
+            else:
+                scale = self.data[xdata[-1]] / self.model.populations[self.population_name].history[xdata[-1]]
         self.chi2d = 0.
+        cumul_offset = 0.
+        if self.population_type == 'total' and self.cumul_reset:
+            cumul_offset = self.data[self.data_range[0]]
         for x in xdata[:-1]:
-            resid = self.data[x] - self.model.populations[self.population_name].history[x] * scale
+            resid = (self.data[x] - cumul_offset) - self.model.populations[self.population_name].history[x] * scale
             self.chi2d += resid ** 2 / (self.model.populations[self.population_name].history[x] * scale)
 
         # report the chi^2 for the fit to daily data and the auto correlation of residuals to the next day
