@@ -53,7 +53,7 @@ class IntervalMaker:
         model.user_dict['forecast_hub'][self.forecast_date][category]['inc_periods'] = self.inc_periods[category]
         model.user_dict['forecast_hub'][self.forecast_date][category]['sim_alphas'] = self.sim_alphas
 
-    def get_quantiles(self, categories, n_periods_dict, model, n_rep=10, scale_std_alpha=1.):
+    def get_quantiles(self, categories, n_periods_dict, model, n_rep=10, scale_std_alpha=1., back_up=7, rescale=False, t0 = datetime.date(2020, 3, 1)):
         # categories: an array containing a combination of 'case', 'death', 'hospitalization'
         # n_periods_for_categories: a dictionary containing number of weeks for case/death and number of days for hospitalizations
         # n_rep: number of repetitions to produce quantiles
@@ -68,8 +68,6 @@ class IntervalMaker:
 
         if scale_std_alpha != 1.:
             print('Warning: scaling the uncertainty for alpha:', str(scale_std_alpha))
-
-        t0 = datetime.date(2020, 3, 1)
 
         # epi-week period calculations:
         day_of_week = self.forecast_date.weekday()
@@ -95,9 +93,9 @@ class IntervalMaker:
             self.inc_periods[category] = [[] for i in range(n_periods_dict[category])]
 
         # norm_day is when the expectation propagation ends and the data generation begins
-        # back this up by a week, so that reporting noise issues do not generate immediate
-        # negative bias (for daily reports)
-        norm_day = days_after_t0 - 7
+        # back this up by a week or more, so that reporting noise issues do not generate immediate
+        # negative bias (for daily reports) and to produce variation in deaths
+        norm_day = max(1,days_after_t0 - back_up)
 
         # quantile estimates
         # Do many repititions: each time use a new alpha_last and renormalize expectation
@@ -132,6 +130,12 @@ class IntervalMaker:
         # adjust alpha uncertainty
         alpha_err *= scale_std_alpha
 
+        # find expectations at start of forecast - to correct for variance produced in last section of generated data
+        model.reset()
+        model.evolve_expectations(days_after_t0-1)
+        case_history = model.populations['reported'].history
+        expected_cases = case_history[-1] - case_history[0]
+
         # run model with expectations to step before last alpha transition
         model.reset()
         model.evolve_expectations(last_time - 1)
@@ -162,6 +166,14 @@ class IntervalMaker:
                         mean = model.parameters[par_name].get_value()
                         sigma = model.parameters[par_name].std_estimator
                         new_value = stats.norm.rvs(loc=mean, scale=sigma)
+                        # if this is a parameter that is limited to between 0 and 1, assume a beta distribution
+                        p_min = model.parameters[par_name].get_min()
+                        p_max = model.parameters[par_name].get_max()
+                        if p_min == 0. and p_max == 1.:
+                            term = (mean * (1.-mean))/sigma**2 - 1.
+                            a = term * mean
+                            b = term * (1.-mean)
+                            new_value = stats.beta.rvs(a,b)
                         sim_model.parameters[par_name].set_value(new_value)
 
             # evolve_expectations up until the renormalization day (just before forecast period)
@@ -178,6 +190,13 @@ class IntervalMaker:
             # now generate data starting from norm_day
             sim_model.generate_data(n_days - 1 - norm_day, from_step=norm_day)
 
+            # derive a scaling factor to correct for variance produced since norm_day
+            scale_factor = 1.
+            if rescale:
+                sim_case_history = sim_model.populations['reported'].history
+                sim_cases = sim_case_history[days_after_t0] - sim_case_history[0]
+                scale_factor = expected_cases / sim_cases
+
             for category in categories:
                 population_name = self.population_name_dict[category]
 
@@ -187,13 +206,13 @@ class IntervalMaker:
                         end_epiweek = first_sunday - 1 + 7 * (week + 1)
                         inc_week = (sim_population_history[end_epiweek] -
                                     sim_population_history[end_epiweek - 7])
-                        self.inc_periods[category][week].append(inc_week)
+                        self.inc_periods[category][week].append(inc_week*scale_factor)
                 elif category in ['hospitalization']:
                     for day in range(n_periods_dict[category]):
                         end_day = days_after_t0 + day
                         inc_day = (sim_population_history[end_day] -
                                    sim_population_history[end_day - 1])
-                        self.inc_periods[category][day].append(inc_day)
+                        self.inc_periods[category][day].append(inc_day*scale_factor)
 
             self.sim_alphas.append(sim_alpha)
 
