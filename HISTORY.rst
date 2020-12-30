@@ -72,3 +72,9 @@ History
  * add AgeModeller tool to automatically fit age groups
  * improve functionality of IntervalMaker
  * fix chi^2 for cumul_reset = True
+
+* 0.2.13 (2020-12-29)
+
+ * modify linear modifier
+ * fix chi^2 for daily data
+ * new reference model
