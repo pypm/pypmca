@@ -91,7 +91,8 @@ class Modifier(Transition):
 
         if linear:
             current_value = self.parameter.get_value()
-            new_value = current_value+self.parameter_after.get_value()
+            slope = (self.parameter_after.get_value() - self.parameter_before.get_value())/self.n_step.get_value()
+            new_value = current_value+slope
             if new_value > self.parameter.get_max():
                 new_value = self.parameter.get_max()
             if new_value < self.parameter.get_min():
