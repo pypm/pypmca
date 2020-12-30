@@ -15,6 +15,7 @@ from pathlib import Path
 import datetime
 
 example_dir = Path('../../examples/').resolve()
+path_model_2_7 = example_dir / 'ref_model_2_7.pypm'
 path_model_2_6 = example_dir / 'ref_model_2_6.pypm'
 path_model_2_5 = example_dir / 'ref_model_2_5.pypm'
 path_model_2_4 = example_dir / 'ref_model_2_4.pypm'
@@ -506,7 +507,9 @@ def test_linear_modifier():
     ref_2_4.transitions['mod_icu_frac'].enabled = True
     ref_2_4.parameters['icu_frac_time'].set_value(60)
     ref_2_4.parameters['icu_frac_0'].set_value(0.1)
-    ref_2_4.parameters['icu_frac_slope'].set_value(0.01)
+    # the meaning of this parameter changed to the end_value
+    # ref_2_4.parameters['icu_frac_slope'].set_value(0.01)
+    ref_2_4.parameters['icu_frac_slope'].set_value(0.2)
     ref_2_4.parameters['icu_frac_nstep'].set_value(10)
     ref_2_4.reset()
     ref_2_4.evolve_expectations(100)
@@ -566,4 +569,15 @@ def test_interval_maker():
                                                scale_std_alpha=scale_std_alpha)
     for category in categories:
         my_IntervalMaker.append_user_dict(category, model)
+    i=1
+
+def test_model_2_7():
+    ref_2_7 = Model.open_file(path_model_2_7)
+    ref_2_7.transitions['vaccination_1'].enabled = True
+    ref_2_7.transitions['vaccination_2'].enabled = True
+    ref_2_7.parameters['vacc_time_2'].set_value(80)
+    ref_2_7.parameters['vacc_number_2'].set_value(-5.)
+    ref_2_7.reset()
+    ref_2_7.evolve_expectations(200)
+
     i=1
