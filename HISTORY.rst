@@ -78,3 +78,7 @@ History
  * modify linear modifier
  * fix chi^2 for daily data
  * new reference model
+
+* 0.2.14 (2020-12-30)
+
+ * minor corrections and additions
