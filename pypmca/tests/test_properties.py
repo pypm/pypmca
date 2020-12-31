@@ -619,7 +619,9 @@ def test_model_2_7():
     ref_2_7.transitions['vaccination_2'].enabled = True
     ref_2_7.parameters['vacc_time_2'].set_value(80)
     ref_2_7.parameters['vacc_number_2'].set_value(-5.)
+#    ref_2_7.reset()
+#    ref_2_7.evolve_expectations(200)
     ref_2_7.reset()
-    ref_2_7.evolve_expectations(200)
+    ref_2_7.generate_data(200)
 
     i=1
