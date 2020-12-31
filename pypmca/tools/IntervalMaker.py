@@ -24,6 +24,7 @@ class IntervalMaker:
         self.hub = hub
         self.forecast_date = forecast_date
         self.quantile_dict = self.def_quantile_dict()
+        self.period_dict = self.def_period_dict()
         self.point_estimates = None
         self.quantiles = None
         self.inc_periods = None
@@ -40,6 +41,26 @@ class IntervalMaker:
         if self.hub == 'Germany':
             for category in ['case','death']:
                 dict[category] = [0.01, 0.025] + [0.05 + 0.05 * i for i in range(19)] + [0.975, 0.99]
+        if self.hub == 'USA-scenario':
+            for category in ['case','death','hospitalization']:
+                dict[category] = [0.01, 0.025] + [0.05 + 0.05 * i for i in range(19)] + [0.975, 0.99]
+        return dict
+
+    def def_period_dict(self):
+        # defines the default periods for each category
+        dict = {}
+        if self.hub == 'USA':
+            dict['case'] = 'weekly'
+            dict['death'] = 'weekly'
+            dict['hospitalization'] = 'daily'
+        if self.hub == 'Germany':
+            dict['case'] = 'weekly'
+            dict['death'] = 'weekly'
+            dict['hospitalization'] = 'weekly'
+        if self.hub == 'USA-scenario':
+            dict['case'] = 'weekly'
+            dict['death'] = 'weekly'
+            dict['hospitalization'] = 'weekly'
         return dict
 
     def append_user_dict(self, category, model):
@@ -81,13 +102,12 @@ class IntervalMaker:
         # find maximum number of days of simulation required
         n_days = 0
         for category in categories:
-            if category in ['case', 'death']:
+            if self.period_dict[category] == 'weekly':
                 n_days_c = first_sunday + n_periods_dict[category] * 7
                 n_days = max(n_days, n_days_c)
-            elif category in ['hospitalization']:
+            elif self.period_dict[category] == 'daily':
                 n_days_c = days_after_t0 + n_periods_dict[category]
                 n_days = max(n_days, n_days_c)
-
             self.point_estimates[category] = {}
             self.quantiles[category] = {}
             self.inc_periods[category] = [[] for i in range(n_periods_dict[category])]
@@ -201,13 +221,13 @@ class IntervalMaker:
                 population_name = self.population_name_dict[category]
 
                 sim_population_history = sim_model.populations[population_name].history
-                if category in ['case', 'death']:
+                if self.period_dict[category] == 'weekly':
                     for week in range(n_periods_dict[category]):
                         end_epiweek = first_sunday - 1 + 7 * (week + 1)
                         inc_week = (sim_population_history[end_epiweek] -
                                     sim_population_history[end_epiweek - 7])
                         self.inc_periods[category][week].append(inc_week*scale_factor)
-                elif category in ['hospitalization']:
+                elif self.period_dict[category] == 'daily':
                     for day in range(n_periods_dict[category]):
                         end_day = days_after_t0 + day
                         inc_day = (sim_population_history[end_day] -
@@ -228,7 +248,7 @@ class IntervalMaker:
             population_name = self.population_name_dict[category]
             quant = self.quantile_dict[category]
 
-            if category in ['case', 'death']:
+            if self.period_dict[category] == 'weekly':
                 for week in range(n_periods_dict[category]):
                     population_history = model.populations[population_name].history
                     end_epiweek = first_sunday - 1 + 7 * (week + 1)
@@ -244,7 +264,7 @@ class IntervalMaker:
                         quant_dict[quantile_text] = value
                     self.quantiles[category][str(week + 1)] = quant_dict
     
-            elif category in ['hospitalization']:
+            elif self.period_dict[category] == 'daily':
                 for day in range(n_periods_dict[category]):
                     population_history = model.populations[population_name].history
                     end_day = days_after_t0 + day
