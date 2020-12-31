@@ -107,7 +107,7 @@ class Subtractor(Connector):
                 iscale = int(scale)
                 i_reduction = iscale * reduction
                 fscale = scale - iscale
-                f_reduction = stats.binom.rvs(reduction, fscale)
+                f_reduction = -stats.binom.rvs(-reduction, fscale)
                 reduction = i_reduction + f_reduction
 
             self.from_population.update_future_fast(reduction)
