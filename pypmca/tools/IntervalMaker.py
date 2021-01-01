@@ -42,7 +42,7 @@ class IntervalMaker:
             for category in ['case','death']:
                 dict[category] = [0.01, 0.025] + [0.05 + 0.05 * i for i in range(19)] + [0.975, 0.99]
         if self.hub == 'USA-scenario':
-            for category in ['case','death','hospitalization']:
+            for category in ['case', 'death', 'hospitalization']:
                 dict[category] = [0.01, 0.025] + [0.05 + 0.05 * i for i in range(19)] + [0.975, 0.99]
         return dict
 
@@ -122,7 +122,7 @@ class IntervalMaker:
         # then produce data and use difference from point estimate and data at last day to force last
         # day of data to have same starting point for forecast
 
-        # find last alpha transition, and min and max of all alphas
+        # find last alpha transition, and min and max of all alphas (prior to forecast date)
         last_time = 0
         alpha_par = None
         alpha_min = model.parameters['alpha_0'].get_value()
@@ -131,13 +131,15 @@ class IntervalMaker:
             if 'rate' in trans_name:
                 trans = model.transitions[trans_name]
                 if trans.enabled:
-                    alpha_trans = trans.parameter_after.get_value()
-                    alpha_min = min(alpha_min, alpha_trans)
-                    alpha_max = max(alpha_max, alpha_trans)
                     time = trans.transition_time.get_value()
-                    if time >= last_time:
-                        alpha_par = trans.parameter_after
-                        last_time = time
+                    if time < days_after_t0:
+                        alpha_trans = trans.parameter_after.get_value()
+                        alpha_min = min(alpha_min, alpha_trans)
+                        alpha_max = max(alpha_max, alpha_trans)
+                        time = trans.transition_time.get_value()
+                        if time >= last_time:
+                            alpha_par = trans.parameter_after
+                            last_time = time
         alpha_min = min(0.11, alpha_min)
         alpha_name = alpha_par.name
         alpha = alpha_par.get_value()
@@ -156,13 +158,13 @@ class IntervalMaker:
         case_history = model.populations['reported'].history
         expected_cases = case_history[-1] - case_history[0]
 
-        # run model with expectations to step before last alpha transition
+        # run model with expectations to step before last alpha transition (prior to forecast date)
         model.reset()
         model.evolve_expectations(last_time - 1)
         sim_model_ref = copy.deepcopy(model)
 
-        # run model with expectations to normalization day
-        model.evolve_expectations(norm_day - last_time + 1, from_step=last_time - 1)
+        # run model with expectations to normalization day - not used!
+        # model.evolve_expectations(norm_day - last_time + 1, from_step=last_time - 1)
 
         for i_rep in range(n_rep):
             sim_alpha = stats.norm.rvs(loc=alpha, scale=alpha_err)
