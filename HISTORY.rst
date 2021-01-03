@@ -79,6 +79,11 @@ History
  * fix chi^2 for daily data
  * new reference model
 
-* 0.2.14 (2020-12-30)
+* 0.2.15 (2020-12-30)
 
  * minor corrections and additions
+
+* 0.2.16 (2021-01-02)
+
+ * fix for interval maker for scenarios with future transitions
+ * modified file format for scenario hub
