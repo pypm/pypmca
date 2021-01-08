@@ -74,11 +74,13 @@ class IntervalMaker:
         model.user_dict['forecast_hub'][self.forecast_date][category]['inc_periods'] = self.inc_periods[category]
         model.user_dict['forecast_hub'][self.forecast_date][category]['sim_alphas'] = self.sim_alphas
 
-    def get_quantiles(self, categories, n_periods_dict, model, n_rep=10, scale_std_alpha=1., back_up=7, rescale=False, t0 = datetime.date(2020, 3, 1)):
+    def get_quantiles(self, categories, n_periods_dict, model, n_rep=10, scale_std_alpha=1., back_up=7, rescale=False,
+                      t0 = datetime.date(2020, 3, 1), fall_back=False):
         # categories: an array containing a combination of 'case', 'death', 'hospitalization'
         # n_periods_for_categories: a dictionary containing number of weeks for case/death and number of days for hospitalizations
         # n_rep: number of repetitions to produce quantiles
         # scale_std_alpha: if necessary the alpha parameter variation can be adjusted by this scaling factor
+        # fall_back: allow the norm_day (start of data production) begin before the last transition date
         
         # The following are dictionaries indexed by categories
         self.point_estimates = {}
@@ -149,7 +151,7 @@ class IntervalMaker:
         else:
             print('Warning: no std_estimator found for', alpha_par.name)
 
-        if last_time >= norm_day:
+        if not fall_back and last_time >= norm_day:
             print('Warning: backup parameter too large: last_time (',last_time,') >= norm_day (',norm_day,')')
             norm_day = last_time + 1
             print(' -> norm_day changed to',norm_day)
@@ -163,13 +165,15 @@ class IntervalMaker:
         case_history = model.populations['reported'].history
         expected_cases = case_history[-1] - case_history[0]
 
+        # define time for which copies of simulation models are made
+        sim_ref_time = last_time
+        if fall_back:
+            sim_ref_time = min(norm_day,last_time)
+
         # run model with expectations to step before last alpha transition (prior to forecast date)
         model.reset()
         model.evolve_expectations(last_time - 1)
         sim_model_ref = copy.deepcopy(model)
-
-        # run model with expectations to normalization day - not used!
-        # model.evolve_expectations(norm_day - last_time + 1, from_step=last_time - 1)
 
         for i_rep in range(n_rep):
             sim_alpha = stats.norm.rvs(loc=alpha, scale=alpha_err)
@@ -201,10 +205,13 @@ class IntervalMaker:
                             a = term * mean
                             b = term * (1.-mean)
                             new_value = stats.beta.rvs(a,b)
+                        # if this is an integer parameter: convert
+                        if model.parameters[par_name].parameter_type == int:
+                            new_value = int(new_value)
                         sim_model.parameters[par_name].set_value(new_value)
 
             # evolve_expectations up until the renormalization day (just before forecast period)
-            sim_model.evolve_expectations(norm_day - last_time + 1, from_step=last_time - 1)
+            sim_model.evolve_expectations(norm_day - sim_ref_time + 1, from_step=sim_ref_time - 1)
 
             # no renormalization performed... just convert to integers...
 
