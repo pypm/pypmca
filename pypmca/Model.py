@@ -633,7 +633,7 @@ class Model:
             par.new_initial_value()
 
         with open(filepath, 'wb') as f:
-            pickle.dump(self, f, pickle.HIGHEST_PROTOCOL)
+            pickle.dump(self, f, protocol=4)
 
 
     @classmethod
