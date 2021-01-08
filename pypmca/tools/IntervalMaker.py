@@ -149,6 +149,11 @@ class IntervalMaker:
         else:
             print('Warning: no std_estimator found for', alpha_par.name)
 
+        if last_time >= norm_day:
+            print('Warning: backup parameter too large: last_time (',last_time,') >= norm_day (',norm_day,')')
+            norm_day = last_time + 1
+            print(' -> norm_day changed to',norm_day)
+
         # adjust alpha uncertainty
         alpha_err *= scale_std_alpha
 
