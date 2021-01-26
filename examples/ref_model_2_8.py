@@ -640,6 +640,9 @@ bc_model.add_connector(
     Subtractor('subtract infected from susceptible', susceptible_pop, infected_pop))
 
 bc_model.add_connector(
+    Subtractor('subtract infected_v from susceptible', susceptible_pop, infected_pop_v))
+
+bc_model.add_connector(
     Subtractor('subtract vaccinated from vacc cand', vaccan_pop, vaccinated_pop))
 
 bc_model.add_connector(
@@ -650,6 +653,10 @@ bc_model.add_connector(
 
 bc_model.add_connector(
     Subtractor('subtract some of infected from sus vacc cand', susvaccan_pop, infected_pop,
+               ratio_populations=[susvaccan_pop, susceptible_pop]))
+
+bc_model.add_connector(
+    Subtractor('subtract some of infected_v from sus vacc cand', susvaccan_pop, infected_pop_v,
                ratio_populations=[susvaccan_pop, susceptible_pop]))
 
 rep_frac_pop = Population('frac', 0.)
