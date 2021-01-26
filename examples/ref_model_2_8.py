@@ -844,9 +844,17 @@ bc_model.add_transition(
     Injector('outbreak_v', 'rel_days', outbreak_v_time, outbreak_pop_v,
              outbreak_v_number, enabled=False, model=bc_model))
 
+outbreak_v_delay_pars = {
+    'mean': Parameter('outbreak_v_delay_mean', 7., 0., 50.,
+                      'mean delay time for outbreak_v'),
+    'sigma': Parameter('outbreak_v_delay_sigma', 1., 0.01, 20.,
+                       'standard deviation of outbreak_v times')
+}
+outbreak_v_delay = Delay('outbreak_v_delay', 'gamma', outbreak_v_delay_pars, bc_model)
+
 bc_model.add_connector(
     Propagator('outbreaks to infected_v', outbreak_pop_v, infected_pop_v,
-               outbreak_fraction, outbreak_delay))
+               outbreak_fraction, outbreak_v_delay))
 
 # reporting anomalies
 
