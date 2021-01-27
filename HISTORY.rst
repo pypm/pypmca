@@ -87,3 +87,9 @@ History
 
  * fix for interval maker for scenarios with future transitions
  * modified file format for scenario hub
+
+* 0.2.17 (2021-01-27)
+
+ * fixes for backup parameter for interval maker
+ * set protocol level for pickling models
+ * add new model (2_8) with second variant infection cycle
