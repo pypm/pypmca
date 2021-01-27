@@ -21,15 +21,16 @@ class Scenario_hub:
     """ Scenario_hub: produce .csv file for covid19 scenario-hub
     """
 
-    def __init__(self, folder, model_names, scenario_names, scenario_abbrevs, scenario_ids):
+    def __init__(self, folder, model_names, scenario_names, scenario_abbrevs, scenario_ids, scenario_types):
 
         self.model_dir = Path(folder).resolve()
         self.model_names = model_names
         self.scenario_names = scenario_names
         self.scenario_abbrevs = scenario_abbrevs
         self.scenario_ids = scenario_ids
+        self.scenario_types = scenario_types
         self.pd_dict = self.get_data()
-        self.buff = [['model_projection_date', 'target', 'target_end_date', 'location', 'type', 'quantile', 'scenario_name', 'scenario_id', 'value']]
+        self.buff = [['model_projection_date', 'target', 'target_end_date', 'scenario_name', 'scenario_id', 'location', 'type', 'quantile', 'value']]
 
         self.fips_code = {
             'AL': '01',
@@ -133,11 +134,21 @@ class Scenario_hub:
         dict_names = ['case', 'death', 'hospitalization']
         periods = ['wk', 'wk', 'wk']
         data_types = ['cum','cum','inc']
-        inc_types_list = [['inc','cum inc'], ['inc', 'cum'], ['inc','cum inc']]
+        # either 'inc', 'cum', or 'cum inc'. Part of the target name. Latter two are treated the same.
+        # requested format as of Jan 6:
+        #inc_types_list = [['inc','cum inc'], ['inc', 'cum'], ['inc','cum inc']]
+        # requested format as of Jan 8:
+        inc_types_list = [['inc', 'cum'], ['inc', 'cum'], ['inc', 'cum']]
+        # which weeks to show: either 'all' or array of weeks to show
+        # requested format as of Jan 6:
+        # inc_weeks_list = [['all','all'],['all','all'],['all',['13','26']]]
+        # requested format as of Jan 8:
+        inc_weeks_list = [['all', 'all'], ['all', 'all'], ['all', 'all']]
 
         for i_s, scenario_name in enumerate(self.scenario_names):
             scenario_abbrev = self.scenario_abbrevs[i_s]
             scenario_id = self.scenario_ids[i_s]
+            scenario_type = self.scenario_types[i_s]
 
             # collect information for full US
             us_inc_point_est_dict = {}
@@ -168,55 +179,78 @@ class Scenario_hub:
                 state_data[dict_names[0]] = self.pd_dict['usa-jhu-pypm.csv'][abbrev.upper() + '-pt'].fillna(0).values
                 state_data[dict_names[1]] = self.pd_dict['usa-jhu-pypm.csv'][abbrev.upper() + '-dt'].fillna(0).values
 
+                models = []
                 success = False
-                for model_name in self.model_names:
-                    try:
-                        filename = abbrev + model_name + scenario_abbrev + '.pypm'
-                        path_model = self.model_dir / scenario_name / filename
-                        case_model = Model.open_file(path_model)
-                        success = True
-                        break
-                    except:
-                        pass
-                for model_name in self.model_names:
-                    for model_suffix in ['_d','_h','']:
+                if scenario_type == 'single':
+                    single_model = None
+                    for model_name in self.model_names:
                         try:
-                            filename = abbrev + model_name + model_suffix + scenario_abbrev + '.pypm'
+                            filename = abbrev + model_name + scenario_abbrev + '.pypm'
                             path_model = self.model_dir / scenario_name / filename
-                            death_model = Model.open_file(path_model)
+                            single_model = Model.open_file(path_model)
                             break
                         except:
                             pass
-                for model_name in self.model_names:
-                    for model_suffix in ['_h','']:
-                        try:
-                            filename = abbrev + model_name + model_suffix + scenario_abbrev + '.pypm'
-                            path_model = self.model_dir / scenario_name / filename
-                            hosp_model = Model.open_file(path_model)
-                            break
-                        except:
-                            pass
+
+                    success = single_model is not None
+                    models = [single_model]
+                    print(models[0].name)
+
+                elif scenario_type == 'split':
+                    young_model = None
+                    old_model = None
+                    for model_suffix in ['','_h']:
+                        for model_name in self.model_names:
+                            try:
+                                filename = abbrev + model_name + model_suffix + scenario_abbrev + '.pypm'
+                                path_model = self.model_dir / scenario_name / filename
+                                if model_suffix == '':
+                                    young_model = Model.open_file(path_model)
+                                else:
+                                    old_model = Model.open_file(path_model)
+                                break
+                            except:
+                                pass
+                    success = young_model is not None and old_model is not None
+                    models = [young_model, old_model]
+                    print(models[0].name, models[1].name)
+
                 if not success:
-                    raise RuntimeError('No model for: ', abbrev)
+                    raise RuntimeError('Missing model for: ', abbrev)
 
-                # These correspond to the names, dict_names above
-                models = [case_model, death_model, hosp_model]
-                print(models[0].name, models[1].name, models[2].name)
-
-                for i in range(len(models)):
-                    model = models[i]
+                for i in range(len(dict_names)):
                     inc_types = inc_types_list[i]
 
-                    hub_dict = model.user_dict['forecast_hub'][forecast_date][dict_names[i]]
-                    point_est_dict = hub_dict['point_estimates']
-                    quantile_dict = hub_dict['quantiles']
-                    inc_periods = hub_dict['inc_periods']
+                    if scenario_type == 'single':
+                        hub_dict = models[0].user_dict['forecast_hub'][forecast_date][dict_names[i]]
+                        point_est_dict = hub_dict['point_estimates']
+                        quantile_dict = hub_dict['quantiles']
+                        inc_periods = hub_dict['inc_periods']
+                    elif scenario_type == 'split':
+                        hub_dicts = [models[k].user_dict['forecast_hub'][forecast_date][dict_names[i]] for k in range(2)]
+                        point_est_dict = {}
+                        quantile_dict = {}
+                        inc_periods = []
+                        for i_period in hub_dicts[0]['point_estimates']:
+                            point_est_dict[i_period] = hub_dicts[0]['point_estimates'][i_period] + \
+                                                       hub_dicts[1]['point_estimates'][i_period]
+                            quantile_dict[i_period] = {}
+                            for quant in hub_dicts[0]['quantiles'][i_period]:
+                                quantile_dict[i_period][quant] = hub_dicts[0]['quantiles'][i_period][quant] + \
+                                                                 hub_dicts[1]['quantiles'][i_period][quant]
+                            index = int(i_period) - 1
+                            inc_period_combined = [hub_dicts[0]['inc_periods'][index][k] + \
+                                                   hub_dicts[1]['inc_periods'][index][k] \
+                                                   for k in range(len(hub_dicts[0]['inc_periods'][index]))]
+                            inc_periods.append(inc_period_combined)
+
+
                     cum_periods = []
                     if data_types[i] == 'cum':
                         cum_periods = [state_data[dict_names[i]][first_sunday-1]] * len(inc_periods[0])
                     else:
                         cum_periods = [0] * len(inc_periods[0])
-                    for inc_type in inc_types:
+                    for j, inc_type in enumerate(inc_types):
                         sum = 0
                         if data_types[i] == 'cum':
                             sum = state_data[dict_names[i]][first_sunday-1]
@@ -244,7 +278,8 @@ class Scenario_hub:
                                 else:
                                     us_cum_point_est_dict[dict_names[i]][i_period] = sum
 
-                            self.add_record(forecast_date_text,target,target_end_date,location,'point','NA',value,scenario_name, scenario_id)
+                            if (inc_weeks_list[i][j] =='all' or i_period in inc_weeks_list[i][j]):
+                                self.add_record(forecast_date_text,target,target_end_date,location,'point','NA',value,scenario_name, scenario_id)
 
                             # quantiles
                             if inc_type == 'inc':
@@ -255,7 +290,8 @@ class Scenario_hub:
 
                                 for quant in quantile_dict[i_period]:
                                     value = quantile_dict[i_period][quant]
-                                    self.add_record(forecast_date_text, target, target_end_date, location, 'quantile', quant, value, scenario_name, scenario_id)
+                                    if (inc_weeks_list[i][j] == 'all' or i_period in inc_weeks_list[i][j]):
+                                        self.add_record(forecast_date_text, target, target_end_date, location, 'quantile', quant, value, scenario_name, scenario_id)
 
                                 if i_period in us_inc_periods_dict[dict_names[i]]:
                                     ip_len = len(inc_periods[index])
@@ -270,7 +306,8 @@ class Scenario_hub:
                                     cum_periods[i_rep] += inc_periods[index][i_rep]
                                 for quant in quantile_dict[i_period]:
                                     value = np.percentile(cum_periods, float(quant)*100.)
-                                    self.add_record(forecast_date_text, target, target_end_date, location, 'quantile', quant, value, scenario_name, scenario_id)
+                                    if (inc_weeks_list[i][j] == 'all' or i_period in inc_weeks_list[i][j]):
+                                        self.add_record(forecast_date_text, target, target_end_date, location, 'quantile', quant, value, scenario_name, scenario_id)
 
                                 if i_period in us_cum_periods_dict[dict_names[i]]:
                                     ip_len = len(cum_periods)
@@ -295,7 +332,7 @@ class Scenario_hub:
                 quants = []
                 if dict_names[i] in ['case', 'death', 'hospitalization']:
                     quants = [0.01, 0.025] + [0.05 + 0.05 * i for i in range(19)] + [0.975, 0.99]
-                for inc_type in inc_types:
+                for j, inc_type in enumerate(inc_types):
                     for i_period in us_inc_point_est_dict[dict_names[i]]:
                         target = i_period + ' ' + periods[i] + ' ahead ' + inc_type + ' ' + names[i]
                         days = int(i_period)
@@ -311,7 +348,8 @@ class Scenario_hub:
                             value = us_cum_point_est_dict[dict_names[i]][i_period]
                             if data_types[i] == 'cum':
                                 value += additional[dict_names[i]]
-                        self.add_record(forecast_date_text, target, target_end_date, location, 'point', 'NA', value, scenario_name, scenario_id)
+                        if (inc_weeks_list[i][j] == 'all' or i_period in inc_weeks_list[i][j]):
+                            self.add_record(forecast_date_text, target, target_end_date, location, 'point', 'NA', value, scenario_name, scenario_id)
 
                         # quantiles
                         if inc_type == 'inc':
@@ -321,8 +359,9 @@ class Scenario_hub:
                                 # increase the width of the interval for the US as a whole, to account for correlations between states
                                 scaled_value = cor_scale*(value-median) + median
                                 quant_text = '{0:0.3f}'.format(quant)
-                                self.add_record(forecast_date_text, target, target_end_date, location, 'quantile', quant_text,
-                                                scaled_value, scenario_name, scenario_id)
+                                if (inc_weeks_list[i][j] == 'all' or i_period in inc_weeks_list[i][j]):
+                                    self.add_record(forecast_date_text, target, target_end_date, location, 'quantile', quant_text,
+                                                    scaled_value, scenario_name, scenario_id)
 
                         elif inc_type == 'cum' or inc_type == 'cum inc':
                             median = np.percentile(us_cum_periods_dict[dict_names[i]][i_period], 50.)
@@ -334,28 +373,45 @@ class Scenario_hub:
                                     value += additional[dict_names[i]]
                                 scaled_value = cor_scale * (value - median) + median
                                 quant_text = '{0:0.3f}'.format(quant)
-                                self.add_record(forecast_date_text, target, target_end_date, location, 'quantile', quant_text,
-                                                scaled_value, scenario_name, scenario_id)
+                                if (inc_weeks_list[i][j] == 'all' or i_period in inc_weeks_list[i][j]):
+                                    self.add_record(forecast_date_text, target, target_end_date, location, 'quantile', quant_text,
+                                                    scaled_value, scenario_name, scenario_id)
 
         return self.buff
 
 
     def add_record(self, forecast_date, target, target_end_date, location, record_type, quantile_text, value, scenario_name, scenario_id):
-        record = [forecast_date, target, target_end_date, location, record_type, quantile_text, scenario_name, scenario_id]
+        record = [forecast_date, target, target_end_date, scenario_name, scenario_id, location, record_type, quantile_text]
         record.append('{0:0.1f}'.format(value))
         self.buff.append(record)
 
-scenario_names = ['optimistic','moderate','fatigue','counterfactual']
-scenario_abbrevs = ['_opt','_mod','_fat','_cfs']
-scenario_ids = ['A-2020-12-22','B-2020-12-22','C-2020-12-22','D-2020-12-22']
+round = 2
 
-my_scenario = Scenario_hub('/Users/karlen/pypm-temp/usa-scenario', ['_2_7_1229'], scenario_names, scenario_abbrevs, scenario_ids)
-# Indicate the total US deaths (up to and including Saturday) here:
-us_deaths = 331909
-us_cases = 18982634
+if round == 1:
+    scenario_names = ['optimistic','moderate','fatigue','counterfactual']
+    scenario_abbrevs = ['_opt','_mod','_fat','_cfs']
+    scenario_ids = ['A-2020-12-22','B-2020-12-22','C-2020-12-22','D-2020-12-22']
+    scenario_types = ['split','split','split','single']
+    model_names = ['_2_7_0103']
+    start_date = datetime.date(2021, 1, 3)
+    # Indicate the total US deaths (up to and including Saturday) here:
+    us_deaths = 350186
+    us_cases = 20426184
 
+elif round == 2:
+    scenario_names = ['optimistic_no_var','optimistic_var','fatigue_no_var','fatigue_var']
+    scenario_abbrevs = ['_opt_nv','_opt_var','_fat_nv','_fat_var']
+    scenario_ids = ['A-2021-01-22','B-2021-01-22','C-2021-01-22','D-2021-01-22']
+    scenario_types = ['split','split','split','split']
+    model_names = ['_2_8_0124']
+    start_date = datetime.date(2021, 1, 24)
+    # Indicate the total US deaths (up to and including Saturday) here:
+    us_deaths = 417439
+    us_cases = 24994463
 
-my_csv = my_scenario.get_csv(datetime.date(2020, 12, 27), us_deaths, us_cases, cor_scale=1.5)
+my_scenario = Scenario_hub('/Users/karlen/pypm-temp/usa-scenario', model_names, scenario_names, scenario_abbrevs, scenario_ids, scenario_types)
+
+my_csv = my_scenario.get_csv(start_date, us_deaths, us_cases, cor_scale=1.5)
 pass
 with open('/Users/karlen/pypm-temp/test-scenario.csv','w') as out:
     for line in my_csv:
