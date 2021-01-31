@@ -93,3 +93,7 @@ History
  * fixes for backup parameter for interval maker
  * set protocol level for pickling models
  * add new model (2_8) with second variant infection cycle
+
+* 0.2.18 (2021-01-31)
+
+ * let fit skip specified dates (xmas period for example)
