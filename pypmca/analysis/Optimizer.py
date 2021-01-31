@@ -69,6 +69,9 @@ The number of degress of freedom can be specified. If the model included all sou
 the best estimate for dof would be the mean(chi2s). This value should be
 increased to account for additional degrees of freedom that reflect the unaccounted for noise, coming from the study in part (3).
 
+2021-1-31: Add skip_data (a string field) is added to define dates that should not be used in optimization and chi^2 calculation
+Format example '250,263:270' means to remove 250,263,264,...,270
+
 @author: karlen
 """
 import copy
@@ -82,7 +85,7 @@ class Optimizer:
     """ Optimizer: point estimator and covariance
     """
 
-    def __init__(self, model, full_population_name, data, data_range, cumul_reset=False):
+    def __init__(self, model, full_population_name, data, data_range, cumul_reset=False, skip_data=None):
         self.model = model
         self.full_population_name = full_population_name
         self.population_name = full_population_name[6:]
@@ -110,6 +113,29 @@ class Optimizer:
         self.calc_chi2f = False
         self.calc_chi2s = False
         self.fit_statistics = None
+        self.skip_dates = None
+        if skip_data is not None and skip_data != '':
+            self.skip_dates = []
+            blocks = skip_data.split(',')
+            for block in blocks:
+                if ':' in block:
+                    limits = block.split(':')
+                    for i in range(int(limits[0]),int(limits[1])+1):
+                        self.skip_dates.append(i)
+                else:
+                    self.skip_dates.append(int(block))
+
+    def remove_data(self, x, y):
+        if self.skip_dates is None:
+            return x,y
+        else:
+            x_rem = []
+            y_rem = []
+            for i,xi in enumerate(x):
+                if xi not in self.skip_dates:
+                    x_rem.append(xi)
+                    y_rem.append(y[i])
+            return x_rem,y_rem
 
     def func_setup(self):
         # find the variable parameters and return the bounds
@@ -232,20 +258,24 @@ class Optimizer:
             if self.population_type == 'total' and self.cumul_reset:
                 cumul_offset = self.data[self.data_range[0]]
                 mod_data = [self.data[i] - cumul_offset for i in range(self.data_range[0],self.data_range[1])]
-                popt, pcov = curve_fit(func, xdata, mod_data,
+                x_rem, y_rem = self.remove_data(xdata, mod_data)
+                popt, pcov = curve_fit(func, x_rem, y_rem,
                                        p0=par_0, bounds=bounds)
             else:
-                popt, pcov = curve_fit(func, xdata, self.data[self.data_range[0]:self.data_range[1]],
+                x_rem, y_rem = self.remove_data(xdata, self.data[self.data_range[0]:self.data_range[1]])
+                popt, pcov = curve_fit(func, x_rem, y_rem,
                                        p0=par_0, bounds=bounds)
         else:
             # with new autocovariance, last point is used for normalization remove from fit
             if self.population_type == 'total' and self.cumul_reset:
                 cumul_offset = self.data[self.data_range[0]]
                 mod_data = [self.data[i] - cumul_offset for i in range(self.data_range[0],self.data_range[1]-1)]
-                popt, pcov = curve_fit(func, xdata[:-1], mod_data,
+                x_rem, y_rem = self.remove_data(xdata[:-1], mod_data)
+                popt, pcov = curve_fit(func, x_rem, y_rem,
                                        p0=par_0, bounds=bounds, sigma=self.auto_cov)
             else:
-                popt, pcov = curve_fit(func, xdata[:-1], self.data[self.data_range[0]:self.data_range[1]-1],
+                x_rem, y_rem = self.remove_data(xdata[:-1], self.data[self.data_range[0]:self.data_range[1]-1])
+                popt, pcov = curve_fit(func, x_rem, y_rem,
                                         p0=par_0, bounds=bounds, sigma=self.auto_cov)
 
         i = -1
@@ -272,12 +302,13 @@ class Optimizer:
             cumul_offset = self.data[self.data_range[0]]
 
         self.chi2d = 0.
+        x_rem, y_rem = self.remove_data(xdata[:-1], xdata[:-1])
         if self.population_type == 'total':
-            for x in xdata[:-1]:
+            for x in x_rem:
                 resid = (self.data[x] - cumul_offset) - self.model.populations[self.population_name].history[x] * scale
                 self.chi2d += resid ** 2 / (self.model.populations[self.population_name].history[x] * scale)
         else:
-            for x in xdata[:-1]:
+            for x in x_rem:
                 diff = self.delta(self.model.populations[self.population_name].history)
                 resid = self.data[x] - diff[x]
                 self.chi2d += resid ** 2 / (1. + diff[x])
@@ -322,7 +353,8 @@ class Optimizer:
         sum_0 = 0.
         sum_1 = 0.
         count = 0
-        for t in range(start_point, end_point):
+        x_rem, y_rem = self.remove_data(range(start_point, end_point), range(start_point, end_point))
+        for t in x_rem:
             include_i = True
             if not all_days:
                 # check that today should be included
@@ -446,7 +478,8 @@ class Optimizer:
             scale = sim_population.history[xdata[-1]] / ref_population.history[xdata[-1]]
             resid = []
             chi2_m = 0.
-            for x in xdata[:-1]:
+            x_rem, y_rem = self.remove_data(xdata[:-1], xdata[:-1])
+            for x in x_rem:
                 delta = sim_population.history[x] - ref_population.history[x] * scale
                 resid.append(delta)
                 chi2_m += delta ** 2 / (ref_population.history[x] * scale)
@@ -482,7 +515,8 @@ class Optimizer:
                 scale_f = sim_population.history[xdata[-1]] / sim_ref_population.history[xdata[-1]]
                 chi2_f = 0.
                 # last point not used for autocovariance xdata[:-1] removes that point
-                for x in xdata[:-1]:
+                x_rem, y_rem = self.remove_data(xdata[:-1], xdata[:-1])
+                for x in x_rem:
                     delta = sim_population.history[x] - sim_ref_population.history[x] * scale_f
                     resid_f.append(delta)
                     chi2_f += delta ** 2 / (sim_ref_population.history[x] * scale_f)

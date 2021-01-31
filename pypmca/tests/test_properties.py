@@ -15,6 +15,7 @@ from pathlib import Path
 import datetime
 
 example_dir = Path('../../examples/').resolve()
+path_model_2_8 = example_dir / 'ref_model_2_8.pypm'
 path_model_2_7 = example_dir / 'ref_model_2_7.pypm'
 path_model_2_6 = example_dir / 'ref_model_2_6.pypm'
 path_model_2_5 = example_dir / 'ref_model_2_5.pypm'
@@ -266,7 +267,8 @@ def test_point_estimate():
 
     sim_2.reset()
     sim_2.generate_data(end_day)
-    optimizer = Optimizer(ref_2, 'total reported', sim_2.populations['reported'].history, [start_day, end_day])
+    sim_2.populations['reported'].history[47] = np.inf
+    optimizer = Optimizer(ref_2, 'total reported', sim_2.populations['reported'].history, [start_day, end_day],skip_data='42,45:48')
     optimizer.reset_variables()
 
     scan_dict = optimizer.i_fit()
@@ -308,7 +310,8 @@ def test_point_estimate_daily():
     sim_2.reset()
     sim_2.generate_data(end_day)
     daily_data = delta(sim_2.populations['reported'].history)
-    optimizer = Optimizer(ref_2, 'daily reported', daily_data, [start_day, end_day])
+    daily_data[47] = np.inf
+    optimizer = Optimizer(ref_2, 'daily reported', daily_data, [start_day, end_day],skip_data='42,45:48')
     optimizer.reset_variables()
 
     scan_dict = optimizer.i_fit()
@@ -388,7 +391,8 @@ def test_sim_gof():
 
     sim_2.reset()
     sim_2.generate_data(end_day)
-    optimizer = Optimizer(ref_2, 'total reported', sim_2.populations['reported'].history, [start_day, end_day])
+    sim_2.populations['reported'].history[47] = np.inf
+    optimizer = Optimizer(ref_2, 'total reported', sim_2.populations['reported'].history, [start_day, end_day],skip_data='42,45:48')
     optimizer.reset_variables()
     popt, pcov = optimizer.fit()
     fit_statistics = optimizer.fit_statistics
@@ -597,7 +601,7 @@ def test_interval_maker():
     my_IntervalMaker = IntervalMaker("USA", hub_date)
     categories = ['case','death','hospitalization']
     n_period_dict = {'case':5, 'death':5, 'hospitalization':30}
-    n_rep = 100
+    n_rep = 10
     scale_std_alpha = 2.
     model = Model.open_file(path_model_2_6)
     if 'interval_maker' not in model.user_dict:
@@ -608,7 +612,7 @@ def test_interval_maker():
     model.parameters['recover_frac'].std_estimator = 0.01
 
     my_IntervalMaker.get_quantiles(categories, n_period_dict, model, n_rep=n_rep,
-                                               scale_std_alpha=scale_std_alpha)
+                                               scale_std_alpha=scale_std_alpha, back_up=21, fall_back=True, rescale=True)
     for category in categories:
         my_IntervalMaker.append_user_dict(category, model)
     i=1
@@ -623,5 +627,18 @@ def test_model_2_7():
 #    ref_2_7.evolve_expectations(200)
     ref_2_7.reset()
     ref_2_7.generate_data(200)
+
+    i=1
+
+def test_model_2_8():
+    ref_2_8 = Model.open_file(path_model_2_8)
+    ref_2_8.transitions['outbreak_v'].enabled = True
+    ref_2_8.parameters['outbreak_v_time'].set_value(30)
+    ref_2_8.parameters['outbreak_v_number'].set_value(2.)
+    ref_2_8.parameters['alpha_0'].set_value(0.35)
+#    ref_2_8.reset()
+#    ref_2_8.evolve_expectations(200)
+    ref_2_8.reset()
+    ref_2_8.generate_data(200)
 
     i=1
