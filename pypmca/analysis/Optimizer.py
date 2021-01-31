@@ -113,6 +113,7 @@ class Optimizer:
         self.calc_chi2f = False
         self.calc_chi2s = False
         self.fit_statistics = None
+        self.skip_data = skip_data
         self.skip_dates = None
         if skip_data is not None and skip_data != '':
             self.skip_dates = []
@@ -502,7 +503,7 @@ class Optimizer:
                 # Make a copy for fitting simulated data - always start with same initial values...
                 sim_fit_model = copy.deepcopy(self.model)
                 sim_optimizer = Optimizer(sim_fit_model, self.full_population_name, sim_population.history,
-                                          self.data_range)
+                                          self.data_range, skip_data=self.skip_data)
                 # following is needed only if re-using optimizer for a new fit...
                 #sim_optimizer.reset_variables()
                 sim_popt, sim_pcov = sim_optimizer.fit()
