@@ -7,6 +7,10 @@ import pytest
 from pypmca import Model, Population, Delay, Parameter, Multiplier, Propagator, \
     Splitter, Adder, Subtractor, Chain, Modifier, Injector
 import numpy as np
+from pathlib import Path
+
+example_dir = Path('../../examples/').resolve()
+path_model_2_8 = example_dir / 'ref_model_2_8.pypm'
 
 
 def test_class_Model():
@@ -21,6 +25,9 @@ def test_class_Population():
                           hidden=True, color='black', show_sim=False, report_noise=False,
                           report_noise_par=None)
     assert test_pop.history[0] == init_value
+
+    model = Model.open_file(path_model_2_8)
+    test_pop.set_model(model)
 
     incoming = 10
     test_pop.update_future_fast(incoming)
@@ -43,9 +50,21 @@ def test_class_Population():
     # restart - back to initial value
     for expectations in [True, False]:
         test_pop.reset()
-        future = [0, 10, 100, 100, 100, 10, 0, 0, 0, 0, 0, 0, 0]
+        future = [0, 10, 100, 100, 100, 10, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
         future_sum = np.sum(np.array(future))
         test_pop.set_report_noise(True, noise_factor, backlog_factor, None)
+        test_pop.future = future
+        for i in range(len(future) + 5):
+            test_pop.do_time_step(expectations=expectations)
+        assert test_pop.history[-1] == init_value + future_sum
+
+    report_days = Parameter('report_days',127,parameter_min=-7,parameter_max=127,parameter_type='int')
+    for report_day_value in [127,63,-1,-2,-5,-7]:
+        report_days.set_value(report_day_value)
+        test_pop.reset()
+        future = [0, 10, 100, 100, 100, 10, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
+        future_sum = np.sum(np.array(future))
+        test_pop.set_report_noise(True, noise_factor, backlog_factor, report_days)
         test_pop.future = future
         for i in range(len(future) + 5):
             test_pop.do_time_step(expectations=expectations)

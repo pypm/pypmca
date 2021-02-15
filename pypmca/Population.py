@@ -34,9 +34,12 @@ class Population:
         - if True, then report_backlog_par is the lower limit of range [low,1] for which a uniform
           random number is drawn to select the number from the backlog that are reported today
           the remaining will be in a future report
-        - if True, and the integer parameter report_days is provided, use that to determine which
+        - if True, and the integer parameter report_days with positive value is provided, use that to determine which
           days of week that reports are produced. In BC, reports are zero on Sunday and included in the
           next reporting day. Bit encoded, with Monday = bit 0... Sunday = bit 6. BC: report_days = 63
+        - if True, and the integer parameter report_days with negative value is provided, use that to identify the
+          situation when data is provided on a weekly basis. The value specifies the day of week which constitutes
+          a new week of data: Sunday = -6, Monday = -7, Tuesday = -1, Wednesday = -2...
         - if True and report_noise_weekly is True, then backlog is released on a weekly basis to model
           states that have a large variance in their weekly death reports
     """
@@ -186,10 +189,22 @@ class Population:
                 day_of_week = today.weekday()
 
                 # are we reporting today? (new member added in ref model 2_2)
+                # also check if reporting is done only once per week, and find day of week that
+                # previous week of data is released. This is set by having report_days = -1 * day of week
+                # that data is released. Note for Monday, that is specified as -7, Tuesday -1, ... Sunday -6
                 try:
-                    reporting = self.__report_days is None
+                    rd_not_set = self.__report_days is None
+                    reporting = rd_not_set
+                    weekly_reporting = False
+                    if not rd_not_set:
+                        weekly_reporting_day = -1 * self.__report_days.get_value()
+                        if weekly_reporting_day > 0 and weekly_reporting_day < 8:
+                            weekly_reporting = True
+                            if weekly_reporting_day == 7:
+                                weekly_reporting_day = 0
                 except:
                     reporting = True
+                    weekly_reporting = False
 
                 if not reporting:
                     report_days = self.__report_days.get_value()
@@ -226,6 +241,28 @@ class Population:
         # don't let the population go negative
         if self.history[-1] < 0:
             self.history[-1] = 0
+
+        # if data is only reported on a weekly basis and today is first day of new week,
+        # spread the previous 7 days of data equally amongst the days (note: already appended new data
+        # for this new week - leave that one as is). Remainder from division of 7 spread over first days
+        if not expectations and self.__report_noise and weekly_reporting:
+            t0 = self.model.t0
+            days_after = timedelta(days=int((len(self.history) + 0.5) * self.model.get_time_step()))
+            today = t0 + days_after
+            day_of_week = today.weekday()
+            if weekly_reporting_day == day_of_week:
+                if len(self.history) > 8:
+                    week_sum = self.history[-2] - self.history[-9]
+                    daily_xtra = week_sum % 7
+                    daily = int((week_sum - daily_xtra) / 7)
+                    cumul = self.history[-9]
+                    for i in range(7):
+                        iloc = i - 8
+                        cumul += daily
+                        if i < daily_xtra:
+                            cumul += 1
+                        self.history[iloc] = cumul
+
         # remove the future element
         if self.future is not None:
             if len(self.future) > 0:
