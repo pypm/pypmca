@@ -97,3 +97,8 @@ History
 * 0.2.18 (2021-01-31)
 
  * let fit skip specified dates (xmas period for example)
+
+* 0.2.19 (2021-02-14)
+
+ * add option to produce simulated weekly data
+ * minor fix for copy
