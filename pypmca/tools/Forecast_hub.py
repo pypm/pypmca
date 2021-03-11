@@ -323,11 +323,12 @@ class Forecast_hub:
         record.append('{0:0.1f}'.format(value))
         self.buff.append(record)
 
-my_forecast = Forecast_hub('/Users/karlen/pypm-temp/usa', ['_2_8_0131'])
+my_forecast = Forecast_hub('/Users/karlen/pypm-temp/usa', ['_2_8_0307'])
 # Indicate the total US deaths (up to and including Saturday) here:
-us_deaths = 439530
+us_deaths = 524362
 
-my_csv = my_forecast.get_csv(datetime.date(2021, 1, 31), us_deaths, cor_scale=1.5)
+# changed to 3 for Feb 28 - all have variant - large correlated uncertainty!
+my_csv = my_forecast.get_csv(datetime.date(2021, 3, 7), us_deaths, cor_scale=3.0)
 pass
 with open('/Users/karlen/pypm-temp/test-forecast.csv','w') as out:
     for line in my_csv:

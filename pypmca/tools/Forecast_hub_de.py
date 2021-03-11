@@ -299,20 +299,21 @@ class Forecast_hub:
         record.append('{0:0.1f}'.format(value))
         self.buff.append(record)
 
-my_forecast = Forecast_hub('/Users/karlen/pypm-temp/germany', ['_2_8_0131'])
+my_forecast = Forecast_hub('/Users/karlen/pypm-temp/germany', ['_2_8_0307'])
 # Indicate the total US deaths (up to and including Saturday) here:
 #de_deaths = xxx
 
-my_csv = my_forecast.get_csv(datetime.date(2021, 1, 31), 'case',cor_scale=1.5)
+# 1.5 -> 3.0 on introduction of variant
+my_csv = my_forecast.get_csv(datetime.date(2021, 3, 7), 'case',cor_scale=3.0)
 pass
 with open('/Users/karlen/pypm-temp/test-germany-forecast-case.csv','w') as out:
     for line in my_csv:
         record = ','.join(line)
         out.write(record + '\n')
 
-my_forecast = Forecast_hub('/Users/karlen/pypm-temp/germany', ['_2_8_0131'])
+my_forecast = Forecast_hub('/Users/karlen/pypm-temp/germany', ['_2_8_0307'])
 
-my_csv = my_forecast.get_csv(datetime.date(2021, 1, 31), 'death',cor_scale=1.5)
+my_csv = my_forecast.get_csv(datetime.date(2021, 3, 7), 'death',cor_scale=3.0)
 pass
 with open('/Users/karlen/pypm-temp/test-germany-forecast.csv','w') as out:
     for line in my_csv:

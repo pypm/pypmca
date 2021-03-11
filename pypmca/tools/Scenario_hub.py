@@ -196,6 +196,21 @@ class Scenario_hub:
                     models = [single_model]
                     print(models[0].name)
 
+                elif scenario_type == 'ens':
+                    single_model = None
+                    for model_name in self.model_names:
+                        try:
+                            filename = abbrev + model_name + scenario_abbrev + '.pypm_e'
+                            path_model = self.model_dir / scenario_name / filename
+                            single_model = Ensemble.open_file(path_model)
+                            break
+                        except:
+                            pass
+
+                    success = single_model is not None
+                    models = [single_model]
+                    print(models[0].name)
+
                 elif scenario_type == 'split':
                     young_model = None
                     old_model = None
@@ -221,7 +236,7 @@ class Scenario_hub:
                 for i in range(len(dict_names)):
                     inc_types = inc_types_list[i]
 
-                    if scenario_type == 'single':
+                    if scenario_type in ['single','ens']:
                         hub_dict = models[0].user_dict['forecast_hub'][forecast_date][dict_names[i]]
                         point_est_dict = hub_dict['point_estimates']
                         quantile_dict = hub_dict['quantiles']
@@ -385,9 +400,9 @@ class Scenario_hub:
         record.append('{0:0.1f}'.format(value))
         self.buff.append(record)
 
-round = 1
+round = '3b'
 
-if round == 1:
+if round == '1':
     scenario_names = ['optimistic','moderate','fatigue','counterfactual']
     scenario_abbrevs = ['_opt','_mod','_fat','_cfs']
     scenario_ids = ['A-2020-12-22','B-2020-12-22','C-2020-12-22','D-2020-12-22']
@@ -398,7 +413,7 @@ if round == 1:
     us_deaths = 350186
     us_cases = 20426184
 
-elif round == 2:
+elif round == '2':
     scenario_names = ['optimistic_no_var','optimistic_var','fatigue_no_var','fatigue_var']
     scenario_abbrevs = ['_opt_nv','_opt_var','_fat_nv','_fat_var']
     scenario_ids = ['A-2021-01-22','B-2021-01-22','C-2021-01-22','D-2021-01-22']
@@ -409,9 +424,32 @@ elif round == 2:
     us_deaths = 417439
     us_cases = 24994463
 
+elif round == '3a':
+    scenario_names = ['highVac_modNPI','highVac_lowNPI','lowVac_modNPI','lowVac_lowNPI']
+    scenario_abbrevs = ['_hvmn','_hvln','_lvmn','_lvln']
+    scenario_ids = ['A-2021-03-05','B-2021-03-05','C-2021-03-05','D-2021-03-05']
+    scenario_types = ['split','split','split','split']
+    model_names = ['_2_8_0307']
+    start_date = datetime.date(2021, 3, 7)
+    # Indicate the total US deaths (up to and including Saturday) here:
+    us_deaths = 524362
+    us_cases = 28952970
+
+elif round == '3b':
+    scenario_names = ['highVac_modNPI','highVac_lowNPI','lowVac_modNPI','lowVac_lowNPI']
+    scenario_abbrevs = ['_hvmn','_hvln','_lvmn','_lvln']
+    scenario_ids = ['A-2021-03-05','B-2021-03-05','C-2021-03-05','D-2021-03-05']
+    scenario_types = ['ens','ens','ens','ens']
+    model_names = ['_2_8_0307']
+    start_date = datetime.date(2021, 3, 7)
+    # Indicate the total US deaths (up to and including Saturday) here:
+    us_deaths = 524362
+    us_cases = 28952970
+
 my_scenario = Scenario_hub('/Users/karlen/pypm-temp/usa-scenario', model_names, scenario_names, scenario_abbrevs, scenario_ids, scenario_types)
 
-my_csv = my_scenario.get_csv(start_date, us_deaths, us_cases, cor_scale=1.5)
+# Changed to 3.0 since all models share same variant uncertainty (starting round 3b, March 10, 2021)
+my_csv = my_scenario.get_csv(start_date, us_deaths, us_cases, cor_scale=3.0)
 pass
 with open('/Users/karlen/pypm-temp/test-scenario.csv','w') as out:
     for line in my_csv:
