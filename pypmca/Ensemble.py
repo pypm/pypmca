@@ -27,7 +27,7 @@ from datetime import date
 import numpy as np
 from scipy import stats
 import copy
-
+from pathlib import Path
 import pickle
 from pypmca import Model, Parameter, Population
 
@@ -671,8 +671,8 @@ class Ensemble(Model):
                 model_A.populations[self.infected_name].update_future_fast(new_infections)
             else:
                 if self.__distribution == 'poisson':
-                    n = stats.poisson.rvs(new_infections)
-                    model_A.populations[self.infected_name].update_future_fast(n)
+                    n_poisson = stats.poisson.rvs(new_infections)
+                    model_A.populations[self.infected_name].update_future_fast(n_poisson)
                 else:
                     p = self.__nbinom_par.get_value()
                     if p < 0.001:
@@ -680,8 +680,8 @@ class Ensemble(Model):
                     if p > 0.999:
                         p = 0.999
                     r = new_infections * p / (1. - p)
-                    n = stats.nbinom.rvs(r, p)
-                    model_A.populations[self.infected_name].update_future_fast(n)
+                    n_binom = stats.nbinom.rvs(r, p)
+                    model_A.populations[self.infected_name].update_future_fast(n_binom)
 
     def do_time_step(self, expectations=True):
         for model_name in self.models:
@@ -739,13 +739,16 @@ class Ensemble(Model):
         None.
 
         """
-        if not isinstance(filename, str):
-            raise TypeError('Error saving file. ' +
-                            ': filename argument must be a str')
 
-        fullname = filename
-        if '.' not in filename:
-            fullname = filename + '.pypm_e'
+        try:
+            filepath = Path(filename).resolve()
+        except:
+            raise TypeError('Input arg could not be converted to a valid path: {}' +
+                            '\n It must be a str or Path-like.'.format(filename))
+
+        if len(filepath.suffix) < 2:
+            filepath = filepath.with_suffix('.pypm_e')
+
 
         #       eliminate histories, undo transitioned parameter adjustments
 
@@ -760,18 +763,18 @@ class Ensemble(Model):
                 par = model.parameters[par_name]
                 par.new_initial_value()
 
-        with open(fullname, 'wb') as f:
-            pickle.dump(self, f, pickle.HIGHEST_PROTOCOL)
+        with open(filepath, 'wb') as f:
+            pickle.dump(self, f, protocol=4)
 
     @classmethod
-    def open_file(cls, filename):
+    def open_file(cls, filepath):
         """
         Restore an ensemble that was saved to a file using Ensemble.save_file(filename)
 
         Parameters
         ----------
-        filename : str
-            name of existing model file to open
+        filepath : Path or str
+            name of existing ensemble file to open
 
         Returns
         -------
@@ -779,13 +782,18 @@ class Ensemble(Model):
             The ensemble object saved in the file
 
         """
-        if not isinstance(filename, str):
-            raise TypeError('Error opening file. ' +
-                            ': filename argument must be a str')
 
-        fullname = filename
-        if '.' not in filename:
-            fullname = filename + '.pypm_e'
+        try:
+            filepath = Path(filepath).resolve()
+        except:
+            raise TypeError('Input arg could not be converted to a valid path: {}' +
+                            '\n It must be a str or Path-like.'.format(filepath))
 
-        with open(fullname, 'rb') as f:
+        if not filepath.exists():
+            raise ValueError('Filepath does not exist: {}'.format(filepath))
+
+        if len(filepath.suffix) < 2:
+            filepath = filepath.with_suffix('.pypm_e')
+
+        with open(filepath, 'rb') as f:
             return pickle.load(f)
