@@ -249,6 +249,60 @@ def test_Ensemble_properties_different():
                 ratio = ens_hist[i] / (tc_hist[i] + td_hist[i])
                 assert np.abs(ratio - 1.) < 0.01
 
+def test_Ensemble_data():
+    """tests to check data from an ensemble"""
+    # Test that the ensemble of two identical models
+    # behalves like twice a single model.
+    # Only for the independent (ie. diagonal) case
+    # Note: this test would fail if a fixed contact_matrix
+    # is passed which happens to be the identity matrix
+    # The difference is that when specified as independent
+    # each model is booted independently
+    # If a contact matrix is specified, then the boot goal
+    # is the combined total of all models. So there will be a different starting point.
+    test_a = Model.open_file(path_model_2)
+    test_a.name = 'test_a'
+    test_b = Model.open_file(path_model_2)
+    test_b.name = 'test_b'
+    test_b.parameters['alpha_0'].set_value(0.7)
+
+    reference = Model.open_file(path_model_2)
+    reference.name = 'reference'
+
+    off_diag = Parameter('off_diagonal', 0.1,
+                         parameter_min=0., parameter_max=1., description='off diagonal element of contact matrix')
+    off_diags = [off_diag]
+
+    test_ensemble = Ensemble('test_ensemble', reference)
+    test_ensemble.upload_models([test_a, test_b])
+    test_ensemble.define_cross_transmission('infection cycle', 'infected',
+                                            'susceptible', 'total',
+                                            'contagious', 'alpha',
+                                            contact_type='simple',contact=off_diags)
+
+    n_days = 100
+    norm_day = 50
+    test_ensemble.reset()
+    test_ensemble.evolve_expectations(norm_day)
+    for key in test_ensemble.populations:
+        pop = test_ensemble.populations[key]
+        nu = pop.history[norm_day]
+        pop.history[norm_day] = int(round(nu))
+        pop.scale_future(1., expectations=False)
+    for model_name in test_ensemble.models:
+        model = test_ensemble.models[model_name]
+        for pop_name in model.populations:
+            pop = model.populations[pop_name]
+            nu = pop.history[norm_day]
+            pop.history[norm_day] = int(round(nu))
+            pop.scale_future(1., expectations=False)
+
+    test_ensemble.generate_data(n_days,norm_day)
+    for pop_name in test_ensemble.populations:
+        pop = test_ensemble.populations[pop_name]
+        if pop.show_sim:
+            ens_hist = test_ensemble.populations[pop_name].history
+
 def test_point_estimate():
     start_day = 12
     end_day = 60
