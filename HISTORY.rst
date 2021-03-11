@@ -102,3 +102,7 @@ History
 
  * add option to produce simulated weekly data
  * minor fix for copy
+
+* 0.2.20 (2021-03-10)
+
+ * fix issues with Ensemble
