@@ -106,3 +106,7 @@ History
 * 0.2.20 (2021-03-10)
 
  * fix issues with Ensemble
+
+* 0.2.21 (2021-03-28)
+
+ * fix mistake in Ensemble transitions
