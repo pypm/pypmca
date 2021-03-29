@@ -549,7 +549,7 @@ class Ensemble(Model):
             self.do_boot(expectations=True)
 
         for step in range(from_step, n_step+from_step):
-            self.do_transitions(step, expectations=False)
+            self.do_transitions(step, expectations=True)
 
             # calculate influence between models
             self.__cross_model_transmission(expectations=True)
