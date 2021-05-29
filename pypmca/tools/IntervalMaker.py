@@ -172,7 +172,7 @@ class IntervalMaker:
 
         # run model with expectations to step before last alpha transition (prior to forecast date)
         model.reset()
-        model.evolve_expectations(last_time - 1)
+        model.evolve_expectations(sim_ref_time - 1)
         sim_model_ref = copy.deepcopy(model)
 
         for i_rep in range(n_rep):
