@@ -15,6 +15,7 @@ from pathlib import Path
 import datetime
 
 example_dir = Path('../../examples/').resolve()
+path_model_2_9 = example_dir / 'ref_model_2_9.pypm'
 path_model_2_8 = example_dir / 'ref_model_2_8.pypm'
 path_model_2_7 = example_dir / 'ref_model_2_7.pypm'
 path_model_2_6 = example_dir / 'ref_model_2_6.pypm'
@@ -694,5 +695,31 @@ def test_model_2_8():
 #    ref_2_8.evolve_expectations(200)
     ref_2_8.reset()
     ref_2_8.generate_data(200)
+
+    i=1
+
+def test_model_2_9():
+    ref_2_9 = Model.open_file(path_model_2_9)
+    ref_2_9.parameters['alpha_0'].set_value(0.35)
+
+    ref_2_9.transitions['outbreak_v'].enabled = True
+    ref_2_9.parameters['outbreak_v_time'].set_value(30)
+    ref_2_9.parameters['outbreak_v_number'].set_value(2.)
+    ref_2_9.parameters['alpha_0_v'].set_value(0.35)
+
+    ref_2_9.transitions['outbreak_w'].enabled = True
+    ref_2_9.parameters['outbreak_w_time'].set_value(60)
+    ref_2_9.parameters['outbreak_w_number'].set_value(4.)
+    ref_2_9.parameters['alpha_0_w'].set_value(0.45)
+
+    ref_2_9.transitions['vaccination_1'].enabled = True
+    ref_2_9.parameters['vacc_time_1'].set_value(80)
+    ref_2_9.parameters['vacc_number_1'].set_value(1000.)
+
+#    ref_2_9.reset()
+#    ref_2_9.evolve_expectations(200)
+
+    ref_2_9.reset()
+    ref_2_9.generate_data(200)
 
     i=1
