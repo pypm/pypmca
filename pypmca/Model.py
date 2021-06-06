@@ -580,6 +580,8 @@ class Model:
             if pop_name in self.populations:
                 pop = self.populations[pop_name]
                 pop.hidden = from_pop.hidden
+                # assign initial population value as necessary
+                pop.set_initial_value(from_pop.initial_value)
 
         self.name = 'copy: '+from_model.name
         self.description = from_model.description
