@@ -74,6 +74,7 @@ Version 2.8:
 
 Version 2.9:
  - more vaccination transitions
+ - more variant alpha transitions
  - add third infection cycle for B.1.617.2 variant (use the letter w in place of v for naminng)
  - add second outbreaks for the two variants
  - include waning immunity (separately for vaccination and natural):
@@ -849,7 +850,7 @@ for i in range(n_rate_transitions):
         Modifier('trans_rate_' + str(j), 'rel_days', times[i], trans_rate,
                  alphas[i], alphas[j], enabled=enabled, model=bc_model))
 
-n_rate_transitions = 4
+n_rate_transitions = 6
 n_rt_visible = 0
 
 times_v = []
@@ -867,6 +868,8 @@ for i in range(n_rate_transitions):
     bc_model.add_transition(
         Modifier('trans_rate_' + str(j) + '_v', 'rel_days', times_v[i], trans_rate_v,
                  alphas_v[i], alphas_v[j], enabled=enabled, model=bc_model))
+
+n_rate_transitions = 4
 
 times_w = []
 alphas_w = [Parameter('alpha_0_w', 0.4, 0., 2.,

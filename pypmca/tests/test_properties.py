@@ -723,3 +723,64 @@ def test_model_2_9():
     ref_2_9.generate_data(200)
 
     i=1
+
+def test_model_az_2_9():
+    az_2_8 = Model.open_file('az_2_8_0530.pypm')
+    az_2_9 = Model.open_file(path_model_2_9)
+
+    az_2_9.copy_values_from(az_2_8)
+    az_2_9.name = 'az_2_9_0530'
+
+    #v_hesitant = 0.14
+    #N0 = az_2_8.parameters['N_0'].get_value()
+    #az_2_8.populations['vacc cand'].set_initial_value(int(N0 * (1. - v_hesitant)))
+    #az_2_8.populations['sus vacc cand'].set_initial_value(int(N0 * (1. - v_hesitant)))
+
+    #az_2_8.parameters['vacc_time_1'].set_value(290)
+    #az_2_9.parameters['vacc_time_1'].set_value(290)
+
+    az_2_8.reset()
+    az_2_8.evolve_expectations(289)
+    az_2_8.evolve_expectations(500-289, from_step=289)
+
+    az_2_9.parameters['vac_waned_delay_mean'].set_value(10000.)
+    az_2_9.parameters['nat_waned_delay_mean'].set_value(10000.)
+    az_2_9.parameters['vac_waned_frac'].set_value(0.)
+
+    #v_hesitant = 0.14
+    #N0 = az_2_9.parameters['N_0'].get_value()
+    #az_2_9.populations['vacc cand'].set_initial_value(int(N0 * (1. - v_hesitant)))
+    #az_2_9.populations['sus vacc cand'].set_initial_value(int(N0 * (1. - v_hesitant)))
+
+    az_2_9.reset()
+    #az_2_9.evolve_expectations(500)
+    az_2_9.evolve_expectations(289)
+    az_2_9.evolve_expectations(500-289, from_step=289)
+
+    reps = []
+    rep_vs = []
+    wanned = []
+
+    pops = ['susceptible','immunized','usefully vaccinated','daily vaccinated','vacc cand','sus vacc cand']
+    compares = {}
+    for pop in pops:
+        compares[pop] = []
+
+    for day in [288,289,290,291,292,293,500]:
+        reps_m = []
+        rep_vs_m = []
+
+        for model in [az_2_8, az_2_9]:
+            rep = model.populations['reported'].history[day] - model.populations['reported'].history[day - 1]
+            reps_m.append(rep)
+            rep_v = model.populations['reported_v'].history[day]-model.populations['reported_v'].history[day-1]
+            rep_vs_m.append(rep_v)
+
+        for pop in pops:
+            compares[pop].append([az_2_8.populations[pop].history[day],az_2_9.populations[pop].history[day]])
+
+        wanned.append(az_2_9.populations['waned_immunity'].history[day])
+        reps.append(reps_m)
+        rep_vs.append(rep_vs_m)
+
+    i=1
