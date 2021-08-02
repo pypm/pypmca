@@ -276,7 +276,7 @@ class Forecast_hub:
                     for quant in quants:
                         value = np.percentile(de_inc_periods_dict[category][i_period], float(quant)*100.)
                         # increase the width of the interval for the US as a whole, to account for correlations between states
-                        scaled_value = cor_scale * (value - median) + median
+                        scaled_value = max(0., cor_scale * (value - median) + median)
                         quant_text = '{0:0.3f}'.format(quant)
                         self.add_record(forecast_date_text, target, target_end_date, location, 'quantile', quant_text,
                                         scaled_value)
@@ -285,7 +285,7 @@ class Forecast_hub:
                     median = np.percentile(de_cum_periods_dict[category][i_period], 50.) + additional_counts
                     for quant in quants:
                         value = np.percentile(de_cum_periods_dict[category][i_period], float(quant) * 100.) + additional_counts
-                        scaled_value = cor_scale * (value - median) + median
+                        scaled_value = max(0., cor_scale * (value - median) + median)
                         quant_text = '{0:0.3f}'.format(quant)
                         self.add_record(forecast_date_text, target, target_end_date, location, 'quantile', quant_text,
                                         scaled_value)
@@ -299,21 +299,21 @@ class Forecast_hub:
         record.append('{0:0.1f}'.format(value))
         self.buff.append(record)
 
-my_forecast = Forecast_hub('/Users/karlen/pypm-temp/germany', ['_2_8_0307'])
+my_forecast = Forecast_hub('/Users/karlen/pypm-temp/germany', ['_2_9_0704'])
 # Indicate the total US deaths (up to and including Saturday) here:
 #de_deaths = xxx
 
-# 1.5 -> 3.0 on introduction of variant
-my_csv = my_forecast.get_csv(datetime.date(2021, 3, 7), 'case',cor_scale=3.0)
+# 1.5 -> 3.0 on introduction of variant -> 1.5 (back to 1 strain)
+my_csv = my_forecast.get_csv(datetime.date(2021, 7, 4), 'case',cor_scale=1.5)
 pass
 with open('/Users/karlen/pypm-temp/test-germany-forecast-case.csv','w') as out:
     for line in my_csv:
         record = ','.join(line)
         out.write(record + '\n')
 
-my_forecast = Forecast_hub('/Users/karlen/pypm-temp/germany', ['_2_8_0307'])
+my_forecast = Forecast_hub('/Users/karlen/pypm-temp/germany', ['_2_9_0704'])
 
-my_csv = my_forecast.get_csv(datetime.date(2021, 3, 7), 'death',cor_scale=3.0)
+my_csv = my_forecast.get_csv(datetime.date(2021, 7, 4), 'death',cor_scale=1.5)
 pass
 with open('/Users/karlen/pypm-temp/test-germany-forecast.csv','w') as out:
     for line in my_csv:

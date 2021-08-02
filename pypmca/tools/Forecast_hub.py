@@ -300,7 +300,7 @@ class Forecast_hub:
                         for quant in quants:
                             value = np.percentile(us_inc_periods_dict[dict_names[i]][i_period], float(quant)*100.)
                             # increase the width of the interval for the US as a whole, to account for correlations between states
-                            scaled_value = cor_scale*(value-median) + median
+                            scaled_value = max(0., cor_scale*(value-median) + median)
                             quant_text = '{0:0.3f}'.format(quant)
                             self.add_record(forecast_date_text, target, target_end_date, location, 'quantile', quant_text,
                                             scaled_value)
@@ -309,7 +309,7 @@ class Forecast_hub:
                         median = np.percentile(us_cum_periods_dict[dict_names[i]][i_period], 50.) + additional_deaths
                         for quant in quants:
                             value = np.percentile(us_cum_periods_dict[dict_names[i]][i_period], float(quant) * 100.) + additional_deaths
-                            scaled_value = cor_scale * (value - median) + median
+                            scaled_value = max(0., cor_scale * (value - median) + median)
                             quant_text = '{0:0.3f}'.format(quant)
                             self.add_record(forecast_date_text, target, target_end_date, location, 'quantile', quant_text,
                                             scaled_value)
@@ -323,12 +323,12 @@ class Forecast_hub:
         record.append('{0:0.1f}'.format(value))
         self.buff.append(record)
 
-my_forecast = Forecast_hub('/Users/karlen/pypm-temp/usa', ['_2_8_0307'])
+my_forecast = Forecast_hub('/Users/karlen/pypm-temp/usa', ['_2_9_0801'])
 # Indicate the total US deaths (up to and including Saturday) here:
-us_deaths = 524362
+us_deaths = 613157
 
-# changed to 3 for Feb 28 - all have variant - large correlated uncertainty!
-my_csv = my_forecast.get_csv(datetime.date(2021, 3, 7), us_deaths, cor_scale=3.0)
+# changed to 3 for Feb 28 - all have variant - large correlated uncertainty! - Apr 25: return to 1.5 (single strain)
+my_csv = my_forecast.get_csv(datetime.date(2021, 8, 1), us_deaths, cor_scale=1.5)
 pass
 with open('/Users/karlen/pypm-temp/test-forecast.csv','w') as out:
     for line in my_csv:

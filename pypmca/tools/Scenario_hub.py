@@ -372,7 +372,7 @@ class Scenario_hub:
                             for quant in quants:
                                 value = np.percentile(us_inc_periods_dict[dict_names[i]][i_period], float(quant)*100.)
                                 # increase the width of the interval for the US as a whole, to account for correlations between states
-                                scaled_value = cor_scale*(value-median) + median
+                                scaled_value = max(0., cor_scale*(value-median) + median)
                                 quant_text = '{0:0.3f}'.format(quant)
                                 if (inc_weeks_list[i][j] == 'all' or i_period in inc_weeks_list[i][j]):
                                     self.add_record(forecast_date_text, target, target_end_date, location, 'quantile', quant_text,
@@ -386,7 +386,7 @@ class Scenario_hub:
                                 value = np.percentile(us_cum_periods_dict[dict_names[i]][i_period], float(quant) * 100.)
                                 if data_types[i] == 'cum':
                                     value += additional[dict_names[i]]
-                                scaled_value = cor_scale * (value - median) + median
+                                scaled_value = max(0., cor_scale * (value - median) + median)
                                 quant_text = '{0:0.3f}'.format(quant)
                                 if (inc_weeks_list[i][j] == 'all' or i_period in inc_weeks_list[i][j]):
                                     self.add_record(forecast_date_text, target, target_end_date, location, 'quantile', quant_text,
@@ -400,7 +400,7 @@ class Scenario_hub:
         record.append('{0:0.1f}'.format(value))
         self.buff.append(record)
 
-round = '3b'
+round = '7'
 
 if round == '1':
     scenario_names = ['optimistic','moderate','fatigue','counterfactual']
@@ -446,10 +446,54 @@ elif round == '3b':
     us_deaths = 524362
     us_cases = 28952970
 
+elif round == '4':
+    scenario_names = ['highVac_modNPI','highVac_lowNPI','lowVac_modNPI','lowVac_lowNPI']
+    scenario_abbrevs = ['_hvmn','_hvln','_lvmn','_lvln']
+    scenario_ids = ['A-2021-03-28','B-2021-03-28','C-2021-03-28','D-2021-03-28']
+    scenario_types = ['ens','ens','ens','ens']
+    model_names = ['_2_8_0328']
+    start_date = datetime.date(2021, 3, 28)
+    # Indicate the total US deaths (up to and including Saturday) here:
+    us_deaths = 548828
+    us_cases = 30218683
+
+elif round == '5':
+    scenario_names = ['highVac_modNPI','highVac_lowNPI','lowVac_modNPI','lowVac_lowNPI']
+    scenario_abbrevs = ['_hvmn','_hvln','_lvmn','_lvln']
+    scenario_ids = ['A-2021-05-02','B-2021-05-02','C-2021-05-02','D-2021-05-02']
+    scenario_types = ['ens','ens','ens','ens']
+    model_names = ['_2_9_0502']
+    start_date = datetime.date(2021, 5, 2)
+    # Indicate the total US deaths (up to and including Saturday) here:
+    us_deaths = 576722
+    us_cases = 32392274
+
+elif round == '6':
+    scenario_names = ['highVac_lowVar','highVac_highVar','lowVac_lowVar','lowVac_highVar']
+    scenario_abbrevs = ['_highVac_lowVar','_highVac_highVar','_lowVac_lowVar','_lowVac_highVar']
+    scenario_ids = ['A-2021-06-08','B-2021-06-08','C-2021-06-08','D-2021-06-08']
+    scenario_types = ['single','single','single','single']
+    model_names = ['_2_9_0606']
+    start_date = datetime.date(2021, 5, 30)
+    # Indicate the total US deaths (up to and including Saturday) here:
+    us_deaths = 594306
+    us_cases = 33251939
+
+elif round == '7':
+    scenario_names = ['highVac_lowVar','highVac_highVar','lowVac_lowVar','lowVac_highVar']
+    scenario_abbrevs = ['_highVac_lowVar','_highVac_highVar','_lowVac_lowVar','_lowVac_highVar']
+    scenario_ids = ['A-2021-07-13','B-2021-07-13','C-2021-07-13','D-2021-07-13']
+    scenario_types = ['single','single','single','single']
+    model_names = ['_2_9_0704']
+    start_date = datetime.date(2021, 7, 4)
+    # Indicate the total US deaths (up to and including Saturday) here:
+    us_deaths = 605493
+    us_cases = 33713870
+
 my_scenario = Scenario_hub('/Users/karlen/pypm-temp/usa-scenario', model_names, scenario_names, scenario_abbrevs, scenario_ids, scenario_types)
 
-# Changed to 3.0 since all models share same variant uncertainty (starting round 3b, March 10, 2021)
-my_csv = my_scenario.get_csv(start_date, us_deaths, us_cases, cor_scale=3.0)
+# Changed to 3.0 since all models share same variant uncertainty (starting round 3b, March 10, 2021). Returned to 1.5 on May 3.
+my_csv = my_scenario.get_csv(start_date, us_deaths, us_cases, cor_scale=1.5)
 pass
 with open('/Users/karlen/pypm-temp/test-scenario.csv','w') as out:
     for line in my_csv:
