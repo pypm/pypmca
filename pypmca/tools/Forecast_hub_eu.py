@@ -62,7 +62,9 @@ class Forecast_hub:
         'Sweden': 'SE',
         'Switzerland': 'CH',
         'United Kingdom': 'GB'
-    }
+        }
+
+        self.hospitalization_states = ['BE','HR','DK','EE','FR','NL','NO','SI','ES','GB','IE']
 
     def get_data(self):
         data_folder = 'data/covid19/EU'
@@ -114,7 +116,11 @@ class Forecast_hub:
             abbrev = self.regional_abbreviations[state].lower()
             location = self.regional_abbreviations[state]
 
-            for category in ['case','death']:
+            categories = ['case','death']
+            if location in self.hospitalization_states:
+                categories = ['case', 'death', 'hospitalization']
+
+            for category in categories:
 
                 success = False
                 model = None
@@ -132,6 +138,17 @@ class Forecast_hub:
                 elif category == 'death':
                     for model_name in self.model_names:
                         for model_suffix in ['_d','_h','']:
+                            try:
+                                filename = abbrev + model_name + model_suffix + '.pypm'
+                                path_model = self.model_dir / filename
+                                model = Model.open_file(path_model)
+                                success = True
+                                break
+                            except:
+                                pass
+                elif category == 'hospitalization':
+                    for model_name in self.model_names:
+                        for model_suffix in ['_h','']:
                             try:
                                 filename = abbrev + model_name + model_suffix + '.pypm'
                                 path_model = self.model_dir / filename
