@@ -168,7 +168,11 @@ class Forecast_hub:
                     quantile_dict = hub_dict['quantiles']
 
                     for i_period in point_est_dict:
-                        target = i_period+' '+period+' ahead '+inc_type+' '+category
+                        # eu has different label for hospitalization...
+                        label = category
+                        if category == 'hospitalization':
+                            label = 'hosp'
+                        target = i_period+' '+period+' ahead '+inc_type+' '+label
                         days = int(i_period)
                         if period == 'wk':
                             days *= 7
