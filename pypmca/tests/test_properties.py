@@ -784,3 +784,10 @@ def test_model_az_2_9():
         rep_vs.append(rep_vs_m)
 
     i=1
+
+def test_mixing_evolve_data():
+    ref_2_9 = Model.open_file(path_model_2_9)
+    ref_2_9.reset()
+    ref_2_9.generate_data(100,from_step=0,data_start=50)
+    reported = ref_2_9.populations['reported'].history
+    i=1

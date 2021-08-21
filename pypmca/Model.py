@@ -271,10 +271,29 @@ class Model:
             # make one time step
             self.do_time_step(expectations=True)
 
-    def generate_data(self, n_step, from_step=0):
+    def generate_data(self, n_step, from_step=0, data_start=0):
         """
-        Produce data
+        Produce data:
+        - n_step: number of steps to take
+        - from_step: allows a continuation of a previous call to generate_data: no check that this was done
+        - data_start: allows that model is first evolved (expectation values) to a date, then generate data
         """
+        if data_start > from_step:
+            n_exp_step = data_start - from_step
+            self.evolve_expectations(n_exp_step, from_step=from_step)
+
+            # Convert current value and future values from float to int, for all populations
+            # in order to produce data going forward
+            for key in self.populations:
+                pop = self.populations[key]
+                nu = pop.history[-1]
+                pop.history[-1] = int(round(nu))
+                pop.scale_future(1., expectations=False)
+
+            data_steps = n_step + from_step - data_start
+            self.generate_data(data_steps, from_step=data_start, data_start=data_start)
+            return
+
         if self.boot_needed:
             self.boot(expectations=False)
 
