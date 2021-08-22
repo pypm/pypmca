@@ -110,3 +110,8 @@ History
 * 0.2.21 (2021-03-28)
 
  * fix mistake in Ensemble transitions
+
+* 0.2.22 (2021-08-22)
+
+ * add feature to combine evolve_expectations and generate_data
+ * improve optimization for local fits (cumul_reset)
