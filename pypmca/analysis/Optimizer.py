@@ -8,6 +8,9 @@ This is done using the scipy.optimize.curve_fit method
 The full_population_name has the prefix daily or total. If daily, then the
 differences need to be calculated
 
+The description below is for a "global fit". The local fit does not use the scaling factor that sets
+the last point in the cumulative to match the data.
+
 The MCMC method relies on calculating a likelihood. The approach was designed around using a cumulative
 indicator (reported cases). This was motivated because this indicator suffers from large reporting noise
 on a daily basis - with large negative correlations between neighbouring days. The effect is smaller on the
@@ -92,7 +95,9 @@ class Optimizer:
         self.population_type = full_population_name[:5]
         self.data = data
         self.data_range = data_range
-        self.cumul_reset = cumul_reset  # if True, use the cumulative starting at data_range[0]
+        self.cumul_reset = cumul_reset  # if True, use the cumulative starting at data_range[0] (a "local" fit)
+        self.start_step = 0 # if local fit, this specifies the step to start each iteration (automatic, speeding up fit)
+        self.model_ref = None # if local fit, this is the reference model that is copied
         self.variable_names = []  # float type variable parameters
         self.variable_initial_values = None
         self.i_variable_names = []  # integer type variable parameters
@@ -139,6 +144,27 @@ class Optimizer:
             return x_rem,y_rem
 
     def func_setup(self):
+        # if a local fit, setup the start_step
+        transition_variable_steps = {}
+        if self.cumul_reset:
+            self.start_step = self.data_range[0]
+            # get list of transitioning parameters and their dates
+            for trans_name in self.model.transitions:
+                transition = self.model.transitions[trans_name]
+                if transition.enabled:
+                    transition_variable_name = None
+                    # Injector
+                    injection_parameter = getattr(transition,'injection',None)
+                    if injection_parameter is not None:
+                        transition_variable_name = injection_parameter.name
+                    else:
+                        # Modifier
+                        after_parameter = getattr(transition,'parameter_after',None)
+                        if after_parameter is not None:
+                            transition_variable_name = after_parameter.name
+                    if transition_variable_name is not None:
+                        transition_variable_steps[transition_variable_name] = transition.trigger_step
+
         # find the variable parameters and return the bounds
         # note: scipy.curve_fit only works for floats
         self.variable_names = []
@@ -155,6 +181,19 @@ class Optimizer:
                     par_0.append(par.get_value())
                     bound_low.append(par.get_min())
                     bound_high.append(par.get_max())
+                    # check to see if this is a transitioning parameter, and if so adjust self.start_step
+                    if self.cumul_reset:
+                        if par_name in transition_variable_steps:
+                            step = transition_variable_steps[par_name]
+                            if step < self.start_step:
+                                self.start_step = step
+
+        # if local fit, make copy and run to start_step
+        if self.cumul_reset:
+            self.model_ref = copy.deepcopy(self.model)
+            self.model_ref.reset()
+            self.model_ref.evolve_expectations(self.start_step)
+
         return par_0, (bound_low, bound_high)
 
     def i_func_setup(self):
@@ -226,15 +265,28 @@ class Optimizer:
         """
 
         def func(x, *params):
-            i = -1
-            for par_val in params:
-                i += 1
-                par_name = self.variable_names[i]
-                self.model.parameters[par_name].set_value(par_val)
 
-            self.model.reset()
-            self.model.evolve_expectations(self.data_range[1])
-            pop = self.model.populations[self.population_name]
+            if self.cumul_reset:
+                # use a copy of the reference, to reduce calculation time to get to start_step
+                model_copy = copy.deepcopy(self.model_ref)
+                i = -1
+                for par_val in params:
+                    i += 1
+                    par_name = self.variable_names[i]
+                    model_copy.parameters[par_name].set_value(par_val)
+                model_copy.evolve_expectations(self.data_range[1]-self.start_step, from_step=self.start_step)
+                pop = model_copy.populations[self.population_name]
+
+            else:
+                i = -1
+                for par_val in params:
+                    i += 1
+                    par_name = self.variable_names[i]
+                    self.model.parameters[par_name].set_value(par_val)
+                self.model.reset()
+                self.model.evolve_expectations(self.data_range[1])
+                pop = self.model.populations[self.population_name]
+
             func_values = []
             if self.population_type == 'total':
                 cumul_offset = 0
@@ -291,23 +343,28 @@ class Optimizer:
         # the model is scaled so that it matches the data on the final point (for cumulative fits)
         # see description at top of this file
         scale = 1.
-        if self.population_type == 'total':
-            if self.cumul_reset:
-                cumul_offset = self.data[self.data_range[0]]
-                scale = (self.data[xdata[-1]] - cumul_offset) / self.model.populations[self.population_name].history[xdata[-1]]
-            else:
-                scale = self.data[xdata[-1]] / self.model.populations[self.population_name].history[xdata[-1]]
 
         cumul_offset = 0.
+        cumul_offset_model = 0.
         if self.population_type == 'total' and self.cumul_reset:
             cumul_offset = self.data[self.data_range[0]]
+            cumul_offset_model = self.model.populations[self.population_name].history[self.data_range[0]]
+
+        if self.population_type == 'total' and not self.cumul_reset:
+                scale = self.data[xdata[-1]] / self.model.populations[self.population_name].history[xdata[-1]]
 
         self.chi2d = 0.
         x_rem, y_rem = self.remove_data(xdata[:-1], xdata[:-1])
         if self.population_type == 'total':
-            for x in x_rem:
-                resid = (self.data[x] - cumul_offset) - self.model.populations[self.population_name].history[x] * scale
-                self.chi2d += resid ** 2 / (self.model.populations[self.population_name].history[x] * scale)
+            if self.cumul_reset:
+                for x in x_rem:
+                    resid = (self.data[x] - cumul_offset) - \
+                            (self.model.populations[self.population_name].history[x] - cumul_offset_model)
+                    self.chi2d += resid ** 2
+            else:
+                for x in x_rem:
+                    resid = (self.data[x] - cumul_offset) - self.model.populations[self.population_name].history[x] * scale
+                    self.chi2d += resid ** 2 / (self.model.populations[self.population_name].history[x] * scale)
         else:
             for x in x_rem:
                 diff = self.delta(self.model.populations[self.population_name].history)
@@ -429,9 +486,15 @@ class Optimizer:
             It is not useful to include a simulation which has the epidemic that dies out, for
             example. A simple condition is applied: the increment to the population for the last 4 days in the simulation
             should be within a factor of 2 of the expectation.
+
+            If a local fit was done, then evolve expectations up until start of fit, then generate data. The conditions
+            mentioned above are not required.
         """
 
-        sim_model = copy.deepcopy(self.model)
+        if self.cumul_reset:
+            sim_model = None
+        else:
+            sim_model = copy.deepcopy(self.model)
         ref_population = self.model.populations[self.population_name]
 
         chi2_s_list = []
@@ -444,37 +507,46 @@ class Optimizer:
 
         condition_days = 5
         condition_sum_expectation = 0
-        if ref_population.monotonic:
-            condition_sum_expectation = ref_population.history[self.data_range[1]] - \
-                                        ref_population.history[self.data_range[1]-condition_days]
-        else:
-            for day in range(condition_days):
-                condition_sum_expectation += ref_population.history[self.data_range[1]-condition_days]
+        if not self.cumul_reset:
+            if ref_population.monotonic:
+                condition_sum_expectation = ref_population.history[self.data_range[1]] - \
+                                            ref_population.history[self.data_range[1]-condition_days]
+            else:
+                for day in range(condition_days):
+                    condition_sum_expectation += ref_population.history[self.data_range[1]-condition_days]
 
         xdata = np.arange(self.data_range[0], self.data_range[1], 1)
-        # last point not included: since its residual is zero by definition:
-        n_p = len(xdata) - 1
+        if self.cumul_reset:
+            n_p = len(xdata)
+        else:
+            # last point not included: since its residual is zero by definition:
+            n_p = len(xdata) - 1
         zeros = [0. for i in range(n_p)]
         if self.calc_chi2s:
             lpdf_zero = stats.multivariate_normal.logpdf(zeros, cov=self.auto_cov)
         for i in range(n_rep):
-            # require the simulation to produce data similar in scale to that observed
-            condition_met = False
-            while not condition_met:
-                sim_model.reset()
-                sim_model.generate_data(self.data_range[1])
+            if self.cumul_reset:
+                sim_model = copy.deepcopy(self.model_ref)
+                sim_model.generate_data(self.data_range[1]-self.start_step, from_step=self.start_step, data_start=self.data_range[0])
                 sim_population = sim_model.populations[self.population_name]
+            else:
+                # require the simulation to produce data similar in scale to that observed
+                condition_met = False
+                while not condition_met:
+                    sim_model.reset()
+                    sim_model.generate_data(self.data_range[1])
+                    sim_population = sim_model.populations[self.population_name]
 
-                condition_sum_simulation = 0
-                if sim_population.monotonic:
-                    condition_sum_simulation = sim_population.history[self.data_range[1]] - \
-                                               sim_population.history[self.data_range[1] - condition_days]
-                else:
-                    for day in range(condition_days):
-                        condition_sum_simulation += sim_population.history[self.data_range[1] - condition_days]
+                    condition_sum_simulation = 0
+                    if sim_population.monotonic:
+                        condition_sum_simulation = sim_population.history[self.data_range[1]] - \
+                                                   sim_population.history[self.data_range[1] - condition_days]
+                    else:
+                        for day in range(condition_days):
+                            condition_sum_simulation += sim_population.history[self.data_range[1] - condition_days]
 
-                condition_met = condition_sum_simulation < 2. * condition_sum_expectation and \
-                                condition_sum_simulation > 0.5 * condition_sum_expectation
+                    condition_met = condition_sum_simulation < 2. * condition_sum_expectation and \
+                                    condition_sum_simulation > 0.5 * condition_sum_expectation
 
             scale = sim_population.history[xdata[-1]] / ref_population.history[xdata[-1]]
             resid = []
@@ -503,7 +575,7 @@ class Optimizer:
                 # Make a copy for fitting simulated data - always start with same initial values...
                 sim_fit_model = copy.deepcopy(self.model)
                 sim_optimizer = Optimizer(sim_fit_model, self.full_population_name, sim_population.history,
-                                          self.data_range, skip_data=self.skip_data)
+                                          self.data_range, cumul_reset=self.cumul_reset, skip_data=self.skip_data)
                 # following is needed only if re-using optimizer for a new fit...
                 #sim_optimizer.reset_variables()
                 sim_popt, sim_pcov = sim_optimizer.fit()
@@ -515,12 +587,18 @@ class Optimizer:
                 resid_f = []
                 scale_f = sim_population.history[xdata[-1]] / sim_ref_population.history[xdata[-1]]
                 chi2_f = 0.
-                # last point not used for autocovariance xdata[:-1] removes that point
-                x_rem, y_rem = self.remove_data(xdata[:-1], xdata[:-1])
-                for x in x_rem:
-                    delta = sim_population.history[x] - sim_ref_population.history[x] * scale_f
-                    resid_f.append(delta)
-                    chi2_f += delta ** 2 / (sim_ref_population.history[x] * scale_f)
+                if self.cumul_reset:
+                    for x in x_rem:
+                        delta = sim_population.history[x] - sim_ref_population.history[x]
+                        resid_f.append(delta)
+                        chi2_f += delta ** 2
+                else:
+                    # last point not used for autocovariance xdata[:-1] removes that point
+                    x_rem, y_rem = self.remove_data(xdata[:-1], xdata[:-1])
+                    for x in x_rem:
+                        delta = sim_population.history[x] - sim_ref_population.history[x] * scale_f
+                        resid_f.append(delta)
+                        chi2_f += delta ** 2 / (sim_ref_population.history[x] * scale_f)
 
                 chi2_f_list.append(chi2_f)
                 fit_stat_list.append(sim_optimizer.fit_statistics)
