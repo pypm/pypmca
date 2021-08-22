@@ -337,6 +337,37 @@ def test_point_estimate():
     assert np.abs(ref_2.parameters['alpha_1'].get_value() - ref_2.parameters['alpha_1'].initial_value) < 0.02
     assert np.abs(ref_2.parameters['cont_0'].get_value() - ref_2.parameters['cont_0'].initial_value) < 20.
 
+def test_point_estimate_local():
+    start_day = 12
+    end_day = 60
+    ref_2 = Model.open_file(path_model_2_2)
+    sim_2 = Model.open_file(path_model_2_2)
+
+    # do fit of alpha_1, trans_rate_1_time
+    for par_name in ['alpha_1']:
+        par = ref_2.parameters[par_name]
+        par.set_variable(None, None)
+
+    par = ref_2.parameters['trans_rate_1_time']
+    par.set_variable(None, None)
+    par.set_min(13)
+    par.set_max(19)
+
+    sim_2.reset()
+    sim_2.generate_data(end_day)
+    sim_2.populations['reported'].history[47] = np.inf
+    optimizer = Optimizer(ref_2, 'total reported', sim_2.populations['reported'].history, [start_day, end_day],cumul_reset=True,skip_data='42,45:48')
+    optimizer.reset_variables()
+
+    scan_dict = optimizer.i_fit()
+    assert ref_2.parameters['trans_rate_1_time'].get_value() in [15,16,17]
+
+    par = ref_2.parameters['trans_rate_1_time']
+    par.set_fixed()
+
+    popt, pcov = optimizer.fit()
+    assert np.abs(ref_2.parameters['alpha_1'].get_value() - ref_2.parameters['alpha_1'].initial_value) < 0.02
+
 def test_point_estimate_daily():
 
     def delta(cumul):
@@ -462,6 +493,40 @@ def test_sim_gof():
     chi2_list = [fit_stat_list[i]['chi2'] for i in range(n_rep)]
     chi2_mean = np.mean(chi2_list)
     assert np.abs(chi2_mean - ndof) < 8.
+    acor_list = [fit_stat_list[i]['acor'] for i in range(n_rep)]
+    acor_mean = np.mean(acor_list)
+    assert np.abs(acor_mean) < 0.2
+
+def test_sim_gof_local():
+    start_day = 12
+    end_day = 60
+    ref_2 = Model.open_file(path_model_2_2)
+    sim_2 = Model.open_file(path_model_2_2)
+
+    # do fit of alpha_0, alpha_1, cont_0
+    par_names = ['alpha_1']
+    for par_name in par_names:
+        par = ref_2.parameters[par_name]
+        par.set_variable(None, None)
+
+    sim_2.reset()
+    sim_2.generate_data(end_day)
+    sim_2.populations['reported'].history[47] = np.inf
+    optimizer = Optimizer(ref_2, 'total reported', sim_2.populations['reported'].history, [start_day, end_day],cumul_reset=True,skip_data='42,45:48')
+    optimizer.reset_variables()
+    popt, pcov = optimizer.fit()
+    fit_statistics = optimizer.fit_statistics
+
+    optimizer.calc_chi2s = False
+    optimizer.calc_chi2f = True
+    n_rep = 10
+    optimizer.calc_sim_gof(n_rep)
+
+    fit_stat_list = optimizer.fit_stat_list
+    ndof = fit_stat_list[0]['ndof']
+    chi2_list = [fit_stat_list[i]['chi2'] for i in range(n_rep)]
+    chi2_mean = np.mean(chi2_list)
+    assert np.abs(chi2_mean - ndof) < 8.E6
     acor_list = [fit_stat_list[i]['acor'] for i in range(n_rep)]
     acor_mean = np.mean(acor_list)
     assert np.abs(acor_mean) < 0.2
