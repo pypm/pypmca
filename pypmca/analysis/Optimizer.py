@@ -290,7 +290,7 @@ class Optimizer:
             func_values = []
             if self.population_type == 'total':
                 cumul_offset = 0
-                if self.cumul_reset:
+                if self.cumul_reset and pop.monotonic:
                     cumul_offset = pop.history[self.data_range[0]]
                 for xi in x:
                     i = int(round(xi))
@@ -309,7 +309,9 @@ class Optimizer:
         pcov = None
         if not with_cov:
             if self.population_type == 'total' and self.cumul_reset:
-                cumul_offset = self.data[self.data_range[0]]
+                cumul_offset = 0
+                if self.model.populations[self.population_name].monotonic:
+                    cumul_offset = self.data[self.data_range[0]]
                 mod_data = [self.data[i] - cumul_offset for i in range(self.data_range[0],self.data_range[1])]
                 x_rem, y_rem = self.remove_data(xdata, mod_data)
                 popt, pcov = curve_fit(func, x_rem, y_rem,
@@ -321,7 +323,9 @@ class Optimizer:
         else:
             # with new autocovariance, last point is used for normalization remove from fit
             if self.population_type == 'total' and self.cumul_reset:
-                cumul_offset = self.data[self.data_range[0]]
+                cumul_offset = 0
+                if self.model.populations[self.population_name].monotonic:
+                    cumul_offset = self.data[self.data_range[0]]
                 mod_data = [self.data[i] - cumul_offset for i in range(self.data_range[0],self.data_range[1]-1)]
                 x_rem, y_rem = self.remove_data(xdata[:-1], mod_data)
                 popt, pcov = curve_fit(func, x_rem, y_rem,
