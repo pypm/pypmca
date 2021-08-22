@@ -278,9 +278,10 @@ class Model:
         - from_step: allows a continuation of a previous call to generate_data: no check that this was done
         - data_start: allows that model is first evolved (expectation values) to a date, then generate data
         """
-        if data_start > from_step:
+        if data_start >= from_step and data_start>0:
             n_exp_step = data_start - from_step
-            self.evolve_expectations(n_exp_step, from_step=from_step)
+            if n_exp_step > 0:
+                self.evolve_expectations(n_exp_step, from_step=from_step)
 
             # Convert current value and future values from float to int, for all populations
             # in order to produce data going forward
@@ -291,7 +292,7 @@ class Model:
                 pop.scale_future(1., expectations=False)
 
             data_steps = n_step + from_step - data_start
-            self.generate_data(data_steps, from_step=data_start, data_start=data_start)
+            self.generate_data(data_steps, from_step=data_start, data_start=0)
             return
 
         if self.boot_needed:
