@@ -368,6 +368,42 @@ def test_point_estimate_local():
     popt, pcov = optimizer.fit()
     assert np.abs(ref_2.parameters['alpha_1'].get_value() - ref_2.parameters['alpha_1'].initial_value) < 0.02
 
+def test_point_estimate_skip_zeros():
+    start_day = 12
+    end_day = 60
+    ref_2 = Model.open_file(path_model_2_2)
+    sim_2 = Model.open_file(path_model_2_2)
+
+    # do fit of alpha_1, trans_rate_1_time
+    for par_name in ['alpha_1']:
+        par = ref_2.parameters[par_name]
+        par.set_variable(None, None)
+
+    par = ref_2.parameters['trans_rate_1_time']
+    par.set_variable(None, None)
+    par.set_min(13)
+    par.set_max(19)
+
+    sim_2.reset()
+    rn_dict = sim_2.populations['reported'].get_report_noise()
+    rn_dict['report_days'].set_value(7)
+    sim_2.generate_data(end_day)
+    sim_2.populations['reported'].history[47] = np.inf
+    optimizer = Optimizer(ref_2, 'total reported', sim_2.populations['reported'].history, [start_day, end_day],
+                          cumul_reset=True,skip_data='42,45:48',skip_zeros=True)
+    #optimizer = Optimizer(ref_2, 'total reported', sim_2.populations['reported'].history, [start_day, end_day],
+    #                      cumul_reset=True, skip_zeros=False)
+    optimizer.reset_variables()
+
+    scan_dict = optimizer.i_fit()
+    assert ref_2.parameters['trans_rate_1_time'].get_value() in [15,16,17]
+
+    par = ref_2.parameters['trans_rate_1_time']
+    par.set_fixed()
+
+    popt, pcov = optimizer.fit()
+    assert np.abs(ref_2.parameters['alpha_1'].get_value() - ref_2.parameters['alpha_1'].initial_value) < 0.02
+
 def test_point_estimate_daily():
 
     def delta(cumul):

@@ -75,6 +75,8 @@ increased to account for additional degrees of freedom that reflect the unaccoun
 2021-1-31: Add skip_data (a string field) is added to define dates that should not be used in optimization and chi^2 calculation
 Format example '250,263:270' means to remove 250,263,264,...,270
 
+2021-9-5: Add skip_zeros: If true, then for a fit to a cumulative ignores zeros (corresponding to non-reporting dates)
+
 @author: karlen
 """
 import copy
@@ -88,7 +90,8 @@ class Optimizer:
     """ Optimizer: point estimator and covariance
     """
 
-    def __init__(self, model, full_population_name, data, data_range, cumul_reset=False, skip_data=None):
+    def __init__(self, model, full_population_name, data, data_range, cumul_reset=False, skip_data=None,
+                 skip_zeros=False):
         self.model = model
         self.full_population_name = full_population_name
         self.population_name = full_population_name[6:]
@@ -120,6 +123,7 @@ class Optimizer:
         self.fit_statistics = None
         self.skip_data = skip_data
         self.skip_dates = None
+        self.skip_zeros = skip_zeros
         if skip_data is not None and skip_data != '':
             self.skip_dates = []
             blocks = skip_data.split(',')
@@ -132,15 +136,20 @@ class Optimizer:
                     self.skip_dates.append(int(block))
 
     def remove_data(self, x, y):
-        if self.skip_dates is None:
+        # skip_zeros only applies to fits to cumulatives
+        skip_zeros = self.skip_zeros and self.population_type=='total' and \
+                     self.model.populations[self.population_name].monotonic
+
+        if self.skip_dates is None and not skip_zeros:
             return x,y
         else:
             x_rem = []
             y_rem = []
             for i,xi in enumerate(x):
-                if xi not in self.skip_dates:
-                    x_rem.append(xi)
-                    y_rem.append(y[i])
+                if self.skip_dates is None or xi not in self.skip_dates:
+                    if (not skip_zeros) or i==0 or y[i] != y[i-1]:
+                        x_rem.append(xi)
+                        y_rem.append(y[i])
             return x_rem,y_rem
 
     def func_setup(self):
