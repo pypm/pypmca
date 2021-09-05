@@ -304,6 +304,14 @@ class Population:
                     nu = self.future[i] * scale
                     self.future[i] = int(round(nu))
 
+    def convert_future(self):
+        """Convert future expectations to Poisson variates"""
+        if len(self.future) > 0:
+            for i in range(len(self.future)):
+                nu = self.future[i]
+                variate = stats.poisson.rvs(nu)
+                self.future[i] = variate
+
     def update_future_expectation(self, scale, delay):
         """Include future expections, growing the future array if needed
         """

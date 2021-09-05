@@ -219,7 +219,7 @@ class IntervalMaker:
                 pop = sim_model.populations[key]
                 nu = pop.history[norm_day]
                 pop.history[norm_day] = int(round(nu))
-                pop.scale_future(1., expectations=False)
+                pop.convert_future()
 
             # now generate data starting from norm_day
             sim_model.generate_data(n_days - 1 - norm_day, from_step=norm_day)

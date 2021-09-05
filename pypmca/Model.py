@@ -284,12 +284,12 @@ class Model:
                 self.evolve_expectations(n_exp_step, from_step=from_step)
 
             # Convert current value and future values from float to int, for all populations
-            # in order to produce data going forward
+            # in order to produce data going forward. Future values are Poisson variates
             for key in self.populations:
                 pop = self.populations[key]
                 nu = pop.history[-1]
                 pop.history[-1] = int(round(nu))
-                pop.scale_future(1., expectations=False)
+                pop.convert_future()
 
             data_steps = n_step + from_step - data_start
             self.generate_data(data_steps, from_step=data_start, data_start=0)
