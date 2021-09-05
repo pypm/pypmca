@@ -115,3 +115,8 @@ History
 
  * add feature to combine evolve_expectations and generate_data
  * improve optimization for local fits (cumul_reset)
+
+* 0.2.23 (2021-09-05)
+
+ * add method to convert population future expectations to Poisson variates
+ * add option for optimizer to skip zeros (no report days) for fit to cumulative
