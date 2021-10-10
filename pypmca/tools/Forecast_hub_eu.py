@@ -196,9 +196,9 @@ class Forecast_hub:
         record.append('{0:0.0f}'.format(value))
         self.buff.append(record)
 
-my_forecast = Forecast_hub('/Users/karlen/pypm-temp/eu', ['_2_9_0801'])
+my_forecast = Forecast_hub('/Users/karlen/pypm-temp/eu', ['_2_9_1003'])
 
-my_csv = my_forecast.get_csv(datetime.date(2021, 8, 1))
+my_csv = my_forecast.get_csv(datetime.date(2021, 10, 3))
 pass
 with open('/Users/karlen/pypm-temp/test-eu-forecast.csv','w') as out:
     for line in my_csv:
