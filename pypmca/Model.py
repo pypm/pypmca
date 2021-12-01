@@ -563,9 +563,15 @@ class Model:
         if not isinstance(from_model, Model):
             raise ValueError('Error in copy_values_from. Argument must be a model object')
 
+        missing_par = []
+        missing_trans = []
+        missing_pop = []
+
         for par_name in from_model.parameters:
             from_par = from_model.parameters[par_name]
-            if par_name in self.parameters:
+            if par_name not in self.parameters:
+                missing_par.append(par_name)
+            else:
                 par = self.parameters[par_name]
                 par.set_value(from_par.get_value())
                 par.initial_value = from_par.initial_value
@@ -591,13 +597,17 @@ class Model:
 
         for tran_name in from_model.transitions:
             from_tran = from_model.transitions[tran_name]
-            if tran_name in self.transitions:
+            if tran_name not in self.transitions:
+                missing_trans.append(tran_name)
+            else:
                 tran = self.transitions[tran_name]
                 tran.enabled = from_tran.enabled
 
         for pop_name in from_model.populations:
             from_pop = from_model.populations[pop_name]
-            if pop_name in self.populations:
+            if pop_name not in self.populations:
+                missing_pop.append(pop_name)
+            else:
                 pop = self.populations[pop_name]
                 pop.hidden = from_pop.hidden
                 # assign initial population value as necessary
@@ -615,6 +625,9 @@ class Model:
         self.boot_pars['boot_value'] = from_model.boot_pars['boot_value']
         # self.boot_pars['exclusion_populations'] = exc_pop_list
         self.boot_needed = True
+
+        return {'Missing parameters':missing_par, 'Missing transitions':missing_trans,
+                'Missing populations':missing_pop}
 
     def save_file(self, filename):
         """
