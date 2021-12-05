@@ -65,6 +65,10 @@ class Subtractor(Connector):
                                     ') ratio_populations must be a list of two Population objects')
         self.ratio_populations = ratio_populations
 
+        # dictionary of parameters
+        if self.scale_factor is not None:
+            self.parameters['scale_factor'] = self.scale_factor
+
         # Identify the from_population as one not to derive daily numbers
         self.from_population.monotonic = False
 
