@@ -86,11 +86,13 @@ Version 3.0:
  - reported does not necessarily lead to removal from vaccine candidates
    (new parameter, frac_report_novacc, has default=1 to be backward compatible)
  - more wariant transitions (delta)
- - 4th strain, in case omicron is real: w-> x
+ - more vaccine transitions
+ - 4th strain, for omicron: w-> x
+   - since natural and vaccine escape is suspected, special susceptible populations are setup for those
  - allow breakthrough populations to be tracked (reported, hospitalized, deaths)
    - breakthrough is any person vaccinated who is not immunized (waning parameters determine susceptible size)
    - share the alphas of the naive populations (adjust waning parameters to incorporate altered immunity)
-   - the original susceptible includes all. bt_susceptible produces bt_infected, which propogate to both bt_contagious
+   - the original susceptible includes all. bt_susceptible produces bt_infected, which propagate to both bt_contagious
      and contagious
  - include boosters
 
@@ -486,7 +488,7 @@ bc_model.add_connector(
 
 # breakthrough infection also leads to natural immunity (that eventually wanes again)
 
-bt_nat_immunized_pop = Population('bt nat immunized', 0,
+bt_nat_immunized_pop = Population('bt_nat_immunized', 0,
                                   'people who gained immunity through breakthrough infection',
                                   hidden=True, color=rotated_color(1, 'gold'))
 
@@ -560,7 +562,7 @@ bc_model.add_connector(
 
 # And again for the breakthroughs
 
-bt_waned_nat_immunity_pop = Population('bt waned nat immunity', 0,
+bt_waned_nat_immunity_pop = Population('bt_waned nat immunity', 0,
                                        'people who lost nat immunity some time after gaining bt nat immunity',
                                        hidden=True, color=rotated_color(1, 'mediumvioletred'))
 
@@ -796,10 +798,10 @@ bc_model.add_connector(
 
 # Recovery and death following breakthrough infections
 
-bt_recovered_pop = Population('bt recovered', 0, 'People who have recovered from a breakthrough illness ',
+bt_recovered_pop = Population('bt_recovered', 0, 'People who have recovered from a breakthrough illness ',
                               color=rotated_color(1, 'limegreen'))
 
-bt_deaths_pop = Population('bt deaths', 0,
+bt_deaths_pop = Population('bt_deaths', 0,
                            'people who have died from a breakthrough illness', hidden=True,
                            color=rotated_color(1, 'indigo'), show_sim=True,
                            report_noise=True, report_noise_par=death_noise_par,
@@ -888,7 +890,7 @@ bc_model.add_connector(
 # The newly bt contagious are split into two groups: symptomatic and non-symptomatic.
 # No contact tracing compartments for bt (until needed)
 
-bt_symptomatic_pop = Population('bt symptomatic', 0,
+bt_symptomatic_pop = Population('bt_symptomatic', 0,
                                 'People with breakthrough infections who have shown symptoms',
                                 color=rotated_color(1, 'chocolate'))
 
@@ -896,7 +898,7 @@ bt_symptomatic_fraction = Parameter('bt_symptomatic_frac', 0.5, 0., 1.,
                                     'fraction of breakthrough contagious people who become ' +
                                     'symptomatic', hidden=False)
 
-bt_asymptomatic_recovered_pop = Population('bt asymptomatic recovered', 0,
+bt_asymptomatic_recovered_pop = Population('bt_asymptomatic recovered', 0,
                                            'People with breakthrough infections who have not shown symptoms',
                                            color=rotated_color(1, 'silver'))
 
@@ -927,7 +929,7 @@ bc_model.add_connector(
 # The newly ve contagious are split into two groups: symptomatic and non-symptomatic.
 # No contact tracing compartments for ve (until needed)
 
-ve_symptomatic_pop = Population('ve symptomatic', 0,
+ve_symptomatic_pop = Population('ve_symptomatic', 0,
                                 'People with vaccine escape infections who have shown symptoms',
                                 color=rotated_color(2, 'chocolate'))
 
@@ -935,7 +937,7 @@ ve_symptomatic_fraction = Parameter('ve_symptomatic_frac', 0.5, 0., 1.,
                                     'fraction of vaccine escape contagious people who become ' +
                                     'symptomatic', hidden=False)
 
-ve_asymptomatic_recovered_pop = Population('ve asymptomatic recovered', 0,
+ve_asymptomatic_recovered_pop = Population('ve_asymptomatic_recovered', 0,
                                            'People with vaccine escape infections who have not shown symptoms',
                                            color=rotated_color(2, 'silver'))
 
@@ -948,7 +950,7 @@ bc_model.add_connector(
 # The newly ne contagious are split into two groups: symptomatic and non-symptomatic.
 # No contact tracing compartments for ne (until needed)
 
-ne_symptomatic_pop = Population('ne symptomatic', 0,
+ne_symptomatic_pop = Population('ne_symptomatic', 0,
                                 'People with natural escape infections who have shown symptoms',
                                 color=rotated_color(3, 'chocolate'))
 
@@ -956,7 +958,7 @@ ne_symptomatic_fraction = Parameter('ne_symptomatic_frac', 0.5, 0., 1.,
                                     'fraction of natural escape contagious people who become ' +
                                     'symptomatic', hidden=False)
 
-ne_asymptomatic_recovered_pop = Population('ne asymptomatic recovered', 0,
+ne_asymptomatic_recovered_pop = Population('ne_asymptomatic_recovered', 0,
                                            'People with natural escape infections who have not shown symptoms',
                                            color=rotated_color(3, 'silver'))
 
@@ -1025,7 +1027,7 @@ bc_model.add_connector(
 
 reported_pop_x = Population('reported_x', 0,
                             'xariant cases reported',
-                            hidden=True, color='tomato', show_sim=True,
+                            hidden=True, color='slateblue', show_sim=True,
                             report_noise=True, report_noise_par=report_noise_par,
                             report_backlog_par=report_backlog_par, report_days=report_days)
 
@@ -1196,7 +1198,7 @@ bc_model.add_connector(
 # no contact tracing or report anomalies -> therefore no "positives" intermediate population
 # use same reporting fraction as for non-bt... if necessary, can reduce by reducing symptomatic fraction
 
-bt_reported_pop = Population('bt reported', 0,
+bt_reported_pop = Population('bt_reported', 0,
                              'Breakthrough cases',
                              hidden=True, color=rotated_color(1, 'forestgreen'), show_sim=True,
                              report_noise=True, report_noise_par=report_noise_par,
@@ -1205,7 +1207,7 @@ bt_reported_pop = Population('bt reported', 0,
 bc_model.add_connector(
     Propagator('bt_testing', bt_symptomatic_pop, bt_reported_pop, reported_fraction, reported_delay))
 
-ve_reported_pop = Population('ve reported', 0,
+ve_reported_pop = Population('ve_reported', 0,
                              'Vaccine escape cases',
                              hidden=True, color=rotated_color(2, 'forestgreen'), show_sim=True,
                              report_noise=True, report_noise_par=report_noise_par,
@@ -1214,7 +1216,7 @@ ve_reported_pop = Population('ve reported', 0,
 bc_model.add_connector(
     Propagator('ve_testing', ve_symptomatic_pop, ve_reported_pop, reported_fraction, reported_delay))
 
-ne_reported_pop = Population('ne reported', 0,
+ne_reported_pop = Population('ne_reported', 0,
                              'Natural escape cases',
                              hidden=True, color=rotated_color(3, 'forestgreen'), show_sim=True,
                              report_noise=True, report_noise_par=report_noise_par,
@@ -1368,7 +1370,7 @@ bc_model.add_connector(
 # breakthrough ICU admissions
 # ----------------------------
 
-bt_icu_pop = Population('bt icu admissions', 0,
+bt_icu_pop = Population('bt_icu_admissions', 0,
                         'People with breakthrough infections admitted to ICU',
                         hidden=True, color=rotated_color(1, 'deeppink'), show_sim=True)
 
@@ -1383,7 +1385,7 @@ bc_model.add_connector(
 # vaccine escape ICU admissions
 # -----------------------------
 
-ve_icu_pop = Population('ve icu admissions', 0,
+ve_icu_pop = Population('ve_icu_admissions', 0,
                         'People with vaccine escape infections admitted to ICU',
                         hidden=True, color=rotated_color(2, 'deeppink'), show_sim=True)
 
@@ -1398,7 +1400,7 @@ bc_model.add_connector(
 # natural escape ICU admissions
 # -----------------------------
 
-ne_icu_pop = Population('ne icu admissions', 0,
+ne_icu_pop = Population('ne_icu_admissions', 0,
                         'People with natural escape infections admitted to ICU',
                         hidden=True, color=rotated_color(2, 'deeppink'), show_sim=True)
 
@@ -1507,7 +1509,7 @@ bc_model.add_connector(
 
 # breakthroughs
 
-bt_hospitalized_pop = Population('bt hospitalized', 0,
+bt_hospitalized_pop = Population('bt_hospitalized', 0,
                                  'Breakthough hospitalization cases',
                                  color=rotated_color(1, 'slategrey'), show_sim=True,
                                  report_noise=True, report_noise_par=hosp_noise_par,
@@ -1520,7 +1522,7 @@ bc_model.add_connector(
 
 # vaccine escape
 
-ve_hospitalized_pop = Population('ve hospitalized', 0,
+ve_hospitalized_pop = Population('ve_hospitalized', 0,
                                  'Vaccine escape hospitalization cases',
                                  color=rotated_color(2, 'slategrey'), show_sim=True,
                                  report_noise=True, report_noise_par=hosp_noise_par,
@@ -1533,7 +1535,7 @@ bc_model.add_connector(
 
 # natural escape
 
-ne_hospitalized_pop = Population('ne hospitalized', 0,
+ne_hospitalized_pop = Population('ne_hospitalized', 0,
                                  'Natural escape hospitalization cases',
                                  color=rotated_color(3, 'slategrey'), show_sim=True,
                                  report_noise=True, report_noise_par=hosp_noise_par,
