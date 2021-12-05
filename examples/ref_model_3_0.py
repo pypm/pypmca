@@ -103,6 +103,7 @@ from pypmca import Model, Population, Delay, Parameter, Multiplier, Propagator, 
 # This is not listed in package requirements:
 # Users generally do not need to run this code.
 import matplotlib
+import numpy as np
 
 
 def complementary_color(c):
@@ -110,6 +111,46 @@ def complementary_color(c):
     rgb = (my_hex[1:3], my_hex[3:5], my_hex[5:7])
     comp = ['%02X' % (255 - int(a, 16)) for a in rgb]
     return '#' + ''.join(comp)
+
+
+# define rotated color: i_rot is in range(n_rot)
+# Currently 4 replications of populations:
+# 0:nominal, 1: bt (breakthrough), 2: ve (vaccine escape), 3: ne (natural escape)
+n_rot = 4
+
+
+def rotated_color(i_rot, c):
+    cos = np.cos(2. * np.pi * i_rot / n_rot)
+    sin = np.sin(2. * np.pi * i_rot / n_rot)
+    term = (1. - cos) / 3.
+    sqrt = np.sqrt(1. / 3.)
+    rm = []
+
+    row = [cos + term, term - sqrt * sin, term + sqrt * sin]
+    rm.append(row)
+    row = [term + sqrt * sin, cos + term, term - sqrt * sin]
+    rm.append(row)
+    row = [term - sqrt * sin, term + sqrt * sin, cos + term]
+    rm.append(row)
+
+    my_hex = matplotlib.colors.to_hex(c)
+    rgb = (my_hex[1:3], my_hex[3:5], my_hex[5:7])
+    rgb_vec = [int(a, 16) for a in rgb]
+
+    rot_vec = []
+    for irow in range(3):
+        sum = 0.
+        for icol in range(3):
+            sum += rgb_vec[icol] * rm[irow][icol]
+        if sum < 0:
+            sum = 0
+        if sum > 255:
+            sum = 255
+        sum = int(sum + 0.5)
+
+        rot_vec.append('%02X' % sum)
+
+    return '#' + ''.join(rot_vec)
 
 
 # Reference model for BC
@@ -257,15 +298,15 @@ bc_model.add_connector(
 
 bt_susceptible_pop = Population('bt_susceptible', 0,
                                 'number of people who could become breakthrough infected',
-                                color=complementary_color('cornflowerblue'))
+                                color=rotated_color(1, 'cornflowerblue'))
 bt_infected_pop = Population('bt_infected', 0,
                              'total number of people ever infected as a breakthough',
-                             color=complementary_color('orange'))
+                             color=rotated_color(1, 'orange'))
 
 # This is a sub population of the overall contagious population:
 bt_contagious_pop = Population('bt_contagious', 0,
                                'number of people that became contagious as a breakthrough',
-                               hidden=True, color=complementary_color('red'))
+                               hidden=True, color=rotated_color(1, 'red'))
 
 # The overall contagious_pop is involved in producing breakthrough infections:
 bc_model.add_connector(
@@ -285,11 +326,11 @@ bc_model.add_connector(
 
 bt_infected_pop_v = Population('bt_infected_v', 0,
                                'total number of people ever infected with variant as a breakthrough',
-                               hidden=True, color=complementary_color('darkgoldenrod'))
+                               hidden=True, color=rotated_color(1, 'darkgoldenrod'))
 
 bt_contagious_pop_v = Population('bt_contagious_v', 0,
                                  'number of people that can cause variant infections as a breakthrough',
-                                 hidden=True, color=complementary_color('rosybrown'))
+                                 hidden=True, color=rotated_color(1, 'rosybrown'))
 
 bc_model.add_connector(
     Multiplier('bt_infection cycle_v', [bt_susceptible_pop, contagious_pop_v, total_pop],
@@ -310,11 +351,11 @@ bc_model.add_connector(
 
 bt_infected_pop_w = Population('bt_infected_w', 0,
                                'total number of people ever infected with wariant as a breakthrough',
-                               hidden=True, color=complementary_color('sienna'))
+                               hidden=True, color=rotated_color(1, 'sienna'))
 
 bt_contagious_pop_w = Population('bt_contagious_w', 0,
                                  'number of people that can cause wariant infections as a breakthrough',
-                                 hidden=True, color=complementary_color('maroon'))
+                                 hidden=True, color=rotated_color(1, 'maroon'))
 
 bc_model.add_connector(
     Multiplier('bt_infection cycle_w', [bt_susceptible_pop, contagious_pop_w, total_pop],
@@ -335,11 +376,11 @@ bc_model.add_connector(
 
 bt_infected_pop_x = Population('bt_infected_x', 0,
                                'total number of people ever infected with xariant as a breakthrough',
-                               hidden=True, color=complementary_color('sandybrown'))
+                               hidden=True, color=rotated_color(1, 'sandybrown'))
 
 bt_contagious_pop_x = Population('bt_contagious_x', 0,
                                  'number of people that can cause xariant infections as a breakthrough',
-                                 hidden=True, color=complementary_color('lightcoral'))
+                                 hidden=True, color=rotated_color(1, 'lightcoral'))
 
 bc_model.add_connector(
     Multiplier('bt_infection cycle_x', [bt_susceptible_pop, contagious_pop_x, total_pop],
@@ -355,14 +396,81 @@ bc_model.add_connector(
 
 # end of fourth infection cycle
 
+# ooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooo
+# Define the vaccine escape infection cycles
+# ooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooo
+
+ve_susceptible_pop = Population('ve_susceptible', 0,
+                                'people who could become vaccine escape infected',
+                                color=rotated_color(2, 'cornflowerblue'))
+
+# Include the fourth infection cycle - xariant
+# ------------------------------------------------------------------
+
+ve_infected_pop_x = Population('ve_infected_x', 0,
+                               'total number of people ever infected with xariant as vaccine escape',
+                               hidden=True, color=rotated_color(2, 'sandybrown'))
+
+ve_contagious_pop_x = Population('ve_contagious_x', 0,
+                                 'number of people that can cause xariant infections as vaccine escape',
+                                 hidden=True, color=rotated_color(2, 'lightcoral'))
+
+bc_model.add_connector(
+    Multiplier('ve_infection cycle_x', [ve_susceptible_pop, contagious_pop_x, total_pop],
+               ve_infected_pop_x, trans_rate_x, fast_delay, bc_model,
+               distribution='nbinom', nbinom_par=neg_binom_par))
+
+bc_model.add_connector(
+    Propagator('ve_infected_x to ve_contagious_x', ve_infected_pop_x,
+               ve_contagious_pop_x, contagious_frac, contagious_delay))
+
+bc_model.add_connector(
+    Adder('include ve_contagious_x in contagious_x', ve_contagious_pop_x, contagious_pop_x))
+
+# end of fourth infection cycle
+
+# ooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooo
+# Define the natural escape infection cycles
+# ooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooo
+
+ne_susceptible_pop = Population('ne_susceptible', 0,
+                                'people who could become natural escape infected',
+                                color=rotated_color(3, 'cornflowerblue'))
+
+# Include the fourth infection cycle - xariant
+# ------------------------------------------------------------------
+
+ne_infected_pop_x = Population('ne_infected_x', 0,
+                               'total number of people ever infected with xariant as natural escape',
+                               hidden=True, color=rotated_color(3, 'sandybrown'))
+
+ne_contagious_pop_x = Population('ne_contagious_x', 0,
+                                 'number of people that can cause xariant infections as natural escape',
+                                 hidden=True, color=rotated_color(3, 'lightcoral'))
+
+bc_model.add_connector(
+    Multiplier('ne_infection cycle_x', [ne_susceptible_pop, contagious_pop_x, total_pop],
+               ne_infected_pop_x, trans_rate_x, fast_delay, bc_model,
+               distribution='nbinom', nbinom_par=neg_binom_par))
+
+bc_model.add_connector(
+    Propagator('ne_infected_x to ne_contagious_x', ne_infected_pop_x,
+               ne_contagious_pop_x, contagious_frac, contagious_delay))
+
+bc_model.add_connector(
+    Adder('include ne_contagious_x in contagious_x', ne_contagious_pop_x, contagious_pop_x))
+
+# end of fourth infection cycle
+
 
 # keep track of naturally immunized population
+# --------------------------------------------
 
 nat_immunized_pop = Population('nat immunized', 0,
                                'people who gained immunity through infection',
                                hidden=True, color='gold')
 
-# all forms of infection lead to natural immunity (that eventually wanes)
+# all strains of infection lead to natural immunity (that eventually wanes)
 
 bc_model.add_connector(
     Adder('natural immunity', infected_pop, nat_immunized_pop))
@@ -380,7 +488,7 @@ bc_model.add_connector(
 
 bt_nat_immunized_pop = Population('bt nat immunized', 0,
                                   'people who gained immunity through breakthrough infection',
-                                  hidden=True, color=complementary_color('gold'))
+                                  hidden=True, color=rotated_color(1, 'gold'))
 
 bc_model.add_connector(
     Adder('bt natural immunity', bt_infected_pop, bt_nat_immunized_pop))
@@ -394,7 +502,31 @@ bc_model.add_connector(
 bc_model.add_connector(
     Adder('bt natural immunity x', bt_infected_pop_x, bt_nat_immunized_pop))
 
+# a fraction of all strain infections will be susceptible to natural escape (except xariant)
+
+nat_escape_fraction = Parameter('ne_frac', 0.5, 0., 1.,
+                                'fraction of natural immunizations that can escape')
+
+bc_model.add_connector(
+    Propagator('natural escape', infected_pop, ne_susceptible_pop, nat_escape_fraction, fast_delay))
+
+bc_model.add_connector(
+    Propagator('natural escape v', infected_pop_v, ne_susceptible_pop, nat_escape_fraction, fast_delay))
+
+bc_model.add_connector(
+    Propagator('natural escape w', infected_pop_w, ne_susceptible_pop, nat_escape_fraction, fast_delay))
+
+bc_model.add_connector(
+    Propagator('bt natural escape', bt_infected_pop, ne_susceptible_pop, nat_escape_fraction, fast_delay))
+
+bc_model.add_connector(
+    Propagator('bt natural escape v', bt_infected_pop_v, ne_susceptible_pop, nat_escape_fraction, fast_delay))
+
+bc_model.add_connector(
+    Propagator('bt natural escape w', bt_infected_pop_w, ne_susceptible_pop, nat_escape_fraction, fast_delay))
+
 # waning immunity
+# ---------------
 
 # Specified by a delay distribution F(t) and a fraction of the immunizations that wane, f.
 # Waning is not considered to be equivalent to returning to a naive state, but instead
@@ -430,7 +562,7 @@ bc_model.add_connector(
 
 bt_waned_nat_immunity_pop = Population('bt waned nat immunity', 0,
                                        'people who lost nat immunity some time after gaining bt nat immunity',
-                                       hidden=True, color=complementary_color('mediumvioletred'))
+                                       hidden=True, color=rotated_color(1, 'mediumvioletred'))
 
 bc_model.add_connector(
     Propagator('bt nat waned immunity', bt_nat_immunized_pop, bt_waned_nat_immunity_pop,
@@ -441,7 +573,9 @@ bc_model.add_connector(
 bc_model.add_connector(
     Adder('bt waned nat to bt susceptible', bt_waned_nat_immunity_pop, bt_susceptible_pop))
 
-# Include vaccination:
+# Include vaccination
+# -------------------
+
 # A multiplier is used. Once the vaccination candidate population goes below zero, it stops.
 
 daily_vaccinated_pop = Population('daily vaccinated', 0, 'number of people vaccinated each day')
@@ -469,9 +603,11 @@ bc_model.add_connector(
     Adder('vaccinating susceptibles', vaccinated_pop, usefully_vaccinated_pop,
           ratio_populations=[susvaccan_pop, vaccan_pop]))
 
-# Now immunize some of those susceptible people who were vaccinated
+# Now immunize some of those susceptible people who were vaccinated, the rest are bt susceptible
 
 immunized_pop = Population('immunized', 0, 'number of susceptible people who were immunized by vaccine')
+non_immunized_pop = Population('non_immunized', 0, 'number of susceptible people who had an ineffective vaccination')
+
 vaccine_effectiveness = Parameter('vaccine_eff', 0.8, 0., 1.,
                                   'probability that a susceptible person gains immunity when vaccinated')
 
@@ -483,7 +619,24 @@ immunized_delay_pars = {
 immunized_delay = Delay('immunized_delay', 'gamma', immunized_delay_pars, bc_model)
 
 bc_model.add_connector(
-    Propagator('immunization', usefully_vaccinated_pop, immunized_pop, vaccine_effectiveness, immunized_delay))
+    Splitter('immunization', usefully_vaccinated_pop, [immunized_pop, non_immunized_pop], [vaccine_effectiveness],
+             [immunized_delay, fast_delay]))
+
+# Ineffective vaccinations increase bt susceptible population and decrease the susceptible population
+
+bc_model.add_connector(
+    Adder('non_immunized to bt susceptible', non_immunized_pop, bt_susceptible_pop))
+
+bc_model.add_connector(
+    Subtractor('non_immunized removes susceptible', susceptible_pop, non_immunized_pop))
+
+# a fraction of immunizations will be susceptible to vaccine escape
+
+vac_escape_fraction = Parameter('ve_frac', 0.5, 0., 1.,
+                                'fraction of vaccine immunizations that can escape')
+
+bc_model.add_connector(
+    Propagator('vaccine escape', immunized_pop, ve_susceptible_pop, vac_escape_fraction, fast_delay))
 
 # Waning vaccination immunity
 
@@ -505,10 +658,13 @@ vac_waned_fraction = Parameter('vac_waned_frac', 1., 0., 1.,
 bc_model.add_connector(
     Propagator('vac waned immunity', immunized_pop, waned_vac_immunity_pop, vac_waned_fraction, vac_waned_delay))
 
-# Once waned, the bt susceptible population increases
+# Once waned, the bt susceptible population increases and the ve susceptible population decreases
 
 bc_model.add_connector(
-    Adder('waned to susceptible', waned_vac_immunity_pop, bt_susceptible_pop))
+    Adder('waned to bt susceptible', waned_vac_immunity_pop, bt_susceptible_pop))
+
+bc_model.add_connector(
+    Subtractor('waned removes ve susceptible', ve_susceptible_pop, waned_vac_immunity_pop))
 
 #####################
 # Include boosters:
@@ -516,7 +672,7 @@ bc_model.add_connector(
 # Grow the population of booster candidates (delay following first dose)
 
 boostcan_pop = Population('boost cand', 0,
-                          'booster candidates', color=complementary_color('brown'))
+                          'booster candidates', color=rotated_color(1, 'brown'))
 
 boosting_delay_pars = {
     'mean': Parameter('boosting_delay_mean', 200., 120., 300., 'mean time from vaccination to booster eligibility'),
@@ -535,7 +691,7 @@ bc_model.add_connector(
 
 daily_boosted_pop = Population('daily boosted', 0, 'number of people boosted each day')
 
-boosted_pop = Population('boosted', 0, 'people boosted', color=complementary_color('skyblue'))
+boosted_pop = Population('boosted', 0, 'people boosted', color=rotated_color(1, 'skyblue'))
 
 bc_model.add_connector(
     Multiplier('boosting', [boostcan_pop, daily_boosted_pop, boostcan_pop],
@@ -544,7 +700,7 @@ bc_model.add_connector(
 # Only a fraction of those were susceptible (designate those as usefully boosted)
 
 usefully_boosted_pop = Population('usefully boosted', 0,
-                                  'people who were boosted when susceptible', color=complementary_color('navy'))
+                                  'people who were boosted when susceptible', color=rotated_color(1, 'navy'))
 
 bc_model.add_connector(
     Adder('boosting bt susceptibles', boosted_pop, usefully_boosted_pop,
@@ -559,19 +715,27 @@ booster_effectiveness = Parameter('booster_eff', 0.8, 0., 1.,
 bc_model.add_connector(
     Propagator('reimmunization', usefully_boosted_pop, reimmunized_pop, booster_effectiveness, immunized_delay))
 
+# a fraction of re-immunizations will be susceptible to vaccine escape
+
+bc_model.add_connector(
+    Propagator('vaccine escape reimmunized', reimmunized_pop, ve_susceptible_pop, vac_escape_fraction, fast_delay))
+
 # Waning booster immunity
 
 waned_boost_immunity_pop = Population('waned booster immunity', 0,
-                                    'people who lost immunity some time after gaining immunity through a booster',
-                                    hidden=True, color=complementary_color('mediumpurple'))
+                                      'people who lost immunity some time after gaining immunity through a booster',
+                                      hidden=True, color=rotated_color(1, 'mediumpurple'))
 
 bc_model.add_connector(
     Propagator('boost waned immunity', reimmunized_pop, waned_boost_immunity_pop, vac_waned_fraction, vac_waned_delay))
 
-# Once waned, the bt susceptible population increases
+# Once waned, the bt susceptible population increases and ve susceptible decreases
 
 bc_model.add_connector(
     Adder('booster waned to susceptible', waned_boost_immunity_pop, bt_susceptible_pop))
+
+bc_model.add_connector(
+    Subtractor('booster waned reduces ve susceptible', ve_susceptible_pop, waned_boost_immunity_pop))
 
 # The contagious either recover or die
 # This split is only used to track the deaths.
@@ -633,11 +797,11 @@ bc_model.add_connector(
 # Recovery and death following breakthrough infections
 
 bt_recovered_pop = Population('bt recovered', 0, 'People who have recovered from a breakthrough illness ',
-                              color=complementary_color('limegreen'))
+                              color=rotated_color(1, 'limegreen'))
 
 bt_deaths_pop = Population('bt deaths', 0,
                            'people who have died from a breakthrough illness', hidden=True,
-                           color=complementary_color('indigo'), show_sim=True,
+                           color=rotated_color(1, 'indigo'), show_sim=True,
                            report_noise=True, report_noise_par=death_noise_par,
                            report_backlog_par=death_backlog_par, report_days=death_report_days,
                            report_noise_weekly=True)
@@ -726,7 +890,7 @@ bc_model.add_connector(
 
 bt_symptomatic_pop = Population('bt symptomatic', 0,
                                 'People with breakthrough infections who have shown symptoms',
-                                color=complementary_color('chocolate'))
+                                color=rotated_color(1, 'chocolate'))
 
 bt_symptomatic_fraction = Parameter('bt_symptomatic_frac', 0.5, 0., 1.,
                                     'fraction of breakthrough contagious people who become ' +
@@ -734,30 +898,72 @@ bt_symptomatic_fraction = Parameter('bt_symptomatic_frac', 0.5, 0., 1.,
 
 bt_asymptomatic_recovered_pop = Population('bt asymptomatic recovered', 0,
                                            'People with breakthrough infections who have not shown symptoms',
-                                           color=complementary_color('silver'))
+                                           color=rotated_color(1, 'silver'))
 
 bc_model.add_connector(
     Splitter('bt symptoms', bt_contagious_pop,
              [bt_symptomatic_pop, bt_asymptomatic_recovered_pop],
-             [symptomatic_fraction],
+             [bt_symptomatic_fraction],
              [symptomatic_delay, asymptomatic_delay]))
 
 bc_model.add_connector(
     Splitter('bt symptoms_v', bt_contagious_pop_v,
              [bt_symptomatic_pop, bt_asymptomatic_recovered_pop],
-             [symptomatic_fraction],
+             [bt_symptomatic_fraction],
              [symptomatic_delay, asymptomatic_delay]))
 
 bc_model.add_connector(
     Splitter('bt symptoms_w', bt_contagious_pop_w,
              [bt_symptomatic_pop, bt_asymptomatic_recovered_pop],
-             [symptomatic_fraction],
+             [bt_symptomatic_fraction],
              [symptomatic_delay, asymptomatic_delay]))
 
 bc_model.add_connector(
     Splitter('bt symptoms_x', bt_contagious_pop_x,
              [bt_symptomatic_pop, bt_asymptomatic_recovered_pop],
-             [symptomatic_fraction],
+             [bt_symptomatic_fraction],
+             [symptomatic_delay, asymptomatic_delay]))
+
+# The newly ve contagious are split into two groups: symptomatic and non-symptomatic.
+# No contact tracing compartments for ve (until needed)
+
+ve_symptomatic_pop = Population('ve symptomatic', 0,
+                                'People with vaccine escape infections who have shown symptoms',
+                                color=rotated_color(2, 'chocolate'))
+
+ve_symptomatic_fraction = Parameter('ve_symptomatic_frac', 0.5, 0., 1.,
+                                    'fraction of vaccine escape contagious people who become ' +
+                                    'symptomatic', hidden=False)
+
+ve_asymptomatic_recovered_pop = Population('ve asymptomatic recovered', 0,
+                                           'People with vaccine escape infections who have not shown symptoms',
+                                           color=rotated_color(2, 'silver'))
+
+bc_model.add_connector(
+    Splitter('ve symptoms_x', ve_contagious_pop_x,
+             [ve_symptomatic_pop, ve_asymptomatic_recovered_pop],
+             [ve_symptomatic_fraction],
+             [symptomatic_delay, asymptomatic_delay]))
+
+# The newly ne contagious are split into two groups: symptomatic and non-symptomatic.
+# No contact tracing compartments for ne (until needed)
+
+ne_symptomatic_pop = Population('ne symptomatic', 0,
+                                'People with natural escape infections who have shown symptoms',
+                                color=rotated_color(3, 'chocolate'))
+
+ne_symptomatic_fraction = Parameter('ne_symptomatic_frac', 0.5, 0., 1.,
+                                    'fraction of natural escape contagious people who become ' +
+                                    'symptomatic', hidden=False)
+
+ne_asymptomatic_recovered_pop = Population('ne asymptomatic recovered', 0,
+                                           'People with natural escape infections who have not shown symptoms',
+                                           color=rotated_color(3, 'silver'))
+
+bc_model.add_connector(
+    Splitter('ne symptoms_x', ne_contagious_pop_x,
+             [ne_symptomatic_pop, ne_asymptomatic_recovered_pop],
+             [ne_symptomatic_fraction],
              [symptomatic_delay, asymptomatic_delay]))
 
 # reporting parameters
@@ -923,9 +1129,9 @@ bc_model.add_connector(
 bc_model.add_connector(
     Subtractor('removal from contagious_x', contagious_pop_x, removed_pop_x))
 
-# Note that there is no removal from bt contagious... that population is not part of the
-# infection cycle. All incoming to bt contagious need to be passed to contagious.
-# As a result, the bt contagious will be cumulative, not current.
+# Note that there is no removal from bt (ve and ne) contagious... those populations are not part of the
+# infection cycle. All incoming to bt (ve and ne) contagious are passed to contagious.
+# As a result, the bt (ve and ne) contagious will be cumulative, not current.
 
 # The symptomatic are sampled by two independent paths:  testing and hospitalization
 
@@ -985,19 +1191,37 @@ bc_model.add_connector(
     Propagator('report anomalies to reported', report_anomalies_pop,
                reported_pop, anomaly_fraction, anomaly_delay))
 
-# TESTING - REPORTING for breakthroughs
+# TESTING - REPORTING for breakthroughs, vaccine escape, natural escape
 # propagate a fraction of symptomatics to reported population
 # no contact tracing or report anomalies -> therefore no "positives" intermediate population
 # use same reporting fraction as for non-bt... if necessary, can reduce by reducing symptomatic fraction
 
 bt_reported_pop = Population('bt reported', 0,
-                             'Positives and reporting anomalies for bt',
-                             hidden=True, color=complementary_color('forestgreen'), show_sim=True,
+                             'Breakthrough cases',
+                             hidden=True, color=rotated_color(1, 'forestgreen'), show_sim=True,
                              report_noise=True, report_noise_par=report_noise_par,
                              report_backlog_par=report_backlog_par, report_days=report_days)
 
 bc_model.add_connector(
     Propagator('bt_testing', bt_symptomatic_pop, bt_reported_pop, reported_fraction, reported_delay))
+
+ve_reported_pop = Population('ve reported', 0,
+                             'Vaccine escape cases',
+                             hidden=True, color=rotated_color(2, 'forestgreen'), show_sim=True,
+                             report_noise=True, report_noise_par=report_noise_par,
+                             report_backlog_par=report_backlog_par, report_days=report_days)
+
+bc_model.add_connector(
+    Propagator('ve_testing', ve_symptomatic_pop, ve_reported_pop, reported_fraction, reported_delay))
+
+ne_reported_pop = Population('ne reported', 0,
+                             'Natural escape cases',
+                             hidden=True, color=rotated_color(3, 'forestgreen'), show_sim=True,
+                             report_noise=True, report_noise_par=report_noise_par,
+                             report_backlog_par=report_backlog_par, report_days=report_days)
+
+bc_model.add_connector(
+    Propagator('ne_testing', ne_symptomatic_pop, ne_reported_pop, reported_fraction, reported_delay))
 
 # SYMPTOMS -> HOSPITALIZATION
 #
@@ -1054,8 +1278,8 @@ bc_model.add_connector(
 
 bt_non_icu_hospitalized_pop = Population('bt_non_icu_hospitalized', 0,
                                          'Breakthrough non_icu hospitalization cases',
-                                         color=complementary_color('dimgrey'), show_sim=False)
-bt_non_icu_hospitalized_fraction = Parameter('bt_non_icu_hosp_frac', 0.2, 0., 1.,
+                                         color=rotated_color(1, 'dimgrey'), show_sim=False)
+bt_non_icu_hospitalized_fraction = Parameter('bt_non_icu_hosp_frac', 0.05, 0., 1.,
                                              'fraction of breakthroughs with symptoms who will ' + \
                                              'be admitted to non_icu hospital', hidden=False)
 
@@ -1067,11 +1291,57 @@ bc_model.add_connector(
 
 bt_non_icu_released_pop = Population('bt_non_icu_rel', 0,
                                      'Hospitalized breakthrough not needing ICU and released',
-                                     hidden=True, color=complementary_color('hotpink'), show_sim=False)
+                                     hidden=True, color=rotated_color(1, 'hotpink'), show_sim=False)
 
 bc_model.add_connector(
     Propagator('bt non_icu hospital to released', bt_non_icu_hospitalized_pop,
                bt_non_icu_released_pop, release_fraction, non_icu_delay))
+
+# SYMPTOMS -> HOSPITALIZATION for vaccine escape
+
+ve_non_icu_hospitalized_pop = Population('ve_non_icu_hospitalized', 0,
+                                         'Vaccine escape non_icu hospitalization cases',
+                                         color=rotated_color(2, 'dimgrey'), show_sim=False)
+ve_non_icu_hospitalized_fraction = Parameter('ve_non_icu_hosp_frac', 0.05, 0., 1.,
+                                             'fraction of vaccine escape with symptoms who will ' + \
+                                             'be admitted to non_icu hospital', hidden=False)
+
+bc_model.add_connector(
+    Propagator('ve symptomatic to non_icu hospital', ve_symptomatic_pop,
+               ve_non_icu_hospitalized_pop, ve_non_icu_hospitalized_fraction, non_icu_hospitalized_delay))
+
+# Those with non_icu hospitalization get released eventually
+
+ve_non_icu_released_pop = Population('ve_non_icu_rel', 0,
+                                     'Hospitalized vaccine escape not needing ICU and released',
+                                     hidden=True, color=rotated_color(2, 'hotpink'), show_sim=False)
+
+bc_model.add_connector(
+    Propagator('ve non_icu hospital to released', ve_non_icu_hospitalized_pop,
+               ve_non_icu_released_pop, release_fraction, non_icu_delay))
+
+# SYMPTOMS -> HOSPITALIZATION for natural escape
+
+ne_non_icu_hospitalized_pop = Population('ne_non_icu_hospitalized', 0,
+                                         'Natural escape non_icu hospitalization cases',
+                                         color=rotated_color(3, 'dimgrey'), show_sim=False)
+ne_non_icu_hospitalized_fraction = Parameter('ne_non_icu_hosp_frac', 0.05, 0., 1.,
+                                             'fraction of natural escape with symptoms who will ' + \
+                                             'be admitted to non_icu hospital', hidden=False)
+
+bc_model.add_connector(
+    Propagator('ne symptomatic to non_icu hospital', ne_symptomatic_pop,
+               ne_non_icu_hospitalized_pop, ne_non_icu_hospitalized_fraction, non_icu_hospitalized_delay))
+
+# Those with non_icu hospitalization get released eventually
+
+ne_non_icu_released_pop = Population('ne_non_icu_rel', 0,
+                                     'Hospitalized natural escape not needing ICU and released',
+                                     hidden=True, color=rotated_color(3, 'hotpink'), show_sim=False)
+
+bc_model.add_connector(
+    Propagator('ne non_icu hospital to released', ne_non_icu_hospitalized_pop,
+               ne_non_icu_released_pop, release_fraction, non_icu_delay))
 
 # Symptoms -> ICU admission
 # Keep track of how many currently in ICU
@@ -1100,7 +1370,7 @@ bc_model.add_connector(
 
 bt_icu_pop = Population('bt icu admissions', 0,
                         'People with breakthrough infections admitted to ICU',
-                        hidden=True, color=complementary_color('deeppink'), show_sim=True)
+                        hidden=True, color=rotated_color(1, 'deeppink'), show_sim=True)
 
 bt_to_icu_fraction = Parameter('bt_icu_frac', 0., 0., 1.,
                                'fraction of symptomatic bt people who go to ' +
@@ -1109,6 +1379,36 @@ bt_to_icu_fraction = Parameter('bt_icu_frac', 0., 0., 1.,
 bc_model.add_connector(
     Propagator('bt symptomatic to icu', bt_symptomatic_pop,
                bt_icu_pop, bt_to_icu_fraction, to_icu_delay))
+
+# vaccine escape ICU admissions
+# -----------------------------
+
+ve_icu_pop = Population('ve icu admissions', 0,
+                        'People with vaccine escape infections admitted to ICU',
+                        hidden=True, color=rotated_color(2, 'deeppink'), show_sim=True)
+
+ve_to_icu_fraction = Parameter('ve_icu_frac', 0., 0., 1.,
+                               'fraction of symptomatic ve people who go to ' +
+                               'icu', hidden=False)
+
+bc_model.add_connector(
+    Propagator('ve symptomatic to icu', ve_symptomatic_pop,
+               ve_icu_pop, ve_to_icu_fraction, to_icu_delay))
+
+# natural escape ICU admissions
+# -----------------------------
+
+ne_icu_pop = Population('ne icu admissions', 0,
+                        'People with natural escape infections admitted to ICU',
+                        hidden=True, color=rotated_color(2, 'deeppink'), show_sim=True)
+
+ne_to_icu_fraction = Parameter('ne_icu_frac', 0., 0., 1.,
+                               'fraction of symptomatic ne people who go to ' +
+                               'icu', hidden=False)
+
+bc_model.add_connector(
+    Propagator('ne symptomatic to icu', ne_symptomatic_pop,
+               ne_icu_pop, ne_to_icu_fraction, to_icu_delay))
 
 # ICU -> VENTILATOR
 ###################
@@ -1163,14 +1463,28 @@ bc_model.add_connector(
     Propagator('ventilator to released', ventilated_pop,
                ventilated_rel_pop, vent_rel_fraction, in_vent_delay))
 
-# No ventilation populations for breakthroughs
+# No ventilation populations for breakthroughs, vaccine escapes, or natural escapes
 # All bt ICU releases are non-ventilated
 
 bt_non_ventilated_rel_pop = Population('bt_non_ventilated_rel', 0,
-                                       'ICU non-vent released', color=complementary_color('palevioletred'))
+                                       'bt ICU non-vent released', color=rotated_color(1, 'palevioletred'))
 
 bc_model.add_connector(
     Propagator('bt icu released', bt_icu_pop, bt_non_ventilated_rel_pop,
+               vent_rel_fraction, non_vent_icu_delay))
+
+ve_non_ventilated_rel_pop = Population('ve_non_ventilated_rel', 0,
+                                       've ICU non-vent released', color=rotated_color(2, 'palevioletred'))
+
+bc_model.add_connector(
+    Propagator('ve icu released', ve_icu_pop, ve_non_ventilated_rel_pop,
+               vent_rel_fraction, non_vent_icu_delay))
+
+ne_non_ventilated_rel_pop = Population('ne_non_ventilated_rel', 0,
+                                       'ne ICU non-vent released', color=rotated_color(3, 'palevioletred'))
+
+bc_model.add_connector(
+    Propagator('ne icu released', ne_icu_pop, ne_non_ventilated_rel_pop,
                vent_rel_fraction, non_vent_icu_delay))
 
 # Need new populations to track total number in hospital (non_icu + icu admissions)
@@ -1195,17 +1509,43 @@ bc_model.add_connector(
 
 bt_hospitalized_pop = Population('bt hospitalized', 0,
                                  'Breakthough hospitalization cases',
-                                 color=complementary_color('slategrey'), show_sim=True,
+                                 color=rotated_color(1, 'slategrey'), show_sim=True,
                                  report_noise=True, report_noise_par=hosp_noise_par,
                                  report_backlog_par=hosp_backlog_par, report_days=hosp_report_days)
 
 bc_model.add_connector(
-    Adder('include bt non_icu in hospitalized', bt_non_icu_hospitalized_pop, bt_hospitalized_pop))
+    Adder('include bt non_icu in bt hospitalized', bt_non_icu_hospitalized_pop, bt_hospitalized_pop))
 bc_model.add_connector(
-    Adder('include bt icu in hospitalized', bt_icu_pop, bt_hospitalized_pop))
+    Adder('include bt icu in bt hospitalized', bt_icu_pop, bt_hospitalized_pop))
+
+# vaccine escape
+
+ve_hospitalized_pop = Population('ve hospitalized', 0,
+                                 'Vaccine escape hospitalization cases',
+                                 color=rotated_color(2, 'slategrey'), show_sim=True,
+                                 report_noise=True, report_noise_par=hosp_noise_par,
+                                 report_backlog_par=hosp_backlog_par, report_days=hosp_report_days)
+
+bc_model.add_connector(
+    Adder('include ve non_icu in ve hospitalized', ve_non_icu_hospitalized_pop, ve_hospitalized_pop))
+bc_model.add_connector(
+    Adder('include ve icu in ve hospitalized', ve_icu_pop, ve_hospitalized_pop))
+
+# natural escape
+
+ne_hospitalized_pop = Population('ne hospitalized', 0,
+                                 'Natural escape hospitalization cases',
+                                 color=rotated_color(3, 'slategrey'), show_sim=True,
+                                 report_noise=True, report_noise_par=hosp_noise_par,
+                                 report_backlog_par=hosp_backlog_par, report_days=hosp_report_days)
+
+bc_model.add_connector(
+    Adder('include ne non_icu in ne hospitalized', ne_non_icu_hospitalized_pop, ne_hospitalized_pop))
+bc_model.add_connector(
+    Adder('include ne icu in ne hospitalized', ne_icu_pop, ne_hospitalized_pop))
 
 # make a copy of hospital admissions to keep track of how many remain in hospital
-# ooooooooooooooooooooooooooooooooooooooooooooooooooooooooo
+# oooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooo
 
 in_hospital_pop = Population('in_hospital', 0,
                              'People currently in hospital',
@@ -1215,12 +1555,24 @@ bc_model.add_connector(
 
 bt_in_hospital_pop = Population('bt_in_hospital', 0,
                                 'Breakthroughs currently in hospital',
-                                hidden=True, color=complementary_color('darkcyan'), show_sim=True)
+                                hidden=True, color=rotated_color(1, 'darkcyan'), show_sim=True)
 bc_model.add_connector(
     Adder('copy bt hospitalizations', bt_hospitalized_pop, bt_in_hospital_pop))
 
+ve_in_hospital_pop = Population('ve_in_hospital', 0,
+                                'Vaccine escape currently in hospital',
+                                hidden=True, color=rotated_color(2, 'darkcyan'), show_sim=True)
+bc_model.add_connector(
+    Adder('copy ve hospitalizations', ve_hospitalized_pop, ve_in_hospital_pop))
+
+ne_in_hospital_pop = Population('ne_in_hospital', 0,
+                                'Vaccine escape currently in hospital',
+                                hidden=True, color=rotated_color(3, 'darkcyan'), show_sim=True)
+bc_model.add_connector(
+    Adder('copy ne hospitalizations', ne_hospitalized_pop, ne_in_hospital_pop))
+
 # make a copy of icu admissions to keep track of how many remain in icu
-# ooooooooooooooooooooooooooooooooooooooooooooooooooooooooo
+# ooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooo
 
 in_icu_pop = Population('in_icu', 0,
                         'People currently in ICU', hidden=False, color='hotpink', show_sim=True)
@@ -1230,10 +1582,24 @@ bc_model.add_connector(
 
 bt_in_icu_pop = Population('bt_in_icu', 0,
                            'Breakthroughs currently in ICU', hidden=True,
-                           color=complementary_color('hotpink'), show_sim=True)
+                           color=rotated_color(1, 'hotpink'), show_sim=True)
 
 bc_model.add_connector(
     Adder('copy bt icu admissions', bt_icu_pop, bt_in_icu_pop))
+
+ve_in_icu_pop = Population('ve_in_icu', 0,
+                           'Vaccine escape currently in ICU', hidden=True,
+                           color=rotated_color(2, 'hotpink'), show_sim=True)
+
+bc_model.add_connector(
+    Adder('copy ve icu admissions', ve_icu_pop, ve_in_icu_pop))
+
+ne_in_icu_pop = Population('ne_in_icu', 0,
+                           'Natural escape currently in ICU', hidden=True,
+                           color=rotated_color(3, 'hotpink'), show_sim=True)
+
+bc_model.add_connector(
+    Adder('copy ne icu admissions', ne_icu_pop, ne_in_icu_pop))
 
 # make a copy of ventilator admissions to keep track of how many remain on ventilator
 # ooooooooooooooooooooooooooooooooooooooooooooooooooooooooo
@@ -1272,6 +1638,28 @@ bc_model.add_connector(
 bc_model.add_connector(
     Subtractor('remove bt non-vent released from hospital', bt_in_hospital_pop, bt_non_ventilated_rel_pop))
 
+# vaccine escape
+# --------------
+
+bc_model.add_connector(
+    Subtractor('remove ve non-ICU released', ve_in_hospital_pop, ve_non_icu_released_pop))
+
+bc_model.add_connector(
+    Subtractor('remove ve non-vent released from icu', ve_in_icu_pop, ve_non_ventilated_rel_pop))
+bc_model.add_connector(
+    Subtractor('remove ve non-vent released from hospital', ve_in_hospital_pop, ve_non_ventilated_rel_pop))
+
+# natural escape
+# --------------
+
+bc_model.add_connector(
+    Subtractor('remove ne non-ICU released', ne_in_hospital_pop, ne_non_icu_released_pop))
+
+bc_model.add_connector(
+    Subtractor('remove ne non-vent released from icu', ne_in_icu_pop, ne_non_ventilated_rel_pop))
+bc_model.add_connector(
+    Subtractor('remove ne non-vent released from hospital', ne_in_hospital_pop, ne_non_ventilated_rel_pop))
+
 # adjust other populations as required
 # ooooooooooooooooooooooooooooooooooooo
 
@@ -1302,7 +1690,15 @@ bc_model.add_connector(
     Subtractor('subtract bt infected_w from bt susceptible', bt_susceptible_pop, bt_infected_pop_w))
 
 bc_model.add_connector(
-    Subtractor('subtract bt infected_x from sbt usceptible', bt_susceptible_pop, bt_infected_pop_x))
+    Subtractor('subtract bt infected_x from bt susceptible', bt_susceptible_pop, bt_infected_pop_x))
+
+# escape
+
+bc_model.add_connector(
+    Subtractor('subtract ve infected_x from ve susceptible', ve_susceptible_pop, ve_infected_pop_x))
+
+bc_model.add_connector(
+    Subtractor('subtract ne infected_x from ne susceptible', ne_susceptible_pop, ne_infected_pop_x))
 
 # some with a positive test will decide not to get vaccinated
 frac_report_novacc_par = Parameter('frac_report_novacc', 1.0, 0., 1.,
