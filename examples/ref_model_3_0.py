@@ -605,10 +605,32 @@ bc_model.add_connector(
     Adder('vaccinating susceptibles', vaccinated_pop, usefully_vaccinated_pop,
           ratio_populations=[susvaccan_pop, vaccan_pop]))
 
-# Now immunize some of those susceptible people who were vaccinated, the rest are bt susceptible
+# All the susceptibles who were vaccinated will eventually become breakthrough candidates
+
+bt_candidate_pop = Population('bt_candidate', 0, 'number of susceptible people who became eligible as a bt candidate')
+
+bt_delay_pars = {
+    'mean': Parameter('breakthrough_delay_mean', 70., 5., 200.,
+                      'mean time to become breakthrough candidate after vaccination'),
+    'sigma': Parameter('breakthrough_delay_sigma', 10., 1., 50.,
+                       'standard deviation of times from vaccination to breakthrough')
+}
+bt_delay = Delay('breakthrough_delay', 'gamma', bt_delay_pars, bc_model)
+
+bc_model.add_connector(
+    Propagator('breakthrough queue', usefully_vaccinated_pop, bt_candidate_pop, vac_fraction, bt_delay))
+
+# Once sufficient time has passed move susceptible to bt susceptible
+
+bc_model.add_connector(
+    Adder('bt_candidate adds to bt susceptible', bt_candidate_pop, bt_susceptible_pop))
+
+bc_model.add_connector(
+    Subtractor('bt_candidate removes susceptible', susceptible_pop, bt_candidate_pop))
+
+# Now immunize some of those susceptible people who were vaccinated
 
 immunized_pop = Population('immunized', 0, 'number of susceptible people who were immunized by vaccine')
-non_immunized_pop = Population('non_immunized', 0, 'number of susceptible people who had an ineffective vaccination')
 
 vaccine_effectiveness = Parameter('vaccine_eff', 0.8, 0., 1.,
                                   'probability that a susceptible person gains immunity when vaccinated')
@@ -621,16 +643,7 @@ immunized_delay_pars = {
 immunized_delay = Delay('immunized_delay', 'gamma', immunized_delay_pars, bc_model)
 
 bc_model.add_connector(
-    Splitter('immunization', usefully_vaccinated_pop, [immunized_pop, non_immunized_pop], [vaccine_effectiveness],
-             [immunized_delay, fast_delay]))
-
-# Ineffective vaccinations increase bt susceptible population and decrease the susceptible population
-
-bc_model.add_connector(
-    Adder('non_immunized to bt susceptible', non_immunized_pop, bt_susceptible_pop))
-
-bc_model.add_connector(
-    Subtractor('non_immunized removes susceptible', susceptible_pop, non_immunized_pop))
+    Propagator('immunization', usefully_vaccinated_pop, immunized_pop, vaccine_effectiveness, immunized_delay))
 
 # a fraction of immunizations will be susceptible to vaccine escape
 
@@ -666,7 +679,8 @@ bc_model.add_connector(
     Adder('waned to bt susceptible', waned_vac_immunity_pop, bt_susceptible_pop))
 
 bc_model.add_connector(
-    Subtractor('waned removes ve susceptible', ve_susceptible_pop, waned_vac_immunity_pop))
+    Subtractor('waned removes ve susceptible', ve_susceptible_pop, waned_vac_immunity_pop,
+               scale_factor=vac_escape_fraction))
 
 #####################
 # Include boosters:
@@ -737,7 +751,8 @@ bc_model.add_connector(
     Adder('booster waned to susceptible', waned_boost_immunity_pop, bt_susceptible_pop))
 
 bc_model.add_connector(
-    Subtractor('booster waned reduces ve susceptible', ve_susceptible_pop, waned_boost_immunity_pop))
+    Subtractor('booster waned reduces ve susceptible', ve_susceptible_pop, waned_boost_immunity_pop,
+               scale_factor=vac_escape_fraction))
 
 # The contagious either recover or die
 # This split is only used to track the deaths.
@@ -1714,7 +1729,7 @@ bc_model.add_connector(
     Subtractor('subtract usefully vaccinated from the sus vacc cand', susvaccan_pop, usefully_vaccinated_pop))
 
 bc_model.add_connector(
-    Subtractor('subtract immunized from susceptible', susceptible_pop, immunized_pop))
+    Subtractor('subtract immunized from bt_susceptible', bt_susceptible_pop, immunized_pop))
 
 bc_model.add_connector(
     Subtractor('subtract some of infected from sus vacc cand', susvaccan_pop, infected_pop,
