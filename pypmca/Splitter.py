@@ -10,6 +10,7 @@ from scipy import stats
 from pypmca.Connector import Connector
 from pypmca.Delay import Delay
 from pypmca.Parameter import Parameter
+from pypmca.Operator import Operator
 
 
 class Splitter(Connector):
@@ -21,7 +22,7 @@ class Splitter(Connector):
         propagated
         - to_population: list of two or more Population objects,
         the destination populations.
-        - fractions: list of Parameter object with expected
+        - fractions: list of Parameter or Operator objects with expected
         fraction of population to be propagated to the first to_population,
         the second is the fraction of the remaining to go to the next to_population
         and so on, with the remainder going to the other population
@@ -57,9 +58,9 @@ class Splitter(Connector):
                              ') fractions length must be len(to_population)-1')
 
         for fraction in fractions:
-            if not isinstance(fraction, Parameter):
+            if not isinstance(fraction, Parameter) and not isinstance(fraction, Operator):
                 raise TypeError('Splitter (' + self.name +
-                                ') fractions list must contain Parameter object')
+                                ') fractions list must contain Parameter or Operator objects')
 
             if fraction.get_value() < 0.:
                 raise ValueError('Splitter (' + self.name +
@@ -87,7 +88,11 @@ class Splitter(Connector):
         self.delay = delay
 
         for i in range(len(self.fractions)):
-            self.parameters['fraction' + str(i)] = self.fractions[i]
+            if isinstance(self.fractions[i], Parameter):
+                self.parameters['fraction' + str(i)] = self.fractions[i]
+            else:
+                for j,par in enumerate(self.fractions[i].parameters):
+                    self.parameters['fraction' + str(i) +'_'+ str(j)] = par
 
         if isinstance(delay, list):
             for i in range(len(delay)):

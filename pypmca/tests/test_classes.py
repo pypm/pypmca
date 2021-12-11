@@ -5,7 +5,7 @@
 import pytest
 
 from pypmca import Model, Population, Delay, Parameter, Multiplier, Propagator, \
-    Splitter, Adder, Subtractor, Chain, Modifier, Injector
+    Splitter, Adder, Subtractor, Chain, Modifier, Injector, Collector, Operator
 import numpy as np
 from pathlib import Path
 
@@ -58,8 +58,8 @@ def test_class_Population():
             test_pop.do_time_step(expectations=expectations)
         assert test_pop.history[-1] == init_value + future_sum
 
-    report_days = Parameter('report_days',127,parameter_min=-7,parameter_max=127,parameter_type='int')
-    for report_day_value in [127,63,-1,-2,-5,-7]:
+    report_days = Parameter('report_days', 127, parameter_min=-7, parameter_max=127, parameter_type='int')
+    for report_day_value in [127, 63, -1, -2, -5, -7]:
         report_days.set_value(report_day_value)
         test_pop.reset()
         future = [0, 10, 100, 100, 100, 10, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
@@ -84,6 +84,22 @@ def test_class_Parameter():
             error_caught = True
         assert error_caught
 
+
+def test_class_Operator():
+    r1 = 10.
+    r2 = 11.3
+    i1 = 5
+    i2 = 7
+    rp1 = Parameter('r1', r1, parameter_min=5., parameter_max=100.)
+    rp2 = Parameter('r2', r2, parameter_min=5., parameter_max=100.)
+    ip1 = Parameter('i1', i1, parameter_type='int', parameter_min=5, parameter_max=100)
+    ip2 = Parameter('r1', i2, parameter_type='int', parameter_min=5, parameter_max=100)
+
+    assert Operator([rp1, rp2], '*').get_value() == r1 * r2
+    assert Operator([rp1, ip1], '*').get_value() == r1 * i1
+    assert Operator([ip1, ip2], '*').get_value() == i1 * i2
+    assert Operator([rp1, rp2, rp1, ip2], '*+/').get_value() == r1 * r2 + r1 / i2
+    assert Operator([ip1, ip2, ip1, ip2], '*/+').get_value() == i1 * i2 / i1 + i2
 
 def test_class_Delay():
     """tests to ensure the behaviour class Delay"""
@@ -129,7 +145,7 @@ def test_class_Delay():
 
 def test_class_Adder():
     """tests to ensure the behaviour class Adder"""
-    for itest in range(5):
+    for itest in range(6):
         f_over_t = 2
         to_init = 10
         from_init = f_over_t * to_init
@@ -146,28 +162,70 @@ def test_class_Adder():
             scale_factor = Parameter('scale_factor', sf, 0., 10.)
             test_adder = Adder('test_add', from_pop, to_pop, scale_factor=scale_factor)
             test_adder.update_expectation()
-            assert to_pop.future[0] == from_next*sf
+            assert to_pop.future[0] == from_next * sf
         elif itest == 2:
             sf = 3.
             ratio_pops = [from_pop, to_pop]
             scale_factor = Parameter('scale_factor', sf, 0., 10.)
             test_adder = Adder('test_add', from_pop, to_pop, scale_factor=scale_factor, ratio_populations=ratio_pops)
             test_adder.update_expectation()
-            assert to_pop.future[0] == from_next*sf*f_over_t
+            assert to_pop.future[0] == from_next * sf * f_over_t
         elif itest == 3:
             sf = 3
             ratio_pops = [from_pop, to_pop]
-            scale_factor = Parameter('scale_factor', sf, 0, 10,' ','int')
+            scale_factor = Parameter('scale_factor', sf, 0, 10, ' ', 'int')
             test_adder = Adder('test_add', from_pop, to_pop, scale_factor=scale_factor, ratio_populations=ratio_pops)
             test_adder.update_data()
-            assert to_pop.future[0] == from_next*sf*f_over_t
+            assert to_pop.future[0] == from_next * sf * f_over_t
         elif itest == 4:
             sf = 3.1
             ratio_pops = [from_pop, to_pop]
             scale_factor = Parameter('scale_factor', sf, 0., 10.)
             test_adder = Adder('test_add', from_pop, to_pop, scale_factor=scale_factor, ratio_populations=ratio_pops)
             test_adder.update_data()
-            assert to_pop.future[0] >= from_next*int(sf)*f_over_t
+            assert to_pop.future[0] >= from_next * int(sf) * f_over_t
+        elif itest == 5:
+            sf = 3.1
+            r1 = Parameter('r1', sf/3., parameter_min=1., parameter_max=100.)
+            r2 = Parameter('r2', 3., parameter_min=1., parameter_max=100.)
+            ratio_pops = [from_pop, to_pop]
+            # scale_factor = Parameter('scale_factor', sf, 0., 10.)
+            scale_factor = Operator([r1,r2],'*')
+            test_adder = Adder('test_add', from_pop, to_pop, scale_factor=scale_factor, ratio_populations=ratio_pops)
+            test_adder.update_data()
+            assert to_pop.future[0] >= from_next * int(sf) * f_over_t
+
+
+def test_class_Collector():
+    """tests to ensure the behaviour class Collector"""
+    from_inits = [20, 30, 40]
+    to_init = int(np.sum(from_inits))
+
+    for itest in range(2):
+
+        from_pops = [Population('from_pop_' + str(i), from_inits[i]) for i in range(len(from_inits))]
+        to_pop = Population('to_pop', to_init)
+
+        if itest == 0:
+            test_collector = Collector('test_add', from_pops, to_pop)
+            from_futures = [5.1, -3.4, 17.8]
+
+            for i in range(len(from_inits)):
+                from_pops[i].future = [from_futures[i]]
+
+            test_collector.update_expectation()
+            assert to_pop.future[0] == np.sum(from_futures)
+
+        if itest == 1:
+            test_collector = Collector('test_add', from_pops, to_pop)
+            from_futures = [5, -3, 17]
+
+            for i in range(len(from_inits)):
+                from_pops[i].future = [from_futures[i]]
+
+            test_collector.update_data()
+            assert to_pop.future[0] == np.sum(from_futures)
+
 
 def test_class_Injector():
     """tests to ensure the behaviour class Injector"""

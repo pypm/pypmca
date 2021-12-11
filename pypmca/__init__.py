@@ -6,10 +6,12 @@ if version_info.major >= 3:
     from pypmca.Model import Model
     from pypmca.Delay import Delay
     from pypmca.Parameter import Parameter
+    from pypmca.Operator import Operator
     from pypmca.Multiplier import Multiplier
     from pypmca.Propagator import Propagator
     from pypmca.Splitter import Splitter
     from pypmca.Adder import Adder
+    from pypmca.Collector import Collector
     from pypmca.Subtractor import Subtractor
     from pypmca.Chain import Chain
     from pypmca.Modifier import Modifier

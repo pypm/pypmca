@@ -17,6 +17,7 @@ from scipy import stats
 from pypmca.Connector import Connector
 from pypmca.Delay import Delay
 from pypmca.Parameter import Parameter
+from pypmca.Operator import Operator
 
 
 class Propagator(Connector):
@@ -28,8 +29,8 @@ class Propagator(Connector):
         propagated
         - to_population: Population object or list of Population objects,
         destination population(s).
-        - fraction: Parameter object or list of Parameter objects, expected
-        fraction of population to be propagated. If list provided,
+        - fraction: Parameter or Operator object or list of Parameter or Operator
+        objects, expected fraction of population to be propagated. If list provided,
         its length must match to_population, and the fractions are applied
         independently. The sum of all fractions can exceed 1.
         - delay: Delay object or list of Delay objects that define how
@@ -57,12 +58,12 @@ class Propagator(Connector):
                                  ') fraction list length does not match' +
                                  ' to_population list length')
             for frac in fraction:
-                if not isinstance(frac, Parameter):
+                if (not isinstance(frac, Parameter) and not isinstance(frac, Operator)):
                     raise TypeError('Propagator (' + self.name +
-                                    ') fraction list must contain Parameter objects')
-        elif not isinstance(fraction, Parameter):
+                                    ') fraction list must contain Parameter or Operator objects')
+        elif (not isinstance(fraction, Parameter) and not isinstance(fraction, Operator)):
             raise TypeError('Propagator (' + self.name +
-                            ') fraction must be a Parameter object')
+                            ') fraction must be a Parameter or Operator object')
         self.fraction = fraction
 
         if not isinstance(delay, Delay):
@@ -73,9 +74,17 @@ class Propagator(Connector):
         if isinstance(fraction, list):
             for i in range(len(fraction)):
                 name = 'fraction_' + str(to_population[i])
-                self.parameters[name] = self.fraction[i]
+                if isinstance(fraction[i], Parameter):
+                    self.parameters[name] = self.fraction[i]
+                else:
+                    for j,par in enumerate(fraction[i].parameters):
+                        self.parameters[name+str(j)] = par
         else:
-            self.parameters['fraction'] = self.fraction
+            if isinstance(fraction, Parameter):
+                self.parameters['fraction'] = self.fraction
+            else:
+                for j, par in enumerate(fraction.parameters):
+                    self.parameters['fraction' + str(j)] = par
         if isinstance(delay, list):
             for i in range(len(delay)):
                 name = 'delay_' + str(to_population[i])

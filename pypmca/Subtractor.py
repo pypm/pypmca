@@ -15,6 +15,7 @@ from scipy import stats
 from pypmca.Connector import Connector
 from pypmca.Population import Population
 from pypmca.Parameter import Parameter
+from pypmca.Operator import Operator
 
 class Subtractor(Connector):
     """
@@ -26,7 +27,7 @@ class Subtractor(Connector):
         - to_population: Population object having received the newcomers
         of the from_population totals. Its future is not affected by
         this connector.
-        - scale_factor: Parameter object that multiplies expectation. Data treats fraction as binomial
+        - scale_factor: Parameter or Operator object that multiplies expectation. Data treats fraction as binomial
         - ratio_populations: List of 2 populations, the ratio of those populations is applied as
         a scale factor
     """
@@ -50,15 +51,15 @@ class Subtractor(Connector):
                             ') from_population cannot have report_noise set to True')
 
         if scale_factor is not None:
-            if not isinstance(scale_factor, Parameter):
-                raise TypeError('Subtractor('+self.name+
-                            ') scale_factor must be a Parameter object')
+            if not isinstance(scale_factor, Parameter) and not isinstance(scale_factor, Operator):
+                raise TypeError('Subtractor(' + self.name +
+                                ') scale_factor must be a Parameter or Operator object')
         self.scale_factor = scale_factor
 
         if ratio_populations is not None:
             if not isinstance(ratio_populations, list) or len(ratio_populations) != 2:
-                raise TypeError('Subtractor('+self.name+
-                            ') ratio_populations must be a list of two Population objects')
+                raise TypeError('Subtractor(' + self.name +
+                                ') ratio_populations must be a list of two Population objects')
             for i in range(2):
                 if not isinstance(ratio_populations[i], Population):
                     raise TypeError('Subtractor(' + self.name +
@@ -67,7 +68,11 @@ class Subtractor(Connector):
 
         # dictionary of parameters
         if self.scale_factor is not None:
-            self.parameters['scale_factor'] = self.scale_factor
+            if isinstance(self.scale_factor, Parameter):
+                self.parameters['scale_factor'] = self.scale_factor
+            else:
+                for j, par in enumerate(self.scale_factor.parameters):
+                    self.parameters['scale_factor_'+str(j)] = par
 
         # Identify the from_population as one not to derive daily numbers
         self.from_population.monotonic = False
