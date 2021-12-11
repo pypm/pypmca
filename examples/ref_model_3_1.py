@@ -185,6 +185,8 @@ initial_contagious_par = Parameter('cont_0', 10., 0., 5000.,
 
 cycles = {'os': 'original susceptible', 'bt': 'breakthrough', 've': 'vaccine escape', 'ne': 'natural escape'}
 variants = {'o': 'original', 'v': 'variant', 'w': 'wariant', 'x': 'xariant'}
+# color rotation
+irc = {'os':1, 'bt':2, 've':3, 'ne':4}
 
 variants_in_cycle = {'os':['o','v','w','x'],
                      'bt':['o','v','w','x'],
@@ -197,9 +199,9 @@ collector_populations = {}
 color = 'cornflowerblue'
 
 susceptible_pops = {}
-for i, cycle in enumerate(cycles):
+for cycle in cycles:
     susceptible_pops[cycle] = Population(cycle + '_susceptible', 0, 'Susceptible:' + cycles[cycle],
-                                         color=rotated_color(i + 1, color))
+                                         color=rotated_color(irc[cycle], color))
 
 susceptible_pops['os'].set_initial_value(initial_pop_par)
 
@@ -213,11 +215,11 @@ colors = ['orange', 'darkgoldenrod', 'sienna', 'sandybrown']
 infected_pops = {}
 for variant, color in zip(variants, colors):
     infected_pops_variant = {}
-    for i, cycle in enumerate(cycles):
+    for cycle in cycles:
         if variant in variants_in_cycle[cycle]:
             infected_pops_variant[cycle] = Population(cycle+'_infected_'+variant, 0,
                                               cycles[cycle]+' infected by type: ' + variants[variant],
-                                              color=rotated_color(i + 1, color))
+                                              color=rotated_color(irc[cycle], color))
     infected_pops[variant] = infected_pops_variant
 
     infected_pop = Population('infected_'+variant, 0, 'infected by type: ' + variants[variant],
@@ -229,14 +231,14 @@ colors = ['red', 'rosybrown', 'maroon', 'lightcoral']
 original_contagious_pop = None
 
 contagious_pops = {}
-contagious = {}
+contagious_by_variant = {}
 for variant, color in zip(variants, colors):
     contagious_pops_variant = {}
-    for i, cycle in enumerate(cycles):
+    for cycle in cycles:
         if variant in variants_in_cycle[cycle]:
             contagious_pops_variant[cycle] = Population(cycle+'_contagious_'+variant, 0,
                                               cycles[cycle]+' contagious with type: ' + variants[variant],
-                                              color=rotated_color(i + 1, color))
+                                              color=rotated_color(irc[cycle], color))
     contagious_pops[variant] = contagious_pops_variant
 
     if variant == 'original':
@@ -246,7 +248,7 @@ for variant, color in zip(variants, colors):
     contagious_pop = Population('contagious_'+variant, initial_contagious_par,
                                 'contagious with type: ' + variants[variant], hidden=True, color=color)
     collector_populations[contagious_pop] = contagious_pops_variant
-    contagious[variant] = contagious_pop
+    contagious_by_variant[variant] = contagious_pop
 
 # oooooooooooooooooooooooooooo
 # Define the infection cycles
@@ -281,7 +283,7 @@ for variant in variants:
         if variant in variants_in_cycle[cycle]:
             bc_model.add_connector(
                 Multiplier(cycle+'_infection cycle_'+variant,
-                           [susceptible_pops[cycle], contagious_pops[variant][cycle], total_pop],
+                           [susceptible_pops[cycle], contagious_by_variant[variant], total_pop],
                            infected_pops[variant][cycle], trans_rate, fast_delay, bc_model,
                            distribution='nbinom', nbinom_par=neg_binom_par))
 
@@ -298,10 +300,10 @@ nat_immunity_fraction = Parameter('nat_immunity_frac', 1., 0., 1.,
 
 color = 'gold'
 nat_immunized_pops = {}
-for i, cycle in enumerate(cycles):
+for cycle in cycles:
     nat_immunized_pops[cycle] = Population(cycle+'_nat_immunized', 0,
                                    'people who gained immunity through '+cycles[cycle]+' infection',
-                                   hidden=True, color=rotated_color(i + 1, color))
+                                   hidden=True, color=rotated_color(irc[cycle], color))
 
     for variant in variants:
         if variant in variants_in_cycle[cycle]:
@@ -309,6 +311,11 @@ for i, cycle in enumerate(cycles):
             bc_model.add_connector(
                 Adder(cycle+' natural immunity '+variant, infected_pops[variant][cycle],
                       nat_immunized_pops[cycle], scale_factor=nat_immunity_fraction))
+
+nat_immunized_pop = Population('nat_immunized', 0,
+                                   'people who gained immunity through infection',
+                                   hidden=True, color=color)
+collector_populations[nat_immunized_pop] = nat_immunized_pops
 
 # a fraction of all strain infections will be susceptible to natural escape (except xariant)
 # ------------------------------------------------------------------------------------------
@@ -346,10 +353,10 @@ nat_waned_fraction = Parameter('nat_waned_frac', 1., 0., 1.,
 
 color = 'mediumvioletred'
 
-for i,cycle in enumerate(['os','bt']):
+for cycle in ['os','bt']:
     waned_nat_immunity_pop = Population(cycle+' waned nat immunity', 0,
                                         'people who lost nat immunity some time after gaining nat immunity: '+
-                                        cycles[cycle],hidden=True, color=rotated_color(i + 1, color))
+                                        cycles[cycle],hidden=True, color=rotated_color(irc[cycle], color))
 
     bc_model.add_connector(
         Propagator(cycle+' nat waned immunity', nat_immunized_pops[cycle], waned_nat_immunity_pop,
@@ -532,10 +539,11 @@ bc_model.add_connector(
                scale_factor=vac_escape_fraction))
 
 
-
 # The contagious either recover or die
 # This split is only used to track the deaths.
-# The removal of recoveries/positive tests etc done in a separate path
+# The removal of recoveries/positive tests etc done in a separate path.
+# Interest in health outcomes for naive and immunized treated separately
+# Track deaths (and hosp) likewise.
 # oooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooo
 
 # add death reporting noise that is reported out weekly
@@ -550,15 +558,9 @@ death_report_days = Parameter('death_report_days', 127, 0, 127, 'days of week wi
 recovered_pop = Population('recovered', 0,
                            'People who have recovered from the illness ', color='limegreen')
 
-deaths_pop = Population('deaths', 0,
-                        'people who have died from the illness', hidden=False,
-                        color='indigo', show_sim=True,
-                        report_noise=True, report_noise_par=death_noise_par,
-                        report_backlog_par=death_backlog_par, report_days=death_report_days,
-                        report_noise_weekly=True)
-
 recover_fraction = Parameter('recover_frac', 0.99, 0., 1.,
-                             'fraction of infected people who recover', hidden=False)
+                             'fraction of (o,v,w) infected who recover', hidden=False)
+
 recover_delay_pars = {
     'mean': Parameter('recover_delay_mean', 14., 0., 50., 'mean time from infection to recovery'),
     'sigma': Parameter('recover_delay_sigma', 5., 0.01, 20.,
@@ -574,72 +576,104 @@ death_delay_pars = {
 }
 death_delay = Delay('death_delay', 'gamma', death_delay_pars, bc_model)
 
-bc_model.add_connector(
-    Splitter('recovery', contagious_pop, [recovered_pop, deaths_pop],
-             [recover_fraction], [recover_delay, death_delay]))
 
-bc_model.add_connector(
-    Splitter('recovery_v', contagious_pop_v, [recovered_pop, deaths_pop],
-             [recover_fraction], [recover_delay, death_delay]))
+colors=['mediumpurple', 'darkslateblue', 'mediumslateblue', 'darkviolet']
+deaths_pops = {}
+for variant, color in zip(variants,colors):
+    if variant == 'x':
+        deaths_pops_x = {}
+        for cycle in cycles:
+            deaths_pops_x[cycle] = Population(cycle+' deaths '+variant, 0,
+                                    cycles[cycle]+' who have died from '+variant, hidden=True,
+                                    color=rotated_color(irc[cycle],color), show_sim=True,
+                                    report_noise=True, report_noise_par=death_noise_par,
+                                    report_backlog_par=death_backlog_par, report_days=death_report_days,
+                                    report_noise_weekly=True)
+            # include these in the overall deaths collector
+            deaths_pops[variant+cycle] = deaths_pops_x[cycle]
 
-bc_model.add_connector(
-    Splitter('recovery_w', contagious_pop_w, [recovered_pop, deaths_pop],
-             [recover_fraction], [recover_delay, death_delay]))
+            recover_fraction_x = Parameter(cycle+'_recover_frac_'+variant, 0.99, 0., 1.,
+                                           cycles[cycle]+' fraction of x infected who recover', hidden=True)
 
-bc_model.add_connector(
-    Splitter('recovery_x', contagious_pop_x, [recovered_pop, deaths_pop],
-             [recover_fraction], [recover_delay, death_delay]))
+            bc_model.add_connector(
+                Splitter(cycle+' recovery '+variant, contagious_pops[variant][cycle],
+                         [recovered_pop, deaths_pops_x[cycle]],
+                         [recover_fraction_x], [recover_delay, death_delay]))
 
-# Recovery and death following breakthrough infections
+        deaths_pop_x = Population('deaths ' + variant, 0,
+                                  'all those who have died from ' + variant, hidden=True,
+                                  color=color, show_sim=True,
+                                  report_noise=True, report_noise_par=death_noise_par,
+                                  report_backlog_par=death_backlog_par, report_days=death_report_days,
+                                  report_noise_weekly=True
+                                  )
+        collector_populations[deaths_pop_x] = deaths_pops_x
+    else:
+        deaths_pops[variant] = Population('deaths ' + variant, 0,
+                                          'all those who have died from ' + variant, hidden=True,
+                                          color=rotated_color(irc[cycle], color), show_sim=True,
+                                          report_noise=True, report_noise_par=death_noise_par,
+                                          report_backlog_par=death_backlog_par, report_days=death_report_days,
+                                          report_noise_weekly=True)
 
-bt_recovered_pop = Population('bt_recovered', 0, 'People who have recovered from a breakthrough illness ',
-                              color=rotated_color(1, 'limegreen'))
+        bc_model.add_connector(
+            Splitter('recovery_'+variant, contagious_by_variant[variant], [recovered_pop, deaths_pops[variant]],
+                     [recover_fraction], [recover_delay, death_delay]))
 
-bt_deaths_pop = Population('bt_deaths', 0,
-                           'people who have died from a breakthrough illness', hidden=True,
-                           color=rotated_color(1, 'indigo'), show_sim=True,
-                           report_noise=True, report_noise_par=death_noise_par,
-                           report_backlog_par=death_backlog_par, report_days=death_report_days,
-                           report_noise_weekly=True)
+deaths_pop = Population('deaths', 0,
+                                  'all those who have died', hidden=False,
+                                  color='indigo', show_sim=True,
+                                  report_noise=True, report_noise_par=death_noise_par,
+                                  report_backlog_par=death_backlog_par, report_days=death_report_days,
+                                  report_noise_weekly=True)
 
-bc_model.add_connector(
-    Splitter('bt recovery', bt_contagious_pop, [bt_recovered_pop, bt_deaths_pop],
-             [recover_fraction], [recover_delay, death_delay]))
+collector_populations[deaths_pop] = deaths_pops
 
-bc_model.add_connector(
-    Splitter('bt recovery_v', bt_contagious_pop_v, [bt_recovered_pop, bt_deaths_pop],
-             [recover_fraction], [recover_delay, death_delay]))
+###############################
+# removal from contagious pools
+###############################
 
-bc_model.add_connector(
-    Splitter('bt recovery_w', bt_contagious_pop_w, [bt_recovered_pop, bt_deaths_pop],
-             [recover_fraction], [recover_delay, death_delay]))
+# The removal of people from the contagious population is treated separately from
+# reporting, to allow the reported number to be independent of delay in removal
 
-bc_model.add_connector(
-    Splitter('bt recovery_x', bt_contagious_pop_x, [bt_recovered_pop, bt_deaths_pop],
-             [recover_fraction], [recover_delay, death_delay]))
-
-# The newly contagious are split into three groups:
-# contact-traced, symptomatic and non-symptomatic.
-
-contact_traced_pop = Population('contact traced', 0,
-                                'People identified through contact tracing', color='coral')
-contact_traced_fraction = Parameter('contact_traced_frac', 0., 0., 1.,
-                                    'fraction of contagious people who are identified first ' +
-                                    'through contact tracing', hidden=False)
-contact_traced_delay_pars = {
-    'mean': Parameter('contact_traced_delay_mean', 2., 0., 50.,
-                      'mean time from becoming contagious to being contact traced', hidden=False),
-    'sigma': Parameter('contact_traced_delay_sigma', 1., 0.01, 20.,
-                       'std dev of times from becoming contagious to being contact traced')
+removed_frac = Parameter('removed_frac', 1., 0., 1.,
+                         'fraction of contagious people eventually removed == 1')
+removed_delay_pars = {
+    'mean': Parameter('removed_delay_mean', 7., 0., 20.,
+                      'mean time from becoming contagious to being removed from contagious', hidden=False),
+    'sigma': Parameter('removed_delay_sigma', 3., 0.1, 20.,
+                       'std dev of times from becoming contagious to being removed from contagious',
+                       hidden=False)
 }
-contact_traced_delay = Delay('contact_traced_delay', 'gamma', contact_traced_delay_pars,
-                             bc_model)
+removed_delay = Delay('removed_delay', 'norm', removed_delay_pars, bc_model)
 
-symptomatic_pop = Population('symptomatic', 0,
-                             'People who have shown symptoms', color='chocolate')
-symptomatic_fraction = Parameter('symptomatic_frac', 0.9, 0., 1.,
-                                 'fraction of contagious people who become ' +
-                                 'symptomatic', hidden=False)
+removed_pops = {}
+color = ['blue','darkslateblue','dodgerblue','lightskyblue']
+for variant, color in zip(variants,colors):
+    removed_pop_variant = Population('removed_'+variant, 0,
+                                     'People removed from the contagious population', color=color)
+    for cycle in cycles:
+        if variant in variants_in_cycle[cycle]:
+            bc_model.add_connector(
+                Propagator(cycle+' contagious to removed: '+variant, contagious_pops[variant][cycle],
+                           removed_pop_variant, removed_frac, removed_delay))
+
+    # Note that there is no removal from os, bt, ve and ne contagious... those populations are not part of the
+    # infection cycle. As a result, the bt (ve and ne) contagious will be cumulative, not current.
+    bc_model.add_connector(
+        Subtractor('removal from contagious '+variant, contagious_by_variant[variant], removed_pop_variant))
+
+
+######################################
+# Symptoms, testing, hospitalizations
+######################################
+
+# The newly contagious are split into two groups:
+# symptomatic and non-symptomatic.
+
+asymptomatic_recovered_pop = Population('asymptomatic recovered', 0,
+                                        'People who have not shown symptoms', color='silver')
+
 symptomatic_delay_pars = {
     'mean': Parameter('symptomatic_delay_mean', 2., 0., 50.,
                       'mean time from becoming contagious to having symptoms'),
@@ -648,9 +682,6 @@ symptomatic_delay_pars = {
 }
 symptomatic_delay = Delay('symptomatic_delay', 'gamma', symptomatic_delay_pars,
                           bc_model)
-
-asymptomatic_recovered_pop = Population('asymptomatic recovered', 0,
-                                        'People who have not shown symptoms', color='silver')
 
 asymptomatic_delay_pars = {
     'mean': Parameter('asymp_rec_delay_mean', 12., 0., 50.,
@@ -661,108 +692,44 @@ asymptomatic_delay_pars = {
 asymptomatic_delay = Delay('asymp_rec_delay', 'gamma', asymptomatic_delay_pars,
                            bc_model)
 
-bc_model.add_connector(
-    Splitter('symptoms', contagious_pop, [contact_traced_pop, symptomatic_pop, asymptomatic_recovered_pop],
-             [contact_traced_fraction, symptomatic_fraction],
-             [contact_traced_delay, symptomatic_delay, asymptomatic_delay]))
+symptomatic_fraction = Parameter('symptomatic_frac', 0.9, 0., 1.,
+                                 'fraction of (o,v,w) contagious people who become ' +
+                                 'symptomatic', hidden=False)
 
-bc_model.add_connector(
-    Splitter('symptoms_v', contagious_pop_v, [contact_traced_pop, symptomatic_pop, asymptomatic_recovered_pop],
-             [contact_traced_fraction, symptomatic_fraction],
-             [contact_traced_delay, symptomatic_delay, asymptomatic_delay]))
+colors = ['chocolate','peru','burlywood','blanchedalmond']
 
-bc_model.add_connector(
-    Splitter('symptoms_w', contagious_pop_w, [contact_traced_pop, symptomatic_pop, asymptomatic_recovered_pop],
-             [contact_traced_fraction, symptomatic_fraction],
-             [contact_traced_delay, symptomatic_delay, asymptomatic_delay]))
+symptomatic_pops = {}
+for variant, color in zip(variants,colors):
+    symptomatic_pops_variant = {}
+    for cycle in cycles:
+        if variant in variants_in_cycle[cycle]:
+            symptomatic_pops_variant[cycle] = Population(cycle+' symptomatic '+variant, 0,cycles[cycle]+' '+
+                                         variants[variant]+' with symptoms', color=rotated_color(irc[cycle],color))
+            if variant == 'x':
+                symptomatic_fraction_x = Parameter(cycle+'_symptomatic_frac_'+variant, 0.9, 0., 1.,'fraction of '+
+                                                   cycles[cycle]+' contagious people with '+variants[variant]+
+                                                   'who become symptomatic', hidden=False)
+                bc_model.add_connector(
+                    Splitter(cycle+'symptoms_'+variant, contagious_pops[variant][cycle],
+                             [symptomatic_pops[cycle], asymptomatic_recovered_pop],
+                             [symptomatic_fraction_x],
+                             [symptomatic_delay, asymptomatic_delay]))
+            else:
+                bc_model.add_connector(
+                    Splitter(cycle + 'symptoms_' + variant, contagious_pops[variant][cycle],
+                             [symptomatic_pops[cycle], asymptomatic_recovered_pop],
+                             [symptomatic_fraction],
+                             [symptomatic_delay, asymptomatic_delay]))
 
-bc_model.add_connector(
-    Splitter('symptoms_x', contagious_pop_x, [contact_traced_pop, symptomatic_pop, asymptomatic_recovered_pop],
-             [contact_traced_fraction, symptomatic_fraction],
-             [contact_traced_delay, symptomatic_delay, asymptomatic_delay]))
+    symptomatic_pops[variant]=symptomatic_pops_variant
 
-# The newly bt contagious are split into two groups: symptomatic and non-symptomatic.
-# No contact tracing compartments for bt (until needed)
 
-bt_symptomatic_pop = Population('bt_symptomatic', 0,
-                                'People with breakthrough infections who have shown symptoms',
-                                color=rotated_color(1, 'chocolate'))
+###########
+# reporting
+###########
 
-bt_symptomatic_fraction = Parameter('bt_symptomatic_frac', 0.5, 0., 1.,
-                                    'fraction of breakthrough contagious people who become ' +
-                                    'symptomatic', hidden=False)
-
-bt_asymptomatic_recovered_pop = Population('bt_asymptomatic recovered', 0,
-                                           'People with breakthrough infections who have not shown symptoms',
-                                           color=rotated_color(1, 'silver'))
-
-bc_model.add_connector(
-    Splitter('bt symptoms', bt_contagious_pop,
-             [bt_symptomatic_pop, bt_asymptomatic_recovered_pop],
-             [bt_symptomatic_fraction],
-             [symptomatic_delay, asymptomatic_delay]))
-
-bc_model.add_connector(
-    Splitter('bt symptoms_v', bt_contagious_pop_v,
-             [bt_symptomatic_pop, bt_asymptomatic_recovered_pop],
-             [bt_symptomatic_fraction],
-             [symptomatic_delay, asymptomatic_delay]))
-
-bc_model.add_connector(
-    Splitter('bt symptoms_w', bt_contagious_pop_w,
-             [bt_symptomatic_pop, bt_asymptomatic_recovered_pop],
-             [bt_symptomatic_fraction],
-             [symptomatic_delay, asymptomatic_delay]))
-
-bc_model.add_connector(
-    Splitter('bt symptoms_x', bt_contagious_pop_x,
-             [bt_symptomatic_pop, bt_asymptomatic_recovered_pop],
-             [bt_symptomatic_fraction],
-             [symptomatic_delay, asymptomatic_delay]))
-
-# The newly ve contagious are split into two groups: symptomatic and non-symptomatic.
-# No contact tracing compartments for ve (until needed)
-
-ve_symptomatic_pop = Population('ve_symptomatic', 0,
-                                'People with vaccine escape infections who have shown symptoms',
-                                color=rotated_color(2, 'chocolate'))
-
-ve_symptomatic_fraction = Parameter('ve_symptomatic_frac', 0.5, 0., 1.,
-                                    'fraction of vaccine escape contagious people who become ' +
-                                    'symptomatic', hidden=False)
-
-ve_asymptomatic_recovered_pop = Population('ve_asymptomatic_recovered', 0,
-                                           'People with vaccine escape infections who have not shown symptoms',
-                                           color=rotated_color(2, 'silver'))
-
-bc_model.add_connector(
-    Splitter('ve symptoms_x', ve_contagious_pop_x,
-             [ve_symptomatic_pop, ve_asymptomatic_recovered_pop],
-             [ve_symptomatic_fraction],
-             [symptomatic_delay, asymptomatic_delay]))
-
-# The newly ne contagious are split into two groups: symptomatic and non-symptomatic.
-# No contact tracing compartments for ne (until needed)
-
-ne_symptomatic_pop = Population('ne_symptomatic', 0,
-                                'People with natural escape infections who have shown symptoms',
-                                color=rotated_color(3, 'chocolate'))
-
-ne_symptomatic_fraction = Parameter('ne_symptomatic_frac', 0.5, 0., 1.,
-                                    'fraction of natural escape contagious people who become ' +
-                                    'symptomatic', hidden=False)
-
-ne_asymptomatic_recovered_pop = Population('ne_asymptomatic_recovered', 0,
-                                           'People with natural escape infections who have not shown symptoms',
-                                           color=rotated_color(3, 'silver'))
-
-bc_model.add_connector(
-    Splitter('ne symptoms_x', ne_contagious_pop_x,
-             [ne_symptomatic_pop, ne_asymptomatic_recovered_pop],
-             [ne_symptomatic_fraction],
-             [symptomatic_delay, asymptomatic_delay]))
-
-# reporting parameters
+# propagate a fraction of symptomatics to population with positive test results
+# the reported population includes the reporting anomalies
 
 report_noise_par = Parameter('report_noise', 1., 0., 1., 'Report noise parameter')
 
@@ -770,180 +737,6 @@ report_backlog_par = Parameter('report_backlog', 1., 0., 1., 'Report backlog par
 
 report_days = Parameter('report_days', 127, 0, 127, 'days of week with reporting (bit encoded)',
                         parameter_type='int')
-
-# additional reporting line from contagious_v to reported_v
-# This allows breakdown of different strains... since it is direct (not going through symptoms, need to
-# match the fraction and delay parameters with the combination of those for overall reporting
-
-reported_pop_v = Population('reported_v', 0,
-                            'variant cases reported',
-                            hidden=True, color='olive', show_sim=True,
-                            report_noise=True, report_noise_par=report_noise_par,
-                            report_backlog_par=report_backlog_par, report_days=report_days)
-
-reported_fraction_v = Parameter('reported_frac_v', 0.8, 0., 1.,
-                                'fraction of variant contagious who will ' + \
-                                'receive a variant case report')
-reported_delay_pars_v = {
-    'mean': Parameter('reported_delay_mean_v', 5., 0., 50.,
-                      'mean time from becoming contagious to getting variant case report', hidden=True),
-    'sigma': Parameter('reported_delay_sigma_v', 2., 0.01, 20.,
-                       'standard deviation of times from contagious to getting variant case report')
-}
-reported_delay_v = Delay('reported_delay_v', 'gamma', reported_delay_pars_v, bc_model)
-
-bc_model.add_connector(
-    Propagator('testing_v', contagious_pop_v, reported_pop_v, reported_fraction_v, reported_delay_v))
-
-# additional reporting line from contagious_w to reported_w
-
-reported_pop_w = Population('reported_w', 0,
-                            'wariant cases reported',
-                            hidden=True, color='tomato', show_sim=True,
-                            report_noise=True, report_noise_par=report_noise_par,
-                            report_backlog_par=report_backlog_par, report_days=report_days)
-
-reported_fraction_w = Parameter('reported_frac_w', 0.8, 0., 1.,
-                                'fraction of wariant contagious who will ' + \
-                                'receive a wariant case report')
-reported_delay_pars_w = {
-    'mean': Parameter('reported_delay_mean_w', 5., 0., 50.,
-                      'mean time from becoming contagious to getting wariant case report', hidden=True),
-    'sigma': Parameter('reported_delay_sigma_w', 2., 0.01, 20.,
-                       'standard deviation of times from contagious to getting wariant case report')
-}
-reported_delay_w = Delay('reported_delay_w', 'gamma', reported_delay_pars_w, bc_model)
-
-bc_model.add_connector(
-    Propagator('testing_w', contagious_pop_w, reported_pop_w, reported_fraction_w, reported_delay_w))
-
-# additional reporting line from contagious_x to reported_x
-
-reported_pop_x = Population('reported_x', 0,
-                            'xariant cases reported',
-                            hidden=True, color='slateblue', show_sim=True,
-                            report_noise=True, report_noise_par=report_noise_par,
-                            report_backlog_par=report_backlog_par, report_days=report_days)
-
-reported_fraction_x = Parameter('reported_frac_x', 0.8, 0., 1.,
-                                'fraction of xariant contagious who will ' + \
-                                'receive a xariant case report')
-reported_delay_pars_x = {
-    'mean': Parameter('reported_delay_mean_x', 5., 0., 50.,
-                      'mean time from becoming contagious to getting xariant case report', hidden=True),
-    'sigma': Parameter('reported_delay_sigma_x', 2., 0.01, 20.,
-                       'standard deviation of times from contagious to getting xariant case report')
-}
-reported_delay_x = Delay('reported_delay_x', 'gamma', reported_delay_pars_x, bc_model)
-
-bc_model.add_connector(
-    Propagator('testing_x', contagious_pop_x, reported_pop_x, reported_fraction_x, reported_delay_x))
-
-# The removal of people from the contagious population is treated separately from
-# reporting, to allow the reported number to be independent of delay in removal
-
-removed_pop = Population('removed', 0,
-                         'People removed from the contagious population', color='blue')
-removed_pop_v = Population('removed_v', 0,
-                           'People removed from the variant contagious population', color='darkslateblue')
-removed_pop_w = Population('removed_w', 0,
-                           'People removed from the wariant contagious population', color='dodgerblue')
-removed_pop_x = Population('removed_x', 0,
-                           'People removed from the xariant contagious population', color='lightskyblue')
-
-removed_frac = Parameter('removed_frac', 1., 0., 1.,
-                         'fraction of contagious people eventually removed == 1')
-removed_delay_pars = {
-    'mean': Parameter('removed_delay_mean', 7., 0., 20.,
-                      'mean time from becoming contagious to being removed from contagious', hidden=False),
-    'sigma': Parameter('removed_delay_sigma', 3., 0.1, 20.,
-                       'std dev of times from becoming contagious to being removed from contagious', hidden=False)
-}
-removed_delay = Delay('removed_delay', 'norm', removed_delay_pars, bc_model)
-
-bc_model.add_connector(
-    Propagator('contagious to removed', contagious_pop,
-               removed_pop, removed_frac, removed_delay))
-
-bc_model.add_connector(
-    Subtractor('removal from contagious', contagious_pop, removed_pop))
-
-# same for variant
-
-removed_delay_pars_v = {
-    'mean': Parameter('removed_delay_mean_v', 7., 0., 20.,
-                      'variant mean time from becoming contagious to being removed from contagious', hidden=True),
-    'sigma': Parameter('removed_delay_sigma_v', 3., 0.1, 20.,
-                       'variant std dev of times from becoming contagious to being removed from contagious',
-                       hidden=True)
-}
-
-removed_delay_v = Delay('removed_delay_v', 'gamma', removed_delay_pars_v, bc_model)
-
-bc_model.add_connector(
-    Propagator('contagious_v to removed_v', contagious_pop_v,
-               removed_pop_v, removed_frac, removed_delay_v))
-
-bc_model.add_connector(
-    Subtractor('removal from contagious_v', contagious_pop_v, removed_pop_v))
-
-# now for wariant
-
-removed_delay_pars_w = {
-    'mean': Parameter('removed_delay_mean_w', 7., 0., 20.,
-                      'variant mean time from becoming contagious to being removed from contagious', hidden=True),
-    'sigma': Parameter('removed_delay_sigma_w', 3., 0.1, 20.,
-                       'variant std dev of times from becoming contagious to being removed from contagious',
-                       hidden=True)
-}
-
-removed_delay_w = Delay('removed_delay_w', 'gamma', removed_delay_pars_w, bc_model)
-
-bc_model.add_connector(
-    Propagator('contagious_w to removed_w', contagious_pop_w,
-               removed_pop_w, removed_frac, removed_delay_w))
-
-bc_model.add_connector(
-    Subtractor('removal from contagious_w', contagious_pop_w, removed_pop_w))
-
-# now for xariant
-
-removed_delay_pars_x = {
-    'mean': Parameter('removed_delay_mean_x', 7., 0., 20.,
-                      'variant mean time from becoming contagious to being removed from contagious', hidden=True),
-    'sigma': Parameter('removed_delay_sigma_x', 3., 0.1, 20.,
-                       'variant std dev of times from becoming contagious to being removed from contagious',
-                       hidden=True)
-}
-
-removed_delay_x = Delay('removed_delay_x', 'gamma', removed_delay_pars_x, bc_model)
-
-bc_model.add_connector(
-    Propagator('contagious_x to removed_x', contagious_pop_x,
-               removed_pop_x, removed_frac, removed_delay_x))
-
-bc_model.add_connector(
-    Subtractor('removal from contagious_x', contagious_pop_x, removed_pop_x))
-
-# Note that there is no removal from bt (ve and ne) contagious... those populations are not part of the
-# infection cycle. All incoming to bt (ve and ne) contagious are passed to contagious.
-# As a result, the bt (ve and ne) contagious will be cumulative, not current.
-
-# The symptomatic are sampled by two independent paths:  testing and hospitalization
-
-# TESTING - REPORTING
-# propagate a fraction of symptomatics to population with positive test results
-# the reported population includes the reporting anomalies
-
-positive_pop = Population('positives', 0,
-                          'People who received a positive test report',
-                          color='cyan')
-
-reported_pop = Population('reported', 0,
-                          'Positives and reporting anomalies',
-                          hidden=False, color='forestgreen', show_sim=True,
-                          report_noise=True, report_noise_par=report_noise_par,
-                          report_backlog_par=report_backlog_par, report_days=report_days)
 
 reported_fraction = Parameter('reported_frac', 0.8, 0., 1.,
                               'fraction of symptomatic people who will ' + \
@@ -956,17 +749,52 @@ reported_delay_pars = {
 }
 reported_delay = Delay('reported_delay', 'gamma', reported_delay_pars, bc_model)
 
-bc_model.add_connector(
-    Propagator('testing', symptomatic_pop, positive_pop, reported_fraction, reported_delay))
+colors = ['springgreen','olive','tomato','slateblue']
+reported_pops = {}
+for variant, color in zip(variants,colors):
+    reported_pops_variant = {}
+    for cycle in cycles:
+        if variant in variants_in_cycle[cycle]:
+            reported_pops_variant[cycle] = Population(cycle+'_reported_'+variant, 0,
+                                         cycles[cycle]+' cases_'+variant,
+                                         hidden=True, color=rotated_color(irc[cycle],color), show_sim=True,
+                                         report_noise=True, report_noise_par=report_noise_par,
+                                         report_backlog_par=report_backlog_par, report_days=report_days)
+            bc_model.add_connector(
+                Propagator(cycle+'_testing_'+variant, symptomatic_pops[variant][cycle], reported_pops_variant[cycle],
+                           reported_fraction, reported_delay))
+    reported_pops[variant] = reported_pops_variant
 
-# include those being contact_traced as getting a positive report
-bc_model.add_connector(
-    Adder('report contact_traced', contact_traced_pop, positive_pop))
+    reported_pop_variant = Population('reported_'+variant, 0,
+                                         cycles[cycle]+' cases',
+                                         hidden=True, color=color, show_sim=True,
+                                         report_noise=True, report_noise_par=report_noise_par,
+                                         report_backlog_par=report_backlog_par, report_days=report_days)
+    collector_populations[reported_pop_variant] = reported_pops_variant
 
-# two sources for reported_pop: normal positives and reporting anomalies
+color = 'forestgreen'
+reported_pops_cycle = {}
+all_reported_pops = {}
+for cycle in cycles:
+    for variant in variants:
+        if variant in variants_in_cycle[cycle]:
+            reported_pops_cycle[variant] = reported_pops[variant][cycle]
+            all_reported_pops[cycle+variant]
 
-bc_model.add_connector(
-    Adder('positives reported', positive_pop, reported_pop))
+    reported_pop_cycle = Population(cycle+'_reported', 0,
+                                      cycles[cycle] + ' cases',
+                                      hidden=True, color=rotated_color(irc[cycle],color), show_sim=True,
+                                      report_noise=True, report_noise_par=report_noise_par,
+                                      report_backlog_par=report_backlog_par, report_days=report_days)
+    collector_populations[reported_pop_cycle] = reported_pops_cycle
+
+reported_pop = Population('reported', 0,
+                          'Positives and reporting anomalies',
+                          hidden=False, color='forestgreen', show_sim=True,
+                          report_noise=True, report_noise_par=report_noise_par,
+                          report_backlog_par=report_backlog_par, report_days=report_days)
+
+collector_populations[reported_pop] = all_reported_pops
 
 report_anomalies_pop = Population('report anomalies', 0,
                                   'Represents anomalous batches of reports',
@@ -987,37 +815,11 @@ bc_model.add_connector(
     Propagator('report anomalies to reported', report_anomalies_pop,
                reported_pop, anomaly_fraction, anomaly_delay))
 
-# TESTING - REPORTING for breakthroughs, vaccine escape, natural escape
-# propagate a fraction of symptomatics to reported population
-# no contact tracing or report anomalies -> therefore no "positives" intermediate population
-# use same reporting fraction as for non-bt... if necessary, can reduce by reducing symptomatic fraction
 
-bt_reported_pop = Population('bt_reported', 0,
-                             'Breakthrough cases',
-                             hidden=True, color=rotated_color(1, 'forestgreen'), show_sim=True,
-                             report_noise=True, report_noise_par=report_noise_par,
-                             report_backlog_par=report_backlog_par, report_days=report_days)
 
-bc_model.add_connector(
-    Propagator('bt_testing', bt_symptomatic_pop, bt_reported_pop, reported_fraction, reported_delay))
 
-ve_reported_pop = Population('ve_reported', 0,
-                             'Vaccine escape cases',
-                             hidden=True, color=rotated_color(2, 'forestgreen'), show_sim=True,
-                             report_noise=True, report_noise_par=report_noise_par,
-                             report_backlog_par=report_backlog_par, report_days=report_days)
 
-bc_model.add_connector(
-    Propagator('ve_testing', ve_symptomatic_pop, ve_reported_pop, reported_fraction, reported_delay))
 
-ne_reported_pop = Population('ne_reported', 0,
-                             'Natural escape cases',
-                             hidden=True, color=rotated_color(3, 'forestgreen'), show_sim=True,
-                             report_noise=True, report_noise_par=report_noise_par,
-                             report_backlog_par=report_backlog_par, report_days=report_days)
-
-bc_model.add_connector(
-    Propagator('ne_testing', ne_symptomatic_pop, ne_reported_pop, reported_fraction, reported_delay))
 
 # SYMPTOMS -> HOSPITALIZATION
 #
