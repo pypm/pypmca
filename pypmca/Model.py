@@ -621,7 +621,7 @@ class Model:
         if getattr(from_model, "user_dict", None) is not None:
             self.user_dict = from_model.user_dict
 
-        self.boot_pars['boot_population'] = from_model.boot_pars['boot_population']
+        # self.boot_pars['boot_population'] = from_model.boot_pars['boot_population']
         self.boot_pars['boot_value'] = from_model.boot_pars['boot_value']
         # self.boot_pars['exclusion_populations'] = exc_pop_list
         self.boot_needed = True

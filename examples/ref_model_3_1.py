@@ -12,11 +12,11 @@ Add a contact tracing population, to allow another mechanism to remove people fr
 the contagious population early. Initial value has p=0, so it does not act until it
 is switched on.
 
-Version 2.1:
- - turn on negative binomial for multiplier. Add parameter to control dispersion (set to 0.999: tiny effect, at p = 0.5, variance is double poisson)
- - turn on reporting errors for reported. Add parameter to control level (set to 1: no effect)
- - add capability to include reporting anomalies: new pop = tested positive receives contact and symp, reduces contagious. added to reported
-   new pop = reporting anomalies: propagates to reported. Add new transition: injector to reporting anomalies
+Version 2.1: - turn on negative binomial for multiplier. Add parameter to control dispersion (set to 0.999: tiny
+effect, at p = 0.5, variance is double poisson) - turn on reporting errors for reported. Add parameter to control
+level (set to 1: no effect) - add capability to include reporting anomalies: new pop = tested positive receives
+contact and symp, reduces contagious. added to reported new pop = reporting anomalies: propagates to reported. Add
+new transition: injector to reporting anomalies
 
 Version 2.2:
  - add 3 additional rate transitions
@@ -75,7 +75,7 @@ Version 2.8:
 Version 2.9:
  - more vaccination transitions
  - more variant alpha transitions
- - add third infection cycle for B.1.617.2 variant (use the letter w in place of v for naminng)
+ - add third infection cycle for B.1.617.2 variant (use the letter w in place of v for naming)
  - add second outbreaks for the two variants
  - include waning immunity (separately for vaccination and natural):
    - add natural immunized population
@@ -99,14 +99,16 @@ Version 3.0:
  Version 3.1:
   - To allow for different hospitalization fractions etc, use independent populations
   - Use the new collector connector, to use with collector populations (such as reported, susceptible, etc)
+  - Use the operator to combine parameters for calculating fractions etc
   - This requires pypmca version 0.2.24 or later
   - remove all contact tracing and all references to ventilation (reduce number of populations to track)
+  - by changing the version number to 4, the breakthrough cycle is removed (speed up processing)
 
 @author: karlen
 """
 
 from pypmca import Model, Population, Delay, Parameter, Multiplier, Propagator, \
-    Splitter, Adder, Subtractor, Modifier, Injector, Collector
+    Splitter, Adder, Subtractor, Modifier, Injector, Collector, Operator
 
 # This is not listed in package requirements:
 # Users generally do not need to run this code.
@@ -147,23 +149,31 @@ def rotated_color(i_rot, c):
 
     rot_vec = []
     for irow in range(3):
-        sum = 0.
+        tot = 0.
         for icol in range(3):
-            sum += rgb_vec[icol] * rm[irow][icol]
-        if sum < 0:
-            sum = 0
-        if sum > 255:
-            sum = 255
-        sum = int(sum + 0.5)
+            tot += rgb_vec[icol] * rm[irow][icol]
+        if tot < 0:
+            tot = 0
+        if tot > 255:
+            tot = 255
+        tot = int(tot + 0.5)
 
-        rot_vec.append('%02X' % sum)
+        rot_vec.append('%02X' % tot)
 
     return '#' + ''.join(rot_vec)
 
 
 # Reference model for BC
 
-bc_model = Model('ref_model_3_1')
+version = 3
+subversion = 1
+
+# no_bt turns off the breakthrough
+no_bt = False
+if version == 4:
+    no_bt = True
+
+bc_model = Model('ref_model_' + str(version) + '_' + str(subversion))
 bc_model.set_t0(2020, 3, 1)
 
 fast_delay = Delay('fast', 'fast', model=bc_model)
@@ -184,14 +194,18 @@ initial_contagious_par = Parameter('cont_0', 10., 0., 5000.,
 # ==============================================================
 
 cycles = {'os': 'original susceptible', 'bt': 'breakthrough', 've': 'vaccine escape', 'ne': 'natural escape'}
+if no_bt:
+    # removes the breakthrough cycle
+    cycles = {'os': 'original susceptible', 've': 'vaccine escape', 'ne': 'natural escape'}
+
 variants = {'o': 'original', 'v': 'variant', 'w': 'wariant', 'x': 'xariant'}
 # color rotation
-irc = {'os':1, 'bt':2, 've':3, 'ne':4}
+irc = {'os': 1, 'bt': 2, 've': 3, 'ne': 4}
 
-variants_in_cycle = {'os':['o','v','w','x'],
-                     'bt':['o','v','w','x'],
-                     've':['x'],
-                     'ne':['x']}
+variants_in_cycle = {'os': ['o', 'v', 'w', 'x'],
+                     'bt': ['o', 'v', 'w', 'x'],
+                     've': ['x'],
+                     'ne': ['x']}
 
 collector_populations = {}
 
@@ -217,18 +231,17 @@ for variant, color in zip(variants, colors):
     infected_pops_variant = {}
     for cycle in cycles:
         if variant in variants_in_cycle[cycle]:
-            infected_pops_variant[cycle] = Population(cycle+'_infected_'+variant, 0,
-                                              cycles[cycle]+' infected by type: ' + variants[variant],
-                                              color=rotated_color(irc[cycle], color))
+            infected_pops_variant[cycle] = Population(cycle + '_infected_' + variant, 0,
+                                                      cycles[cycle] + ' infected by type: ' + variants[variant],
+                                                      color=rotated_color(irc[cycle], color))
     infected_pops[variant] = infected_pops_variant
 
-    infected_pop = Population('infected_'+variant, 0, 'infected by type: ' + variants[variant],
-                            hidden=True, color=color)
+    infected_pop = Population('infected_' + variant, 0, 'infected by type: ' + variants[variant],
+                              hidden=True, color=color)
     collector_populations[infected_pop] = infected_pops_variant
 
 # contagious
 colors = ['red', 'rosybrown', 'maroon', 'lightcoral']
-original_contagious_pop = None
 
 contagious_pops = {}
 contagious_by_variant = {}
@@ -236,19 +249,21 @@ for variant, color in zip(variants, colors):
     contagious_pops_variant = {}
     for cycle in cycles:
         if variant in variants_in_cycle[cycle]:
-            contagious_pops_variant[cycle] = Population(cycle+'_contagious_'+variant, 0,
-                                              cycles[cycle]+' contagious with type: ' + variants[variant],
-                                              color=rotated_color(irc[cycle], color))
+            contagious_pops_variant[cycle] = Population(cycle + '_contagious_' + variant, 0,
+                                                        cycles[cycle] + ' contagious with type: ' + variants[variant],
+                                                        color=rotated_color(irc[cycle], color))
     contagious_pops[variant] = contagious_pops_variant
 
-    if variant == 'original':
-        contagious_pops_variant['os'].set_initial_value(initial_contagious_par)
-        original_contagious_pop = contagious_pops_variant['os']
+    # if variant == 'o':
+    #    contagious_pops_variant['os'].set_initial_value(initial_contagious_par)
 
-    contagious_pop = Population('contagious_'+variant, initial_contagious_par,
+    contagious_pop = Population('contagious_' + variant, 0,
                                 'contagious with type: ' + variants[variant], hidden=True, color=color)
     collector_populations[contagious_pop] = contagious_pops_variant
     contagious_by_variant[variant] = contagious_pop
+
+contagious_by_variant['o'].set_initial_value(initial_contagious_par)
+original_contagious_pop = contagious_by_variant['o']
 
 # oooooooooooooooooooooooooooo
 # Define the infection cycles
@@ -273,22 +288,22 @@ trans_rates = {}
 for variant in variants:
     par_name = 'alpha'
     if variant != 'o':
-        par_name = 'alpha_'+variant
+        par_name = 'alpha_' + variant
 
-    trans_rate = Parameter(par_name, 0.4, 0., 2.,'mean number of people that a '+variants[variant]+
+    trans_rate = Parameter(par_name, 0.4, 0., 2., 'mean number of people that a ' + variants[variant] +
                            ' contagious person infects per day', hidden=True)
     trans_rates[variant] = trans_rate
 
     for cycle in cycles:
         if variant in variants_in_cycle[cycle]:
             bc_model.add_connector(
-                Multiplier(cycle+'_infection cycle_'+variant,
+                Multiplier(cycle + '_infection cycle_' + variant,
                            [susceptible_pops[cycle], contagious_by_variant[variant], total_pop],
                            infected_pops[variant][cycle], trans_rate, fast_delay, bc_model,
                            distribution='nbinom', nbinom_par=neg_binom_par))
 
             bc_model.add_connector(
-                Propagator(cycle+' infected to contagious'+variant, infected_pops[variant][cycle],
+                Propagator(cycle + ' infected to contagious' + variant, infected_pops[variant][cycle],
                            contagious_pops[variant][cycle], contagious_frac, contagious_delay))
 
 # --------------------------------------------
@@ -301,20 +316,25 @@ nat_immunity_fraction = Parameter('nat_immunity_frac', 1., 0., 1.,
 color = 'gold'
 nat_immunized_pops = {}
 for cycle in cycles:
-    nat_immunized_pops[cycle] = Population(cycle+'_nat_immunized', 0,
-                                   'people who gained immunity through '+cycles[cycle]+' infection',
-                                   hidden=True, color=rotated_color(irc[cycle], color))
+    nat_immunized_pops[cycle] = Population(cycle + '_nat_immunized', 0,
+                                           'people who gained immunity through ' + cycles[cycle] + ' infection',
+                                           hidden=True, color=rotated_color(irc[cycle], color))
 
     for variant in variants:
         if variant in variants_in_cycle[cycle]:
             # all strains of infection lead to natural immunity (that eventually wanes)
             bc_model.add_connector(
-                Adder(cycle+' natural immunity '+variant, infected_pops[variant][cycle],
+                Adder(cycle + ' natural immunity ' + variant, infected_pops[variant][cycle],
                       nat_immunized_pops[cycle], scale_factor=nat_immunity_fraction))
 
+            # remove the same fraction from the corresponding susceptible population
+            bc_model.add_connector(
+                Subtractor('subtract infected from susceptible: ' + cycle + '_' + variant, susceptible_pops[cycle],
+                           infected_pops[variant][cycle]))
+
 nat_immunized_pop = Population('nat_immunized', 0,
-                                   'people who gained immunity through infection',
-                                   hidden=True, color=color)
+                               'people who gained immunity through infection',
+                               hidden=True, color=color)
 collector_populations[nat_immunized_pop] = nat_immunized_pops
 
 # a fraction of all strain infections will be susceptible to natural escape (except xariant)
@@ -322,12 +342,15 @@ collector_populations[nat_immunized_pop] = nat_immunized_pops
 
 nat_escape_fraction = Parameter('ne_frac', 0.5, 0., 1.,
                                 'fraction of natural immunizations that can escape')
+cycle_list = ['os', 'bt']
+if no_bt:
+    cycle_list = ['os']
 
-for cycle in ['os','bt']:
+for cycle in cycle_list:
     for variant in variants:
         if variant != 'x':
             bc_model.add_connector(
-                Propagator(cycle+' natural escape '+variant, infected_pops[variant][cycle],
+                Propagator(cycle + ' natural escape ' + variant, infected_pops[variant][cycle],
                            susceptible_pops['ne'], nat_escape_fraction, fast_delay))
 
 # waning immunity
@@ -353,19 +376,19 @@ nat_waned_fraction = Parameter('nat_waned_frac', 1., 0., 1.,
 
 color = 'mediumvioletred'
 
-for cycle in ['os','bt']:
-    waned_nat_immunity_pop = Population(cycle+' waned nat immunity', 0,
-                                        'people who lost nat immunity some time after gaining nat immunity: '+
-                                        cycles[cycle],hidden=True, color=rotated_color(irc[cycle], color))
+for cycle in cycle_list:
+    waned_nat_immunity_pop = Population(cycle + ' waned nat immunity', 0,
+                                        'people who lost nat immunity some time after gaining nat immunity: ' +
+                                        cycles[cycle], hidden=True, color=rotated_color(irc[cycle], color))
 
     bc_model.add_connector(
-        Propagator(cycle+' nat waned immunity', nat_immunized_pops[cycle], waned_nat_immunity_pop,
+        Propagator(cycle + ' nat waned immunity', nat_immunized_pops[cycle], waned_nat_immunity_pop,
                    nat_waned_fraction, nat_waned_delay))
 
     # Once waned, the susceptible population increases
 
     bc_model.add_connector(
-        Adder(cycle+' waned nat to susceptible', waned_nat_immunity_pop, susceptible_pops[cycle]))
+        Adder(cycle + ' waned nat to susceptible', waned_nat_immunity_pop, susceptible_pops[cycle]))
 
 # Include vaccination
 # -------------------
@@ -399,18 +422,20 @@ bc_model.add_connector(
 
 # All the susceptibles who were vaccinated become breakthrough candidates
 
-bt_candidate_pop = Population('bt_candidate', 0, 'number of susceptible people who became eligible as a bt candidate')
+if not no_bt:
+    bt_candidate_pop = Population('bt_candidate', 0,
+                                  'number of susceptible people who became eligible as a bt candidate')
 
-bc_model.add_connector(
-    Propagator('breakthrough queue', usefully_vaccinated_pop, bt_candidate_pop, vac_fraction, fast_delay))
+    bc_model.add_connector(
+        Propagator('breakthrough queue', usefully_vaccinated_pop, bt_candidate_pop, vac_fraction, fast_delay))
 
-# This means moving susceptible to bt susceptible
+    # This means moving susceptible to bt susceptible
 
-bc_model.add_connector(
-    Adder('bt_candidate adds to bt susceptible', bt_candidate_pop, susceptible_pops['bt']))
+    bc_model.add_connector(
+        Adder('bt_candidate adds to bt susceptible', bt_candidate_pop, susceptible_pops['bt']))
 
-bc_model.add_connector(
-    Subtractor('bt_candidate removes susceptible', susceptible_pops['os'], bt_candidate_pop))
+    bc_model.add_connector(
+        Subtractor('bt_candidate removes susceptible', susceptible_pops['os'], bt_candidate_pop))
 
 # Now immunize some of those susceptible people who were vaccinated
 
@@ -428,6 +453,14 @@ immunized_delay = Delay('immunized_delay', 'gamma', immunized_delay_pars, bc_mod
 
 bc_model.add_connector(
     Propagator('immunization', usefully_vaccinated_pop, immunized_pop, vaccine_effectiveness, immunized_delay))
+
+# immunizations reduce the breakthrough susceptible (or original susceptible)
+if not no_bt:
+    bc_model.add_connector(
+        Subtractor('subtract immunized from bt susceptible', susceptible_pops['bt'], immunized_pop))
+else:
+    bc_model.add_connector(
+        Subtractor('subtract immunized from os susceptible', susceptible_pops['os'], immunized_pop))
 
 # a fraction of immunizations will be susceptible to vaccine escape
 
@@ -459,8 +492,12 @@ bc_model.add_connector(
 
 # Once waned, the bt susceptible population increases and the ve susceptible population decreases
 
-bc_model.add_connector(
-    Adder('waned to bt susceptible', waned_vac_immunity_pop, susceptible_pops['bt']))
+if not no_bt:
+    bc_model.add_connector(
+        Adder('waned to bt susceptible', waned_vac_immunity_pop, susceptible_pops['bt']))
+else:
+    bc_model.add_connector(
+        Adder('waned to os susceptible', waned_vac_immunity_pop, susceptible_pops['os']))
 
 bc_model.add_connector(
     Subtractor('waned removes ve susceptible', susceptible_pops['ve'], waned_vac_immunity_pop,
@@ -470,74 +507,77 @@ bc_model.add_connector(
 # Include boosters:
 #####################
 # Grow the population of booster candidates (delay following first dose)
+# This requires the breakthrough process to be activated
 
-boostcan_pop = Population('boost cand', 0,
-                          'booster candidates', color=rotated_color(1, 'brown'))
+if not no_bt:
+    boostcan_pop = Population('boost cand', 0,
+                              'booster candidates', color=rotated_color(1, 'brown'))
 
-boosting_delay_pars = {
-    'mean': Parameter('boosting_delay_mean', 200., 120., 300., 'mean time from vaccination to booster eligibility'),
-    'sigma': Parameter('boosting_delay_sigma', 20., 1., 200.,
-                       'standard deviation of times from vaccination to booster eligibility')
-}
-boosting_delay = Delay('boosting_delay', 'gamma', boosting_delay_pars, bc_model)
+    boosting_delay_pars = {
+        'mean': Parameter('boosting_delay_mean', 200., 120., 300., 'mean time from vaccination to booster eligibility'),
+        'sigma': Parameter('boosting_delay_sigma', 20., 1., 200.,
+                           'standard deviation of times from vaccination to booster eligibility')
+    }
+    boosting_delay = Delay('boosting_delay', 'gamma', boosting_delay_pars, bc_model)
 
-boost_fraction = Parameter('boost_frac', 1., 0., 1.,
-                           'fraction of boosters included == 1')
+    boost_fraction = Parameter('boost_frac', 1., 0., 1.,
+                               'fraction of boosters included == 1')
 
-bc_model.add_connector(
-    Propagator('boosting eligibility', vaccinated_pop, boostcan_pop, boost_fraction, boosting_delay))
+    bc_model.add_connector(
+        Propagator('boosting eligibility', vaccinated_pop, boostcan_pop, boost_fraction, boosting_delay))
 
-# A multiplier is used. Once the booster candidate population goes below zero, it stops.
+    # A multiplier is used. Once the booster candidate population goes below zero, it stops.
 
-daily_boosted_pop = Population('daily boosted', 0, 'number of people boosted each day')
+    daily_boosted_pop = Population('daily boosted', 0, 'number of people boosted each day')
 
-boosted_pop = Population('boosted', 0, 'people boosted', color=rotated_color(1, 'skyblue'))
+    boosted_pop = Population('boosted', 0, 'people boosted', color=rotated_color(1, 'skyblue'))
 
-bc_model.add_connector(
-    Multiplier('boosting', [boostcan_pop, daily_boosted_pop, boostcan_pop],
-               boosted_pop, boost_fraction, fast_delay, bc_model))
+    bc_model.add_connector(
+        Multiplier('boosting', [boostcan_pop, daily_boosted_pop, boostcan_pop],
+                   boosted_pop, boost_fraction, fast_delay, bc_model))
 
-# Only a fraction of those were susceptible (designate those as usefully boosted)
+    # Only a fraction of those were susceptible (designate those as usefully boosted)
 
-usefully_boosted_pop = Population('usefully boosted', 0,
-                                  'people who were boosted when susceptible', color=rotated_color(1, 'navy'))
+    usefully_boosted_pop = Population('usefully boosted', 0,
+                                      'people who were boosted when susceptible', color=rotated_color(1, 'navy'))
 
-bc_model.add_connector(
-    Adder('boosting bt susceptibles', boosted_pop, usefully_boosted_pop,
-          ratio_populations=[susceptible_pops['bt'], boostcan_pop]))
+    bc_model.add_connector(
+        Adder('boosting bt susceptibles', boosted_pop, usefully_boosted_pop,
+              ratio_populations=[susceptible_pops['bt'], boostcan_pop]))
 
-# Now re-immunize some of those susceptible people who were boosted
+    # Now re-immunize some of those susceptible people who were boosted
 
-reimmunized_pop = Population('reimmunized', 0, 'number of bt susceptible people who were immunized by booster')
-booster_effectiveness = Parameter('booster_eff', 0.8, 0., 1.,
-                                  'probability that a bt susceptible person gains immunity when boosted')
+    reimmunized_pop = Population('reimmunized', 0, 'number of bt susceptible people who were immunized by booster')
+    booster_effectiveness = Parameter('booster_eff', 0.8, 0., 1.,
+                                      'probability that a bt susceptible person gains immunity when boosted')
 
-bc_model.add_connector(
-    Propagator('reimmunization', usefully_boosted_pop, reimmunized_pop, booster_effectiveness, immunized_delay))
+    bc_model.add_connector(
+        Propagator('reimmunization', usefully_boosted_pop, reimmunized_pop, booster_effectiveness, immunized_delay))
 
-# a fraction of re-immunizations will be susceptible to vaccine escape
+    # a fraction of re-immunizations will be susceptible to vaccine escape
 
-bc_model.add_connector(
-    Propagator('vaccine escape reimmunized', reimmunized_pop, susceptible_pops['ve'], vac_escape_fraction, fast_delay))
+    bc_model.add_connector(
+        Propagator('vaccine escape reimmunized', reimmunized_pop, susceptible_pops['ve'], vac_escape_fraction,
+                   fast_delay))
 
-# Waning booster immunity
+    # Waning booster immunity
 
-waned_boost_immunity_pop = Population('waned booster immunity', 0,
-                                      'people who lost immunity some time after gaining immunity through a booster',
-                                      hidden=True, color=rotated_color(1, 'mediumpurple'))
+    waned_boost_immunity_pop = Population('waned booster immunity', 0,
+                                          'people who lost immunity some time after gaining immunity through a booster',
+                                          hidden=True, color=rotated_color(1, 'mediumpurple'))
 
-bc_model.add_connector(
-    Propagator('boost waned immunity', reimmunized_pop, waned_boost_immunity_pop, vac_waned_fraction, vac_waned_delay))
+    bc_model.add_connector(
+        Propagator('boost waned immunity', reimmunized_pop, waned_boost_immunity_pop, vac_waned_fraction,
+                   vac_waned_delay))
 
-# Once waned, the bt susceptible population increases and ve susceptible decreases
+    # Once waned, the bt susceptible population increases and ve susceptible decreases
 
-bc_model.add_connector(
-    Adder('booster waned to bt susceptible', waned_boost_immunity_pop, susceptible_pops['bt']))
+    bc_model.add_connector(
+        Adder('booster waned to bt susceptible', waned_boost_immunity_pop, susceptible_pops['bt']))
 
-bc_model.add_connector(
-    Subtractor('booster waned reduces ve susceptible', susceptible_pops['ve'], waned_boost_immunity_pop,
-               scale_factor=vac_escape_fraction))
-
+    bc_model.add_connector(
+        Subtractor('booster waned reduces ve susceptible', susceptible_pops['ve'], waned_boost_immunity_pop,
+                   scale_factor=vac_escape_fraction))
 
 # The contagious either recover or die
 # This split is only used to track the deaths.
@@ -576,27 +616,26 @@ death_delay_pars = {
 }
 death_delay = Delay('death_delay', 'gamma', death_delay_pars, bc_model)
 
-
-colors=['mediumpurple', 'darkslateblue', 'mediumslateblue', 'darkviolet']
+colors = ['mediumpurple', 'darkslateblue', 'mediumslateblue', 'darkviolet']
 deaths_pops = {}
-for variant, color in zip(variants,colors):
+for variant, color in zip(variants, colors):
     if variant == 'x':
         deaths_pops_x = {}
         for cycle in cycles:
-            deaths_pops_x[cycle] = Population(cycle+' deaths '+variant, 0,
-                                    cycles[cycle]+' who have died from '+variant, hidden=True,
-                                    color=rotated_color(irc[cycle],color), show_sim=True,
-                                    report_noise=True, report_noise_par=death_noise_par,
-                                    report_backlog_par=death_backlog_par, report_days=death_report_days,
-                                    report_noise_weekly=True)
+            deaths_pops_x[cycle] = Population(cycle + ' deaths ' + variant, 0,
+                                              cycles[cycle] + ' who have died from ' + variant, hidden=True,
+                                              color=rotated_color(irc[cycle], color), show_sim=True,
+                                              report_noise=True, report_noise_par=death_noise_par,
+                                              report_backlog_par=death_backlog_par, report_days=death_report_days,
+                                              report_noise_weekly=True)
             # include these in the overall deaths collector
-            deaths_pops[variant+cycle] = deaths_pops_x[cycle]
+            deaths_pops[variant + cycle] = deaths_pops_x[cycle]
 
-            recover_fraction_x = Parameter(cycle+'_recover_frac_'+variant, 0.99, 0., 1.,
-                                           cycles[cycle]+' fraction of x infected who recover', hidden=True)
+            recover_fraction_x = Parameter(cycle + '_recover_frac_' + variant, 0.99, 0., 1.,
+                                           cycles[cycle] + ' fraction of x infected who recover', hidden=True)
 
             bc_model.add_connector(
-                Splitter(cycle+' recovery '+variant, contagious_pops[variant][cycle],
+                Splitter(cycle + ' recovery ' + variant, contagious_pops[variant][cycle],
                          [recovered_pop, deaths_pops_x[cycle]],
                          [recover_fraction_x], [recover_delay, death_delay]))
 
@@ -617,15 +656,15 @@ for variant, color in zip(variants,colors):
                                           report_noise_weekly=True)
 
         bc_model.add_connector(
-            Splitter('recovery_'+variant, contagious_by_variant[variant], [recovered_pop, deaths_pops[variant]],
+            Splitter('recovery_' + variant, contagious_by_variant[variant], [recovered_pop, deaths_pops[variant]],
                      [recover_fraction], [recover_delay, death_delay]))
 
 deaths_pop = Population('deaths', 0,
-                                  'all those who have died', hidden=False,
-                                  color='indigo', show_sim=True,
-                                  report_noise=True, report_noise_par=death_noise_par,
-                                  report_backlog_par=death_backlog_par, report_days=death_report_days,
-                                  report_noise_weekly=True)
+                        'all those who have died', hidden=False,
+                        color='indigo', show_sim=True,
+                        report_noise=True, report_noise_par=death_noise_par,
+                        report_backlog_par=death_backlog_par, report_days=death_report_days,
+                        report_noise_weekly=True)
 
 collector_populations[deaths_pop] = deaths_pops
 
@@ -648,21 +687,20 @@ removed_delay_pars = {
 removed_delay = Delay('removed_delay', 'norm', removed_delay_pars, bc_model)
 
 removed_pops = {}
-color = ['blue','darkslateblue','dodgerblue','lightskyblue']
-for variant, color in zip(variants,colors):
-    removed_pop_variant = Population('removed_'+variant, 0,
+color = ['blue', 'darkslateblue', 'dodgerblue', 'lightskyblue']
+for variant, color in zip(variants, colors):
+    removed_pop_variant = Population('removed_' + variant, 0,
                                      'People removed from the contagious population', color=color)
     for cycle in cycles:
         if variant in variants_in_cycle[cycle]:
             bc_model.add_connector(
-                Propagator(cycle+' contagious to removed: '+variant, contagious_pops[variant][cycle],
+                Propagator(cycle + ' contagious to removed: ' + variant, contagious_pops[variant][cycle],
                            removed_pop_variant, removed_frac, removed_delay))
 
     # Note that there is no removal from os, bt, ve and ne contagious... those populations are not part of the
     # infection cycle. As a result, the bt (ve and ne) contagious will be cumulative, not current.
     bc_model.add_connector(
-        Subtractor('removal from contagious '+variant, contagious_by_variant[variant], removed_pop_variant))
-
+        Subtractor('removal from contagious ' + variant, contagious_by_variant[variant], removed_pop_variant))
 
 ######################################
 # Symptoms, testing, hospitalizations
@@ -692,37 +730,57 @@ asymptomatic_delay_pars = {
 asymptomatic_delay = Delay('asymp_rec_delay', 'gamma', asymptomatic_delay_pars,
                            bc_model)
 
+# The nominal fraction who become symptomatic: 'os' and 'o'
 symptomatic_fraction = Parameter('symptomatic_frac', 0.9, 0., 1.,
-                                 'fraction of (o,v,w) contagious people who become ' +
-                                 'symptomatic', hidden=False)
+                                 'nominal fraction of contagious people who become symptomatic', hidden=False)
 
-colors = ['chocolate','peru','burlywood','blanchedalmond']
+# Allow the fraction who become symptomatic to depend on cycles and variants
+
+symptomatic_scale_cycle = {}
+for cycle in cycles:
+    if cycle != 'os':
+        symptomatic_scale_cycle[cycle] = Parameter(cycle + '_symptomatic_scale', 1., 0., 1., cycles[cycle] +
+                                                   ' scale factor for fraction of contagious people who become ' +
+                                                   'symptomatic', hidden=True)
+
+symptomatic_scale_variant = {}
+for variant in variants:
+    if variant != 'o':
+        symptomatic_scale_variant[variant] = Parameter('symptomatic_scale_' + variant, 1., 0., 1., variants[variant] +
+                                                       ' scale factor for fraction of contagious people who become ' +
+                                                       'symptomatic', hidden=True)
+
+colors = ['chocolate', 'peru', 'burlywood', 'blanchedalmond']
 
 symptomatic_pops = {}
-for variant, color in zip(variants,colors):
+for variant, color in zip(variants, colors):
     symptomatic_pops_variant = {}
     for cycle in cycles:
         if variant in variants_in_cycle[cycle]:
-            symptomatic_pops_variant[cycle] = Population(cycle+' symptomatic '+variant, 0,cycles[cycle]+' '+
-                                         variants[variant]+' with symptoms', color=rotated_color(irc[cycle],color))
-            if variant == 'x':
-                symptomatic_fraction_x = Parameter(cycle+'_symptomatic_frac_'+variant, 0.9, 0., 1.,'fraction of '+
-                                                   cycles[cycle]+' contagious people with '+variants[variant]+
-                                                   'who become symptomatic', hidden=False)
-                bc_model.add_connector(
-                    Splitter(cycle+'symptoms_'+variant, contagious_pops[variant][cycle],
-                             [symptomatic_pops[cycle], asymptomatic_recovered_pop],
-                             [symptomatic_fraction_x],
-                             [symptomatic_delay, asymptomatic_delay]))
+            symptomatic_pops_variant[cycle] = Population(cycle + ' symptomatic ' + variant, 0, cycles[cycle] + ' ' +
+                                                         variants[variant] + ' with symptoms',
+                                                         color=rotated_color(irc[cycle], color))
+
+            # scale the symptomatic fraction as needed
+            if variant == 'o':
+                if cycle == 'os':
+                    symptomatic_frac = symptomatic_fraction
+                else:
+                    symptomatic_frac = Operator([symptomatic_fraction, symptomatic_scale_cycle[cycle]], '*')
             else:
-                bc_model.add_connector(
-                    Splitter(cycle + 'symptoms_' + variant, contagious_pops[variant][cycle],
-                             [symptomatic_pops[cycle], asymptomatic_recovered_pop],
-                             [symptomatic_fraction],
-                             [symptomatic_delay, asymptomatic_delay]))
+                if cycle == 'os':
+                    symptomatic_frac = Operator([symptomatic_fraction, symptomatic_scale_variant[variant]], '*')
+                else:
+                    symptomatic_frac = Operator([symptomatic_fraction, symptomatic_scale_cycle[cycle],
+                                                 symptomatic_scale_variant[variant]], '**')
 
-    symptomatic_pops[variant]=symptomatic_pops_variant
+            bc_model.add_connector(
+                Splitter(cycle + 'symptoms_' + variant, contagious_pops[variant][cycle],
+                         [symptomatic_pops_variant[cycle], asymptomatic_recovered_pop],
+                         [symptomatic_frac],
+                         [symptomatic_delay, asymptomatic_delay]))
 
+    symptomatic_pops[variant] = symptomatic_pops_variant
 
 ###########
 # reporting
@@ -739,8 +797,7 @@ report_days = Parameter('report_days', 127, 0, 127, 'days of week with reporting
                         parameter_type='int')
 
 reported_fraction = Parameter('reported_frac', 0.8, 0., 1.,
-                              'fraction of symptomatic people who will ' + \
-                              'receive a positive report')
+                              'fraction of symptomatic people who will receive a positive report')
 reported_delay_pars = {
     'mean': Parameter('reported_delay_mean', 3., 0., 50.,
                       'mean time from becoming symptomatic to getting positive report', hidden=False),
@@ -749,28 +806,32 @@ reported_delay_pars = {
 }
 reported_delay = Delay('reported_delay', 'gamma', reported_delay_pars, bc_model)
 
-colors = ['springgreen','olive','tomato','slateblue']
+colors = ['springgreen', 'olive', 'tomato', 'slateblue']
 reported_pops = {}
-for variant, color in zip(variants,colors):
+for variant, color in zip(variants, colors):
     reported_pops_variant = {}
     for cycle in cycles:
         if variant in variants_in_cycle[cycle]:
-            reported_pops_variant[cycle] = Population(cycle+'_reported_'+variant, 0,
-                                         cycles[cycle]+' cases_'+variant,
-                                         hidden=True, color=rotated_color(irc[cycle],color), show_sim=True,
-                                         report_noise=True, report_noise_par=report_noise_par,
-                                         report_backlog_par=report_backlog_par, report_days=report_days)
+            reported_pops_variant[cycle] = Population(cycle + '_reported_' + variant, 0,
+                                                      cycles[cycle] + ' cases_' + variant,
+                                                      hidden=True, color=rotated_color(irc[cycle], color),
+                                                      show_sim=True,
+                                                      report_noise=True, report_noise_par=report_noise_par,
+                                                      report_backlog_par=report_backlog_par, report_days=report_days)
             bc_model.add_connector(
-                Propagator(cycle+'_testing_'+variant, symptomatic_pops[variant][cycle], reported_pops_variant[cycle],
+                Propagator(cycle + '_testing_' + variant, symptomatic_pops[variant][cycle],
+                           reported_pops_variant[cycle],
                            reported_fraction, reported_delay))
     reported_pops[variant] = reported_pops_variant
 
-    reported_pop_variant = Population('reported_'+variant, 0,
-                                         cycles[cycle]+' cases',
-                                         hidden=True, color=color, show_sim=True,
-                                         report_noise=True, report_noise_par=report_noise_par,
-                                         report_backlog_par=report_backlog_par, report_days=report_days)
+    reported_pop_variant = Population('reported_' + variant, 0,
+                                      cycles[cycle] + ' cases',
+                                      hidden=True, color=color, show_sim=True,
+                                      report_noise=True, report_noise_par=report_noise_par,
+                                      report_backlog_par=report_backlog_par, report_days=report_days)
     collector_populations[reported_pop_variant] = reported_pops_variant
+
+# setup collectors for reported by cycle and all reports
 
 color = 'forestgreen'
 reported_pops_cycle = {}
@@ -779,13 +840,13 @@ for cycle in cycles:
     for variant in variants:
         if variant in variants_in_cycle[cycle]:
             reported_pops_cycle[variant] = reported_pops[variant][cycle]
-            all_reported_pops[cycle+variant]
+            all_reported_pops[cycle + variant] = reported_pops[variant][cycle]
 
-    reported_pop_cycle = Population(cycle+'_reported', 0,
-                                      cycles[cycle] + ' cases',
-                                      hidden=True, color=rotated_color(irc[cycle],color), show_sim=True,
-                                      report_noise=True, report_noise_par=report_noise_par,
-                                      report_backlog_par=report_backlog_par, report_days=report_days)
+    reported_pop_cycle = Population(cycle + '_reported', 0,
+                                    cycles[cycle] + ' cases',
+                                    hidden=True, color=rotated_color(irc[cycle], color), show_sim=True,
+                                    report_noise=True, report_noise_par=report_noise_par,
+                                    report_backlog_par=report_backlog_par, report_days=report_days)
     collector_populations[reported_pop_cycle] = reported_pops_cycle
 
 reported_pop = Population('reported', 0,
@@ -795,6 +856,9 @@ reported_pop = Population('reported', 0,
                           report_backlog_par=report_backlog_par, report_days=report_days)
 
 collector_populations[reported_pop] = all_reported_pops
+
+# include reporting anomalies (in overall reports only)
+# ---------------------------
 
 report_anomalies_pop = Population('report anomalies', 0,
                                   'Represents anomalous batches of reports',
@@ -815,277 +879,27 @@ bc_model.add_connector(
     Propagator('report anomalies to reported', report_anomalies_pop,
                reported_pop, anomaly_fraction, anomaly_delay))
 
-
-
-
-
-
-
+#############################
 # SYMPTOMS -> HOSPITALIZATION
+#############################
 #
 # To ensure independence, keep track of the different types of hospitalization
 # as separate streams. Since the total probability for entering hospital is low,
 # the independent treatment is approximately correct
 #
+# - Severity may depend on vaccination and previous infection status
+# hospitalization fractions are specified separately for each cycle
+# - Severity may depend on strain
+# - To make this backward compatible, include new parameters that
+# scale the nominal fractions (nominal: 'os' and 'o')
+#
+#
 # 2 independent hospitalized streams:
 # -> non-ICU hospitalized
 # -> ICU
-#
-# Some in the ICU will get ventilated
 
+# population to track total number in hospital (non_icu + icu admissions)
 
-non_icu_hospitalized_pop = Population('non_icu_hospitalized', 0,
-                                      'Total non_icu hospitalization cases', color='dimgrey', show_sim=False)
-non_icu_hospitalized_fraction = Parameter('non_icu_hosp_frac', 0.2, 0., 1.,
-                                          'fraction of those with symptoms who will ' + \
-                                          'be admitted to non_icu hospital', hidden=False)
-non_icu_hospitalized_delay_pars = {
-    'mean': Parameter('non_icu_hosp_delay_mean', 6., 0., 50.,
-                      'mean time from symptoms to non_icu hospitalization', hidden=False),
-    'sigma': Parameter('non_icu_hosp_delay_sigma', 3., 0.01, 20.,
-                       'standard deviation of times from symptoms to non_icu hospitalization')
-}
-non_icu_hospitalized_delay = Delay('non_icu_hosp_delay', 'gamma', non_icu_hospitalized_delay_pars, bc_model)
-
-bc_model.add_connector(
-    Propagator('symptomatic to non_icu hospital', symptomatic_pop,
-               non_icu_hospitalized_pop, non_icu_hospitalized_fraction, non_icu_hospitalized_delay))
-
-# Those with non_icu hospitalization get released eventually
-
-non_icu_released_pop = Population('non_icu_rel', 0,
-                                  'Hospitalized not needing ICU and released',
-                                  hidden=True, color='hotpink', show_sim=False)
-
-non_icu_delay_pars = {
-    'mean': Parameter('non_icu_rel_delay_mean', 10., 0., 50.,
-                      'mean time from non_icu hospital to release', hidden=False),
-    'sigma': Parameter('non_icu_rel_delay_sigma', 3., 0.01, 20.,
-                       'standard deviation of times from non_icu hospital to release')
-}
-non_icu_delay = Delay('non_icu_rel_delay', 'gamma', non_icu_delay_pars, bc_model)
-
-release_fraction = Parameter('release_frac', 1., 1., 1.,
-                             'fraction for all released == 1', hidden=True)
-
-bc_model.add_connector(
-    Propagator('non_icu hospital to released', non_icu_hospitalized_pop,
-               non_icu_released_pop, release_fraction, non_icu_delay))
-
-# SYMPTOMS -> HOSPITALIZATION for breakthroughs
-
-bt_non_icu_hospitalized_pop = Population('bt_non_icu_hospitalized', 0,
-                                         'Breakthrough non_icu hospitalization cases',
-                                         color=rotated_color(1, 'dimgrey'), show_sim=False)
-bt_non_icu_hospitalized_fraction = Parameter('bt_non_icu_hosp_frac', 0.05, 0., 1.,
-                                             'fraction of breakthroughs with symptoms who will ' + \
-                                             'be admitted to non_icu hospital', hidden=False)
-
-bc_model.add_connector(
-    Propagator('bt symptomatic to non_icu hospital', bt_symptomatic_pop,
-               bt_non_icu_hospitalized_pop, bt_non_icu_hospitalized_fraction, non_icu_hospitalized_delay))
-
-# Those with non_icu hospitalization get released eventually
-
-bt_non_icu_released_pop = Population('bt_non_icu_rel', 0,
-                                     'Hospitalized breakthrough not needing ICU and released',
-                                     hidden=True, color=rotated_color(1, 'hotpink'), show_sim=False)
-
-bc_model.add_connector(
-    Propagator('bt non_icu hospital to released', bt_non_icu_hospitalized_pop,
-               bt_non_icu_released_pop, release_fraction, non_icu_delay))
-
-# SYMPTOMS -> HOSPITALIZATION for vaccine escape
-
-ve_non_icu_hospitalized_pop = Population('ve_non_icu_hospitalized', 0,
-                                         'Vaccine escape non_icu hospitalization cases',
-                                         color=rotated_color(2, 'dimgrey'), show_sim=False)
-ve_non_icu_hospitalized_fraction = Parameter('ve_non_icu_hosp_frac', 0.05, 0., 1.,
-                                             'fraction of vaccine escape with symptoms who will ' + \
-                                             'be admitted to non_icu hospital', hidden=False)
-
-bc_model.add_connector(
-    Propagator('ve symptomatic to non_icu hospital', ve_symptomatic_pop,
-               ve_non_icu_hospitalized_pop, ve_non_icu_hospitalized_fraction, non_icu_hospitalized_delay))
-
-# Those with non_icu hospitalization get released eventually
-
-ve_non_icu_released_pop = Population('ve_non_icu_rel', 0,
-                                     'Hospitalized vaccine escape not needing ICU and released',
-                                     hidden=True, color=rotated_color(2, 'hotpink'), show_sim=False)
-
-bc_model.add_connector(
-    Propagator('ve non_icu hospital to released', ve_non_icu_hospitalized_pop,
-               ve_non_icu_released_pop, release_fraction, non_icu_delay))
-
-# SYMPTOMS -> HOSPITALIZATION for natural escape
-
-ne_non_icu_hospitalized_pop = Population('ne_non_icu_hospitalized', 0,
-                                         'Natural escape non_icu hospitalization cases',
-                                         color=rotated_color(3, 'dimgrey'), show_sim=False)
-ne_non_icu_hospitalized_fraction = Parameter('ne_non_icu_hosp_frac', 0.05, 0., 1.,
-                                             'fraction of natural escape with symptoms who will ' + \
-                                             'be admitted to non_icu hospital', hidden=False)
-
-bc_model.add_connector(
-    Propagator('ne symptomatic to non_icu hospital', ne_symptomatic_pop,
-               ne_non_icu_hospitalized_pop, ne_non_icu_hospitalized_fraction, non_icu_hospitalized_delay))
-
-# Those with non_icu hospitalization get released eventually
-
-ne_non_icu_released_pop = Population('ne_non_icu_rel', 0,
-                                     'Hospitalized natural escape not needing ICU and released',
-                                     hidden=True, color=rotated_color(3, 'hotpink'), show_sim=False)
-
-bc_model.add_connector(
-    Propagator('ne non_icu hospital to released', ne_non_icu_hospitalized_pop,
-               ne_non_icu_released_pop, release_fraction, non_icu_delay))
-
-# Symptoms -> ICU admission
-# Keep track of how many currently in ICU
-##########################################
-
-icu_pop = Population('icu admissions', 0,
-                     'People admitted to ICU', hidden=True, color='deeppink', show_sim=True)
-
-to_icu_fraction = Parameter('icu_frac', 0., 0., 1.,
-                            'fraction of symptomatic people who go to ' +
-                            'icu', hidden=False)
-to_icu_delay_pars = {
-    'mean': Parameter('to_icu_delay_mean', 4., 0., 50.,
-                      'mean time from symptoms to icu', hidden=False),
-    'sigma': Parameter('to_icu_delay_sigma', 2., 0.01, 20.,
-                       'standard deviation of times from symptoms to icu')
-}
-to_icu_delay = Delay('to_icu_delay', 'gamma', to_icu_delay_pars, bc_model)
-
-bc_model.add_connector(
-    Propagator('symptomatic to icu', symptomatic_pop,
-               icu_pop, to_icu_fraction, to_icu_delay))
-
-# breakthrough ICU admissions
-# ----------------------------
-
-bt_icu_pop = Population('bt_icu_admissions', 0,
-                        'People with breakthrough infections admitted to ICU',
-                        hidden=True, color=rotated_color(1, 'deeppink'), show_sim=True)
-
-bt_to_icu_fraction = Parameter('bt_icu_frac', 0., 0., 1.,
-                               'fraction of symptomatic bt people who go to ' +
-                               'icu', hidden=False)
-
-bc_model.add_connector(
-    Propagator('bt symptomatic to icu', bt_symptomatic_pop,
-               bt_icu_pop, bt_to_icu_fraction, to_icu_delay))
-
-# vaccine escape ICU admissions
-# -----------------------------
-
-ve_icu_pop = Population('ve_icu_admissions', 0,
-                        'People with vaccine escape infections admitted to ICU',
-                        hidden=True, color=rotated_color(2, 'deeppink'), show_sim=True)
-
-ve_to_icu_fraction = Parameter('ve_icu_frac', 0., 0., 1.,
-                               'fraction of symptomatic ve people who go to ' +
-                               'icu', hidden=False)
-
-bc_model.add_connector(
-    Propagator('ve symptomatic to icu', ve_symptomatic_pop,
-               ve_icu_pop, ve_to_icu_fraction, to_icu_delay))
-
-# natural escape ICU admissions
-# -----------------------------
-
-ne_icu_pop = Population('ne_icu_admissions', 0,
-                        'People with natural escape infections admitted to ICU',
-                        hidden=True, color=rotated_color(2, 'deeppink'), show_sim=True)
-
-ne_to_icu_fraction = Parameter('ne_icu_frac', 0., 0., 1.,
-                               'fraction of symptomatic ne people who go to ' +
-                               'icu', hidden=False)
-
-bc_model.add_connector(
-    Propagator('ne symptomatic to icu', ne_symptomatic_pop,
-               ne_icu_pop, ne_to_icu_fraction, to_icu_delay))
-
-# ICU -> VENTILATOR
-###################
-
-ventilated_pop = Population('ventilated', 0,
-                            'People who received ICU ventilator', color='mediumorchid')
-
-icu_vent_fraction = Parameter('vent_frac', 0.3, 0., 1.,
-                              'fraction of those in ICU who need ventillation')
-
-to_vent_delay_pars = {
-    'mean': Parameter('to_vent_delay_mean', 4., 0., 50.,
-                      'mean time from icu admission to ventilator', hidden=False),
-    'sigma': Parameter('to_vent_delay_sigma', 2., 0.01, 20.,
-                       'standard deviation of times from icu admission to ventilator')
-}
-to_vent_delay = Delay('to_vent_delay', 'gamma', to_vent_delay_pars, bc_model)
-
-non_ventilated_rel_pop = Population('non_ventilated_rel', 0,
-                                    'ICU non-vent released', color='palevioletred')
-
-non_vent_icu_delay_pars = {
-    'mean': Parameter('non_vent_icu_delay_mean', 14., 0., 50.,
-                      'mean time from non-vent icu admission to release', hidden=False),
-    'sigma': Parameter('non_vent_icu_delay_sigma', 5., 0.01, 20.,
-                       'standard deviation of times from non-vent icu admission to release')
-}
-non_vent_icu_delay = Delay('in_icu_delay', 'gamma', non_vent_icu_delay_pars, bc_model)
-
-bc_model.add_connector(
-    Splitter('ventilator', icu_pop, [ventilated_pop, non_ventilated_rel_pop],
-             [icu_vent_fraction], [to_vent_delay, non_vent_icu_delay]))
-
-# VENTILATOR -> RELEASED
-########################
-
-in_vent_delay_pars = {
-    'mean': Parameter('in_vent_delay_mean', 10., 0., 50.,
-                      'mean time from ventilator admission to departure', hidden=False),
-    'sigma': Parameter('in_vent_delay_sigma', 5., 0.01, 20.,
-                       'standard deviation of times from ventilator admission to departure')
-}
-in_vent_delay = Delay('in_vent_delay', 'gamma', in_vent_delay_pars, bc_model)
-
-ventilated_rel_pop = Population('ventilated_rel', 0,
-                                'ICU ventilated released', color='aqua')
-
-vent_rel_fraction = Parameter('vent_rel_frac', 1., 1., 1.,
-                              'fraction of those on ventialators eventually released == 1')
-
-bc_model.add_connector(
-    Propagator('ventilator to released', ventilated_pop,
-               ventilated_rel_pop, vent_rel_fraction, in_vent_delay))
-
-# No ventilation populations for breakthroughs, vaccine escapes, or natural escapes
-# All bt ICU releases are non-ventilated
-
-bt_non_ventilated_rel_pop = Population('bt_non_ventilated_rel', 0,
-                                       'bt ICU non-vent released', color=rotated_color(1, 'palevioletred'))
-
-bc_model.add_connector(
-    Propagator('bt icu released', bt_icu_pop, bt_non_ventilated_rel_pop,
-               vent_rel_fraction, non_vent_icu_delay))
-
-ve_non_ventilated_rel_pop = Population('ve_non_ventilated_rel', 0,
-                                       've ICU non-vent released', color=rotated_color(2, 'palevioletred'))
-
-bc_model.add_connector(
-    Propagator('ve icu released', ve_icu_pop, ve_non_ventilated_rel_pop,
-               vent_rel_fraction, non_vent_icu_delay))
-
-ne_non_ventilated_rel_pop = Population('ne_non_ventilated_rel', 0,
-                                       'ne ICU non-vent released', color=rotated_color(3, 'palevioletred'))
-
-bc_model.add_connector(
-    Propagator('ne icu released', ne_icu_pop, ne_non_ventilated_rel_pop,
-               vent_rel_fraction, non_vent_icu_delay))
-
-# Need new populations to track total number in hospital (non_icu + icu admissions)
 hosp_noise_par = Parameter('hosp_noise', 0.1, 0., 1.,
                            'Hospital report noise parameter')
 hosp_backlog_par = Parameter('hosp_backlog', 0.5, 0., 1.,
@@ -1098,49 +912,177 @@ hospitalized_pop = Population('hospitalized', 0,
                               report_noise=True, report_noise_par=hosp_noise_par,
                               report_backlog_par=hosp_backlog_par, report_days=hosp_report_days)
 
-bc_model.add_connector(
-    Adder('include non_icu in hospitalized', non_icu_hospitalized_pop, hospitalized_pop))
-bc_model.add_connector(
-    Adder('include icu in hospitalized', icu_pop, hospitalized_pop))
+icu_pop = Population('icu admissions', 0, 'Total icu admissions', color='deeppink', show_sim=False)
 
-# breakthroughs
+# Non-ICU
+# -------
 
-bt_hospitalized_pop = Population('bt_hospitalized', 0,
-                                 'Breakthough hospitalization cases',
-                                 color=rotated_color(1, 'slategrey'), show_sim=True,
-                                 report_noise=True, report_noise_par=hosp_noise_par,
-                                 report_backlog_par=hosp_backlog_par, report_days=hosp_report_days)
+non_icu_hospitalized_delay_pars = {
+    'mean': Parameter('non_icu_hosp_delay_mean', 6., 0., 50.,
+                      'mean time from symptoms to non_icu hospitalization', hidden=False),
+    'sigma': Parameter('non_icu_hosp_delay_sigma', 3., 0.01, 20.,
+                       'standard deviation of times from symptoms to non_icu hospitalization')
+}
+non_icu_hospitalized_delay = Delay('non_icu_hosp_delay', 'gamma', non_icu_hospitalized_delay_pars, bc_model)
 
-bc_model.add_connector(
-    Adder('include bt non_icu in bt hospitalized', bt_non_icu_hospitalized_pop, bt_hospitalized_pop))
-bc_model.add_connector(
-    Adder('include bt icu in bt hospitalized', bt_icu_pop, bt_hospitalized_pop))
+non_icu_released_pop = Population('non_icu_rel', 0,
+                                  'Hospitalized not needing ICU and released',
+                                  hidden=True, color='mistyrose', show_sim=False)
 
-# vaccine escape
+non_icu_delay_pars = {
+    'mean': Parameter('non_icu_rel_delay_mean', 10., 0., 50.,
+                      'mean time from non_icu hospital to release', hidden=False),
+    'sigma': Parameter('non_icu_rel_delay_sigma', 3., 0.01, 20.,
+                       'standard deviation of times from non_icu hospital to release')
+}
+non_icu_delay = Delay('non_icu_rel_delay', 'gamma', non_icu_delay_pars, bc_model)
 
-ve_hospitalized_pop = Population('ve_hospitalized', 0,
-                                 'Vaccine escape hospitalization cases',
-                                 color=rotated_color(2, 'slategrey'), show_sim=True,
-                                 report_noise=True, report_noise_par=hosp_noise_par,
-                                 report_backlog_par=hosp_backlog_par, report_days=hosp_report_days)
+release_fraction = Parameter('release_frac', 1., 1., 1.,
+                             'fraction for all released == 1', hidden=True)
 
-bc_model.add_connector(
-    Adder('include ve non_icu in ve hospitalized', ve_non_icu_hospitalized_pop, ve_hospitalized_pop))
-bc_model.add_connector(
-    Adder('include ve icu in ve hospitalized', ve_icu_pop, ve_hospitalized_pop))
+# nominal hospitalized fraction ('os' and 'o)
+nih_fraction = Parameter('non_icu_hosp_frac', 0.2, 0., 1.,
+                         'nominal fraction of those with symptoms who will be admitted to non_icu hospital',
+                         hidden=False)
 
-# natural escape
+nih_scale_cycle = {}
+for cycle in cycles:
+    if cycle != 'os':
+        nih_scale_cycle[cycle] = Parameter(cycle + '_nih_scale', 1., 0., 1.,
+                                           cycles[cycle] + ' scale factor for fraction of symptomatic who ' +
+                                           'are admitted to non_icu hospital', hidden=True)
 
-ne_hospitalized_pop = Population('ne_hospitalized', 0,
-                                 'Natural escape hospitalization cases',
-                                 color=rotated_color(3, 'slategrey'), show_sim=True,
-                                 report_noise=True, report_noise_par=hosp_noise_par,
-                                 report_backlog_par=hosp_backlog_par, report_days=hosp_report_days)
+nih_scale_variant = {}
+for variant in variants:
+    if variant != 'o':
+        nih_scale_variant[variant] = Parameter('nih_scale_' + variant, 1., 0., 1.,
+                                               variants[variant] + ' scale factor for fraction of symptomatic who ' +
+                                               'are admitted to non_icu hospital', hidden=True)
 
-bc_model.add_connector(
-    Adder('include ne non_icu in ne hospitalized', ne_non_icu_hospitalized_pop, ne_hospitalized_pop))
-bc_model.add_connector(
-    Adder('include ne icu in ne hospitalized', ne_icu_pop, ne_hospitalized_pop))
+colors = ['indianred', 'hotpink', 'rosybrown', 'brown']
+non_icu_hospitalized_pops = {}
+for variant, color in zip(variants, colors):
+    for cycle in cycles:
+        if variant in variants_in_cycle[cycle]:
+            non_icu_hospitalized_pops[cycle + variant] = Population(cycle + '_non_icu_hospitalized_' + variant, 0,
+                                                                    cycles[cycle] + ' non_icu hospitalization ' +
+                                                                    variants[variant] +
+                                                                    ' cases', color=rotated_color(irc[cycle], color),
+                                                                    show_sim=False)
+
+            # scale the nih fraction as needed
+            if variant == 'o':
+                if cycle == 'os':
+                    nih_frac = nih_fraction
+                else:
+                    nih_frac = Operator([nih_fraction, nih_scale_cycle[cycle]], '*')
+            else:
+                if cycle == 'os':
+                    nih_frac = Operator([nih_fraction, nih_scale_variant[variant]], '*')
+                else:
+                    nih_frac = Operator([nih_fraction, nih_scale_cycle[cycle],
+                                         nih_scale_variant[variant]], '**')
+
+            bc_model.add_connector(
+                Propagator(cycle + ' symptomatic to non_icu hospital: ' + variant, symptomatic_pops[variant][cycle],
+                           non_icu_hospitalized_pops[cycle + variant], nih_frac, non_icu_hospitalized_delay))
+
+            bc_model.add_connector(
+                Adder('include non_icu in hospitalized:' + cycle + '_' + variant,
+                      non_icu_hospitalized_pops[cycle + variant], hospitalized_pop))
+
+            # Those with non_icu hospitalization get released eventually
+
+            bc_model.add_connector(
+                Propagator(cycle + ' non_icu hospital to released ' + variant,
+                           non_icu_hospitalized_pops[cycle + variant],
+                           non_icu_released_pop, release_fraction, non_icu_delay))
+
+non_icu_hospitalized_pop = Population('non_icu_hospitalized', 0,
+                                      'Total non_icu hospitalization cases', color='dimgrey', show_sim=False)
+collector_populations[non_icu_hospitalized_pop] = non_icu_hospitalized_pops
+
+# ICU
+# ---
+
+to_icu_delay_pars = {
+    'mean': Parameter('to_icu_delay_mean', 4., 0., 50.,
+                      'mean time from symptoms to icu', hidden=False),
+    'sigma': Parameter('to_icu_delay_sigma', 2., 0.01, 20.,
+                       'standard deviation of times from symptoms to icu')
+}
+to_icu_delay = Delay('to_icu_delay', 'gamma', to_icu_delay_pars, bc_model)
+
+# for backwards compatability, these parameters refer to icu as non_vent_icu
+
+non_vent_icu_delay_pars = {
+    'mean': Parameter('non_vent_icu_delay_mean', 14., 0., 50.,
+                      'mean time from non-vent icu admission to release', hidden=False),
+    'sigma': Parameter('non_vent_icu_delay_sigma', 5., 0.01, 20.,
+                       'standard deviation of times from non-vent icu admission to release')
+}
+non_vent_icu_delay = Delay('in_icu_delay', 'gamma', non_vent_icu_delay_pars, bc_model)
+
+# nominal icu fraction ('os' and 'o)
+icu_fraction = Parameter('icu_frac', 0., 0., 1.,
+                         'fraction of symptomatic people who go to ' +
+                         'icu', hidden=False)
+
+icu_scale_cycle = {}
+for cycle in cycles:
+    if cycle != 'os':
+        icu_scale_cycle[cycle] = Parameter(cycle + '_icu_scale', 1., 0., 1.,
+                                           cycles[cycle] + ' scale factor for fraction of symptomatic who ' +
+                                           'are admitted to icu', hidden=True)
+
+icu_scale_variant = {}
+for variant in variants:
+    if variant != 'o':
+        icu_scale_variant[variant] = Parameter('icu_scale_' + variant, 1., 0., 1.,
+                                               variants[variant] + ' scale factor for fraction of symptomatic who ' +
+                                               'are admitted to icu', hidden=True)
+
+icu_released_pop = Population('icu_rel', 0, cycles[cycle] +
+                              'admitted to ICU and released:',
+                              hidden=True, color='lightgrey', show_sim=False)
+
+colors = ['deeppink', 'hotpink', 'rosybrown', 'brown']
+icu_pops = {}
+for variant, color in zip(variants, colors):
+    for cycle in cycles:
+        if variant in variants_in_cycle[cycle]:
+            icu_pops[cycle + variant] = Population(cycle + ' icu admissions: ' + variant, 0, 'People admitted to ICU',
+                                                   hidden=True, color=rotated_color(irc[cycle], color), show_sim=True)
+
+            # scale the icu fraction as needed
+            if variant == 'o':
+                if cycle == 'os':
+                    icu_frac = icu_fraction
+                else:
+                    icu_frac = Operator([icu_fraction, icu_scale_cycle[cycle]], '*')
+            else:
+                if cycle == 'os':
+                    icu_frac = Operator([icu_fraction, icu_scale_variant[variant]], '*')
+                else:
+                    icu_frac = Operator([icu_fraction, icu_scale_cycle[cycle],
+                                         icu_scale_variant[variant]], '**')
+
+            bc_model.add_connector(
+                Propagator(cycle + ' symptomatic to icu ' + variant, symptomatic_pops[variant][cycle],
+                           icu_pops[cycle + variant], icu_frac, to_icu_delay))
+
+            bc_model.add_connector(
+                Adder('include icu in hospitalized ' + cycle + '_' + variant, icu_pops[cycle + variant],
+                      hospitalized_pop))
+            bc_model.add_connector(
+                Adder('include this in total icu ' + cycle + '_' + variant, icu_pops[cycle + variant], icu_pop))
+
+            # Those admitted to icu get released eventually
+
+            bc_model.add_connector(
+                Propagator(cycle + ' icu to released ' + variant,
+                           icu_pops[cycle + variant],
+                           icu_released_pop, release_fraction, non_vent_icu_delay))
 
 # make a copy of hospital admissions to keep track of how many remain in hospital
 # oooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooo
@@ -1151,24 +1093,6 @@ in_hospital_pop = Population('in_hospital', 0,
 bc_model.add_connector(
     Adder('copy hospitalizations', hospitalized_pop, in_hospital_pop))
 
-bt_in_hospital_pop = Population('bt_in_hospital', 0,
-                                'Breakthroughs currently in hospital',
-                                hidden=True, color=rotated_color(1, 'darkcyan'), show_sim=True)
-bc_model.add_connector(
-    Adder('copy bt hospitalizations', bt_hospitalized_pop, bt_in_hospital_pop))
-
-ve_in_hospital_pop = Population('ve_in_hospital', 0,
-                                'Vaccine escape currently in hospital',
-                                hidden=True, color=rotated_color(2, 'darkcyan'), show_sim=True)
-bc_model.add_connector(
-    Adder('copy ve hospitalizations', ve_hospitalized_pop, ve_in_hospital_pop))
-
-ne_in_hospital_pop = Population('ne_in_hospital', 0,
-                                'Vaccine escape currently in hospital',
-                                hidden=True, color=rotated_color(3, 'darkcyan'), show_sim=True)
-bc_model.add_connector(
-    Adder('copy ne hospitalizations', ne_hospitalized_pop, ne_in_hospital_pop))
-
 # make a copy of icu admissions to keep track of how many remain in icu
 # ooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooo
 
@@ -1178,35 +1102,6 @@ in_icu_pop = Population('in_icu', 0,
 bc_model.add_connector(
     Adder('copy icu admissions', icu_pop, in_icu_pop))
 
-bt_in_icu_pop = Population('bt_in_icu', 0,
-                           'Breakthroughs currently in ICU', hidden=True,
-                           color=rotated_color(1, 'hotpink'), show_sim=True)
-
-bc_model.add_connector(
-    Adder('copy bt icu admissions', bt_icu_pop, bt_in_icu_pop))
-
-ve_in_icu_pop = Population('ve_in_icu', 0,
-                           'Vaccine escape currently in ICU', hidden=True,
-                           color=rotated_color(2, 'hotpink'), show_sim=True)
-
-bc_model.add_connector(
-    Adder('copy ve icu admissions', ve_icu_pop, ve_in_icu_pop))
-
-ne_in_icu_pop = Population('ne_in_icu', 0,
-                           'Natural escape currently in ICU', hidden=True,
-                           color=rotated_color(3, 'hotpink'), show_sim=True)
-
-bc_model.add_connector(
-    Adder('copy ne icu admissions', ne_icu_pop, ne_in_icu_pop))
-
-# make a copy of ventilator admissions to keep track of how many remain on ventilator
-# ooooooooooooooooooooooooooooooooooooooooooooooooooooooooo
-on_ventilator_pop = Population('on_ventilator', 0,
-                               'People currently on ICU ventilator', color='mediumpurple', show_sim=True)
-
-bc_model.add_connector(
-    Adder('copy ventilator admissions', ventilated_pop, on_ventilator_pop))
-
 # do subtractions to make the in_hospital etc correct
 # oooooooooooooooooooooooooooooooooooooooooooooooooooo
 
@@ -1214,49 +1109,9 @@ bc_model.add_connector(
     Subtractor('remove non-ICU released', in_hospital_pop, non_icu_released_pop))
 
 bc_model.add_connector(
-    Subtractor('remove non-vent released from icu', in_icu_pop, non_ventilated_rel_pop))
+    Subtractor('remove non-vent released from icu', in_icu_pop, icu_released_pop))
 bc_model.add_connector(
-    Subtractor('remove non-vent released from hospital', in_hospital_pop, non_ventilated_rel_pop))
-
-bc_model.add_connector(
-    Subtractor('remove vent released from on_ventilator', on_ventilator_pop, ventilated_rel_pop))
-bc_model.add_connector(
-    Subtractor('remove vent released from icu', in_icu_pop, ventilated_rel_pop))
-bc_model.add_connector(
-    Subtractor('remove vent released from hospital', in_hospital_pop, ventilated_rel_pop))
-
-# breakthroughs
-# -------------
-
-bc_model.add_connector(
-    Subtractor('remove bt non-ICU released', bt_in_hospital_pop, bt_non_icu_released_pop))
-
-bc_model.add_connector(
-    Subtractor('remove bt non-vent released from icu', bt_in_icu_pop, bt_non_ventilated_rel_pop))
-bc_model.add_connector(
-    Subtractor('remove bt non-vent released from hospital', bt_in_hospital_pop, bt_non_ventilated_rel_pop))
-
-# vaccine escape
-# --------------
-
-bc_model.add_connector(
-    Subtractor('remove ve non-ICU released', ve_in_hospital_pop, ve_non_icu_released_pop))
-
-bc_model.add_connector(
-    Subtractor('remove ve non-vent released from icu', ve_in_icu_pop, ve_non_ventilated_rel_pop))
-bc_model.add_connector(
-    Subtractor('remove ve non-vent released from hospital', ve_in_hospital_pop, ve_non_ventilated_rel_pop))
-
-# natural escape
-# --------------
-
-bc_model.add_connector(
-    Subtractor('remove ne non-ICU released', ne_in_hospital_pop, ne_non_icu_released_pop))
-
-bc_model.add_connector(
-    Subtractor('remove ne non-vent released from icu', ne_in_icu_pop, ne_non_ventilated_rel_pop))
-bc_model.add_connector(
-    Subtractor('remove ne non-vent released from hospital', ne_in_hospital_pop, ne_non_ventilated_rel_pop))
+    Subtractor('remove non-vent released from hospital', in_hospital_pop, icu_released_pop))
 
 # adjust other populations as required
 # ooooooooooooooooooooooooooooooooooooo
@@ -1264,71 +1119,28 @@ bc_model.add_connector(
 bc_model.add_connector(
     Subtractor('subtract deaths from total', total_pop, deaths_pop))
 
-bc_model.add_connector(
-    Subtractor('subtract infected from susceptible', susceptible_pop, infected_pop))
-
-bc_model.add_connector(
-    Subtractor('subtract infected_v from susceptible', susceptible_pop, infected_pop_v))
-
-bc_model.add_connector(
-    Subtractor('subtract infected_w from susceptible', susceptible_pop, infected_pop_w))
-
-bc_model.add_connector(
-    Subtractor('subtract infected_x from susceptible', susceptible_pop, infected_pop_x))
-
-# breakthroughs (infections reducing bt susceptible)
-
-bc_model.add_connector(
-    Subtractor('subtract bt infected from bt susceptible', bt_susceptible_pop, bt_infected_pop))
-
-bc_model.add_connector(
-    Subtractor('subtract bt infected_v from bt susceptible', bt_susceptible_pop, bt_infected_pop_v))
-
-bc_model.add_connector(
-    Subtractor('subtract bt infected_w from bt susceptible', bt_susceptible_pop, bt_infected_pop_w))
-
-bc_model.add_connector(
-    Subtractor('subtract bt infected_x from bt susceptible', bt_susceptible_pop, bt_infected_pop_x))
-
-# escape
-
-bc_model.add_connector(
-    Subtractor('subtract ve infected_x from ve susceptible', ve_susceptible_pop, ve_infected_pop_x))
-
-bc_model.add_connector(
-    Subtractor('subtract ne infected_x from ne susceptible', ne_susceptible_pop, ne_infected_pop_x))
-
 # some with a positive test will decide not to get vaccinated
 frac_report_novacc_par = Parameter('frac_report_novacc', 1.0, 0., 1.,
                                    'Fraction of those reported who decide against vaccination')
 
+# vaccination and booster accounting
+
 bc_model.add_connector(
     Subtractor('subtract vaccinated from vacc cand', vaccan_pop, vaccinated_pop))
 
-bc_model.add_connector(
-    Subtractor('subtract boosted from booster cand', boostcan_pop, boosted_pop))
+if not no_bt:
+    bc_model.add_connector(
+        Subtractor('subtract boosted from booster cand', boostcan_pop, boosted_pop))
 
 bc_model.add_connector(
     Subtractor('subtract usefully vaccinated from the sus vacc cand', susvaccan_pop, usefully_vaccinated_pop))
 
-bc_model.add_connector(
-    Subtractor('subtract immunized from bt_susceptible', bt_susceptible_pop, immunized_pop))
-
-bc_model.add_connector(
-    Subtractor('subtract some of infected from sus vacc cand', susvaccan_pop, infected_pop,
-               ratio_populations=[susvaccan_pop, susceptible_pop]))
-
-bc_model.add_connector(
-    Subtractor('subtract some of infected_v from sus vacc cand', susvaccan_pop, infected_pop_v,
-               ratio_populations=[susvaccan_pop, susceptible_pop]))
-
-bc_model.add_connector(
-    Subtractor('subtract some of infected_w from sus vacc cand', susvaccan_pop, infected_pop_w,
-               ratio_populations=[susvaccan_pop, susceptible_pop]))
-
-bc_model.add_connector(
-    Subtractor('subtract some of infected_x from sus vacc cand', susvaccan_pop, infected_pop_x,
-               ratio_populations=[susvaccan_pop, susceptible_pop]))
+for variant in variants:
+    for cycle in cycles:
+        if variant in variants_in_cycle[cycle]:
+            bc_model.add_connector(
+                Subtractor('subtract some of infected from sus vacc cand: ' + cycle + '_' + variant, susvaccan_pop,
+                           infected_pops[variant][cycle], ratio_populations=[susvaccan_pop, susceptible_pop]))
 
 rep_frac_pop = Population('frac', 0.)
 
@@ -1347,102 +1159,40 @@ bc_model.add_connector(
 # Do all collections at the end
 
 for collector_population in collector_populations:
+    populations = []
+    for key in collector_populations[collector_population]:
+        populations.append(collector_populations[collector_population][key])
+
     bc_model.add_connector(
-        Collector(collector_population.name, collector_populations[collector_population], collector_population)
+        Collector(collector_population.name, populations, collector_population)
     )
 
 # transitional aspects of the model
 # oooooooooooooooooooooooooooooooooo
 
-n_rate_transitions = 14
-n_rt_visible = 4
+n_rate_transitions = {'o': 14, 'v': 6, 'w': 12, 'x': 4}
+n_rt_visible = {'o': 4, 'v': 0, 'w': 0, 'x': 0}
 
-times = []
-alphas = [Parameter('alpha_0', 0.4, 0., 2.,
-                    'initial transmission rate', hidden=False)]
-for i in range(n_rate_transitions):
-    j = i + 1
-    hidden = j > n_rt_visible
-    enabled = i == 0
-    times.append(Parameter('trans_rate_' + str(j) + '_time', 20 + i, 0, 600,
-                           'day of trans rate change ' + 'str(j)',
-                           parameter_type='int', hidden=hidden))
-    alphas.append(Parameter('alpha_' + str(j), 0.1, 0., 2.,
-                            'alpha after transition ' + str(j), hidden=hidden))
-    bc_model.add_transition(
-        Modifier('trans_rate_' + str(j), 'rel_days', times[i], trans_rate,
-                 alphas[i], alphas[j], enabled=enabled, model=bc_model))
+for variant in variants:
+    suffix = ''
+    if variant != 'o':
+        suffix = '_' + variant
 
-n_rate_transitions = 6
-n_rt_visible = 0
-
-times_v = []
-alphas_v = [Parameter('alpha_0_v', 0.4, 0., 2.,
-                      'initial variant transmission rate', hidden=False)]
-for i in range(n_rate_transitions):
-    j = i + 1
-    hidden = j > n_rt_visible
-    enabled = False
-    times_v.append(Parameter('trans_rate_' + str(j) + '_time_v', 20 + i, 0, 600,
-                             'day of variant trans rate change ' + 'str(j)',
-                             parameter_type='int', hidden=hidden))
-    alphas_v.append(Parameter('alpha_' + str(j) + '_v', 0.1, 0., 2.,
-                              'alpha_v after transition ' + str(j), hidden=hidden))
-    bc_model.add_transition(
-        Modifier('trans_rate_' + str(j) + '_v', 'rel_days', times_v[i], trans_rate_v,
-                 alphas_v[i], alphas_v[j], enabled=enabled, model=bc_model))
-
-n_rate_transitions = 12
-
-times_w = []
-alphas_w = [Parameter('alpha_0_w', 0.4, 0., 2.,
-                      'initial wariant transmission rate', hidden=False)]
-for i in range(n_rate_transitions):
-    j = i + 1
-    hidden = j > n_rt_visible
-    enabled = False
-    times_w.append(Parameter('trans_rate_' + str(j) + '_time_w', 200 + i, 0, 600,
-                             'day of variant trans rate change ' + 'str(j)',
-                             parameter_type='int', hidden=hidden))
-    alphas_w.append(Parameter('alpha_' + str(j) + '_w', 0.1, 0., 2.,
-                              'alpha_w after transition ' + str(j), hidden=hidden))
-    bc_model.add_transition(
-        Modifier('trans_rate_' + str(j) + '_w', 'rel_days', times_w[i], trans_rate_w,
-                 alphas_w[i], alphas_w[j], enabled=enabled, model=bc_model))
-
-n_rate_transitions = 4
-
-times_x = []
-alphas_x = [Parameter('alpha_0_x', 0.4, 0., 2.,
-                      'initial xariant transmission rate', hidden=False)]
-for i in range(n_rate_transitions):
-    j = i + 1
-    hidden = j > n_rt_visible
-    enabled = False
-    times_x.append(Parameter('trans_rate_' + str(j) + '_time_x', 200 + i, 0, 600,
-                             'day of variant trans rate change ' + 'str(j)',
-                             parameter_type='int', hidden=hidden))
-    alphas_x.append(Parameter('alpha_' + str(j) + '_x', 0.1, 0., 2.,
-                              'alpha_x after transition ' + str(j), hidden=hidden))
-    bc_model.add_transition(
-        Modifier('trans_rate_' + str(j) + '_x', 'rel_days', times_x[i], trans_rate_x,
-                 alphas_x[i], alphas_x[j], enabled=enabled, model=bc_model))
-
-# contact tracing
-
-trans_traced_1_time = Parameter('trans_trace_1_time', 100, 0, 600,
-                                'number of days before contact traced fraction changes',
-                                parameter_type='int', hidden=False)
-
-trans_traced_0 = Parameter('trans_traced_0', 0., 0., 1.,
-                           'initial contact traced fraction')
-
-trans_traced_1 = Parameter('trans_traced_1', 0.1, 0., 1.,
-                           'contact traced fraction after transition', hidden=False)
-
-bc_model.add_transition(
-    Modifier('trans_traced_1', 'rel_days', trans_traced_1_time, contact_traced_fraction,
-             trans_traced_0, trans_traced_1, enabled=False, model=bc_model))
+    times = []
+    alphas = [Parameter('alpha_0' + suffix, 0.4, 0., 2.,
+                        'initial transmission rate', hidden=False)]
+    for i in range(n_rate_transitions[variant]):
+        j = i + 1
+        hidden = j > n_rt_visible[variant]
+        enabled = i == 0
+        times.append(Parameter('trans_rate_' + str(j) + '_time' + suffix, 20 + i, 0, 600,
+                               'day of trans rate change ' + 'str(j)',
+                               parameter_type='int', hidden=hidden))
+        alphas.append(Parameter('alpha_' + str(j) + suffix, 0.1, 0., 2.,
+                                'alpha' + suffix + ' after transition ' + str(j), hidden=hidden))
+        bc_model.add_transition(
+            Modifier('trans_rate_' + str(j) + suffix, 'rel_days', times[i], trans_rates[variant],
+                     alphas[i], alphas[j], enabled=enabled, model=bc_model))
 
 # vaccination start
 
@@ -1459,231 +1209,67 @@ for i in range(n_vacc_periods):
         Injector('vaccination_' + str(j), 'rel_days', vaccination_time, daily_vaccinated_pop,
                  vaccination_number, enabled=False, model=bc_model))
 
-# outbreaks
+# booster scheduls
 
-outbreak_pop = Population('outbreaks', 0,
-                          'Infection outbreaks')
+if not no_bt:
+    n_boost_periods = 4
 
-outbreak_1_time = Parameter('outbreak_1_time', 14, 0, 600,
-                            'number of days since t0 when outbreak_1 established',
-                            parameter_type='int', hidden=False)
+    for i in range(n_boost_periods):
+        j = i + 1
+        boost_time = Parameter('boost_time_' + str(j), 75 + i, 0, 600,
+                               'first day of booster period ' + str(j),
+                               parameter_type='int')
+        boost_number = Parameter('boost_number_' + str(j), 10., 0., 5000000.,
+                                 'change in number boosted each day for period ' + str(j))
+        bc_model.add_transition(
+            Injector('booster_' + str(j), 'rel_days', boost_time, daily_boosted_pop,
+                     boost_number, enabled=False, model=bc_model))
 
-outbreak_1_number = Parameter('outbreak_1_number', 10., 0., 50000.,
-                              'number of infections in outbreak_1',
-                              hidden=False)
-
-bc_model.add_transition(
-    Injector('outbreak_1', 'rel_days', outbreak_1_time, outbreak_pop,
-             outbreak_1_number, enabled=False, model=bc_model))
+# outbreaks (in the 'os' susceptible population)
 
 outbreak_fraction = Parameter('outbreak_frac', 1., 0., 1.,
                               'fraction of infected in outbreak active ==1')
-outbreak_delay_pars = {
-    'mean': Parameter('outbreak_delay_mean', 7., 0., 50.,
-                      'mean delay time for outbreak', hidden=False),
-    'sigma': Parameter('outbreak_delay_sigma', 1., 0.01, 20.,
-                       'standard deviation of outbreak times',
-                       hidden=False)
-}
-outbreak_delay = Delay('outbreak_delay', 'gamma', outbreak_delay_pars, bc_model)
 
-bc_model.add_connector(
-    Propagator('outbreaks to infected', outbreak_pop, infected_pop,
-               outbreak_fraction, outbreak_delay))
+n_outbreaks = {'o': 7, 'v': 3, 'w': 4, 'x': 3}
 
-outbreak_2_time = Parameter('outbreak_2_time', 21, 0, 600,
-                            'number of days since t0 when outbreak_2 established',
-                            parameter_type='int', hidden=False)
+for variant in variants:
+    suffix = ''
+    if variant != 'o':
+        suffix = '_' + variant
 
-outbreak_2_number = Parameter('outbreak_2_number', 10., 0., 50000.,
-                              'number of infections in outbreak_2',
-                              hidden=False)
+    outbreak_delay_pars = {
+        'mean': Parameter('outbreak' + suffix + '_delay_mean', 7., 0., 50.,
+                          'mean delay time for outbreak' + suffix, hidden=False),
+        'sigma': Parameter('outbreak' + suffix + '_delay_sigma', 1., 0.01, 20.,
+                           'standard deviation of outbreak' + suffix + ' times',
+                           hidden=False)
+    }
+    outbreak_delay = Delay('outbreak' + suffix + '_delay', 'gamma', outbreak_delay_pars, bc_model)
 
-bc_model.add_transition(
-    Injector('outbreak_2', 'rel_days', outbreak_2_time, outbreak_pop,
-             outbreak_2_number, enabled=False, model=bc_model))
+    outbreak_pop = Population('outbreaks' + suffix, 0, variants[variant] + ' infection outbreaks')
 
-outbreak_3_time = Parameter('outbreak_3_time', 41, 0, 600,
-                            'number of days since t0 when outbreak_3 established',
-                            parameter_type='int', hidden=False)
+    for i in range(n_outbreaks[variant]):
+        vid = ''
+        if i > 0:
+            vid = str(i)
+        if variant != 'o':
+            vid = variant + vid
 
-outbreak_3_number = Parameter('outbreak_3_number', 10., 0., 50000.,
-                              'number of infections in outbreak_3',
-                              hidden=False)
+        outbreak_time = Parameter('outbreak_' + vid + '_time', 14, 0, 800,
+                                  'number of days since t0 when outbreak_' + vid + ' established',
+                                  parameter_type='int', hidden=False)
 
-bc_model.add_transition(
-    Injector('outbreak_3', 'rel_days', outbreak_3_time, outbreak_pop,
-             outbreak_3_number, enabled=False, model=bc_model))
+        outbreak_number = Parameter('outbreak_' + vid + '_number', 10., 0., 50000.,
+                                    'number of infections in outbreak_' + vid,
+                                    hidden=False)
 
-outbreak_4_time = Parameter('outbreak_4_time', 61, 0, 600,
-                            'number of days since t0 when outbreak_4 established',
-                            parameter_type='int')
+        bc_model.add_transition(
+            Injector('outbreak_' + vid, 'rel_days', outbreak_time, outbreak_pop,
+                     outbreak_number, enabled=False, model=bc_model))
 
-outbreak_4_number = Parameter('outbreak_4_number', 10., 0., 50000.,
-                              'number of infections in outbreak_4')
-
-bc_model.add_transition(
-    Injector('outbreak_4', 'rel_days', outbreak_4_time, outbreak_pop,
-             outbreak_4_number, enabled=False, model=bc_model))
-
-outbreak_5_time = Parameter('outbreak_5_time', 61, 0, 600,
-                            'number of days since t0 when outbreak_5 established',
-                            parameter_type='int')
-
-outbreak_5_number = Parameter('outbreak_5_number', 10., 0., 50000.,
-                              'number of infections in outbreak_5')
-
-bc_model.add_transition(
-    Injector('outbreak_5', 'rel_days', outbreak_5_time, outbreak_pop,
-             outbreak_5_number, enabled=False, model=bc_model))
-
-outbreak_6_time = Parameter('outbreak_6_time', 61, 0, 600,
-                            'number of days since t0 when outbreak_6 established',
-                            parameter_type='int')
-
-outbreak_6_number = Parameter('outbreak_6_number', 10., 0., 50000.,
-                              'number of infections in outbreak_6')
-
-bc_model.add_transition(
-    Injector('outbreak_6', 'rel_days', outbreak_6_time, outbreak_pop,
-             outbreak_6_number, enabled=False, model=bc_model))
-
-# variant outbreak: necessary to introduce infections...
-
-outbreak_pop_v = Population('outbreaks_v', 0,
-                            'Variant infection outbreaks')
-
-outbreak_v_time = Parameter('outbreak_v_time', 14, 0, 600,
-                            'number of days since t0 when outbreak_v established',
-                            parameter_type='int', hidden=True)
-
-outbreak_v_number = Parameter('outbreak_v_number', 10., 0., 50000.,
-                              'number of infections in outbreak_v',
-                              hidden=True)
-
-bc_model.add_transition(
-    Injector('outbreak_v', 'rel_days', outbreak_v_time, outbreak_pop_v,
-             outbreak_v_number, enabled=False, model=bc_model))
-
-outbreak_v_delay_pars = {
-    'mean': Parameter('outbreak_v_delay_mean', 7., 0., 50.,
-                      'mean delay time for outbreak_v'),
-    'sigma': Parameter('outbreak_v_delay_sigma', 1., 0.01, 20.,
-                       'standard deviation of outbreak_v times')
-}
-outbreak_v_delay = Delay('outbreak_v_delay', 'gamma', outbreak_v_delay_pars, bc_model)
-
-bc_model.add_connector(
-    Propagator('outbreaks to infected_v', outbreak_pop_v, infected_pop_v,
-               outbreak_fraction, outbreak_v_delay))
-
-outbreak_v2_time = Parameter('outbreak_v2_time', 210, 0, 600,
-                             'number of days since t0 when outbreak_v2 established',
-                             parameter_type='int', hidden=False)
-
-outbreak_v2_number = Parameter('outbreak_v2_number', 10., 0., 50000.,
-                               'number of infections in outbreak_v2',
-                               hidden=False)
-
-bc_model.add_transition(
-    Injector('outbreak_v2', 'rel_days', outbreak_v2_time, outbreak_pop_v,
-             outbreak_v2_number, enabled=False, model=bc_model))
-
-# wariant outbreak: necessary to introduce infections...
-
-outbreak_pop_w = Population('outbreaks_w', 0,
-                            'Wariant infection outbreaks')
-
-outbreak_w_time = Parameter('outbreak_w_time', 140, 0, 600,
-                            'number of days since t0 when outbreak_w established',
-                            parameter_type='int', hidden=True)
-
-outbreak_w_number = Parameter('outbreak_w_number', 10., 0., 50000.,
-                              'number of infections in outbreak_w',
-                              hidden=True)
-
-bc_model.add_transition(
-    Injector('outbreak_w', 'rel_days', outbreak_w_time, outbreak_pop_w,
-             outbreak_w_number, enabled=False, model=bc_model))
-
-outbreak_w_delay_pars = {
-    'mean': Parameter('outbreak_w_delay_mean', 7., 0., 50.,
-                      'mean delay time for outbreak_w'),
-    'sigma': Parameter('outbreak_w_delay_sigma', 1., 0.01, 20.,
-                       'standard deviation of outbreak_w times')
-}
-outbreak_w_delay = Delay('outbreak_w_delay', 'gamma', outbreak_w_delay_pars, bc_model)
-
-bc_model.add_connector(
-    Propagator('outbreaks to infected_w', outbreak_pop_w, infected_pop_w,
-               outbreak_fraction, outbreak_w_delay))
-
-outbreak_w2_time = Parameter('outbreak_w2_time', 210, 0, 600,
-                             'number of days since t0 when outbreak_w2 established',
-                             parameter_type='int', hidden=False)
-
-outbreak_w2_number = Parameter('outbreak_w2_number', 10., 0., 50000.,
-                               'number of infections in outbreak_w2',
-                               hidden=False)
-
-bc_model.add_transition(
-    Injector('outbreak_w2', 'rel_days', outbreak_w2_time, outbreak_pop_w,
-             outbreak_w2_number, enabled=False, model=bc_model))
-
-outbreak_w3_time = Parameter('outbreak_w3_time', 510, 0, 900,
-                             'number of days since t0 when outbreak_w3 established',
-                             parameter_type='int', hidden=False)
-
-outbreak_w3_number = Parameter('outbreak_w3_number', 10., 0., 50000.,
-                               'number of infections in outbreak_w3',
-                               hidden=False)
-
-bc_model.add_transition(
-    Injector('outbreak_w3', 'rel_days', outbreak_w3_time, outbreak_pop_w,
-             outbreak_w3_number, enabled=False, model=bc_model))
-
-# xariant outbreak: necessary to introduce infections...
-
-outbreak_pop_x = Population('outbreaks_x', 0,
-                            'xariant infection outbreaks')
-
-outbreak_x_time = Parameter('outbreak_x_time', 140, 0, 600,
-                            'number of days since t0 when outbreak_x established',
-                            parameter_type='int', hidden=True)
-
-outbreak_x_number = Parameter('outbreak_x_number', 10., 0., 50000.,
-                              'number of infections in outbreak_x',
-                              hidden=True)
-
-bc_model.add_transition(
-    Injector('outbreak_x', 'rel_days', outbreak_x_time, outbreak_pop_x,
-             outbreak_x_number, enabled=False, model=bc_model))
-
-outbreak_x_delay_pars = {
-    'mean': Parameter('outbreak_x_delay_mean', 7., 0., 50.,
-                      'mean delay time for outbreak_x'),
-    'sigma': Parameter('outbreak_x_delay_sigma', 1., 0.01, 20.,
-                       'standard deviation of outbreak_x times')
-}
-outbreak_x_delay = Delay('outbreak_x_delay', 'gamma', outbreak_x_delay_pars, bc_model)
-
-bc_model.add_connector(
-    Propagator('outbreaks to infected_x', outbreak_pop_x, infected_pop_x,
-               outbreak_fraction, outbreak_x_delay))
-
-outbreak_x2_time = Parameter('outbreak_x2_time', 210, 0, 600,
-                             'number of days since t0 when outbreak_x2 established',
-                             parameter_type='int', hidden=False)
-
-outbreak_x2_number = Parameter('outbreak_x2_number', 10., 0., 50000.,
-                               'number of infections in outbreak_x2',
-                               hidden=False)
-
-bc_model.add_transition(
-    Injector('outbreak_x2', 'rel_days', outbreak_x2_time, outbreak_pop_x,
-             outbreak_x2_number, enabled=False, model=bc_model))
-
-# Assume outbreaks are limited to unvaccinated populations for now
+    bc_model.add_connector(
+        Propagator('outbreaks to os infected' + suffix, outbreak_pop, infected_pops[variant]['os'],
+                   outbreak_fraction, outbreak_delay))
 
 # reporting anomalies
 
@@ -1723,9 +1309,8 @@ bc_model.add_transition(
 
 # Linear modification to testing fraction:
 
-reported_fractions = []
-reported_fractions.append(Parameter('report_frac_0', 0.95, 0., 1.,
-                                    'initial reported fraction', hidden=False))
+reported_fractions = [Parameter('report_frac_0', 0.95, 0., 1.,
+                                'initial reported fraction', hidden=False)]
 
 for i in range(4):
     j = i + 1
@@ -1746,13 +1331,10 @@ for i in range(4):
                  reported_fractions[i], reported_fractions[j], enabled=False, model=bc_model,
                  linear=True, n_step=mod_reported_fraction_nstep))
 
-
 # define boot parameters
 # ooooooooooooooooooooooo
 
 bc_model.boot_setup(original_contagious_pop, 0.1,
                     exclusion_populations=[total_pop, susceptible_pops['os'], susvaccan_pop, vaccan_pop])
 
-*** need to think about the above line...
-
-bc_model.save_file('ref_model_3_1.pypm')
+bc_model.save_file('ref_model_' + str(version) + '_' + str(subversion) + '.pypm')

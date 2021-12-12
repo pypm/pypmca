@@ -15,6 +15,9 @@ from pathlib import Path
 import datetime
 
 example_dir = Path('../../examples/').resolve()
+path_model_4_1 = example_dir / 'ref_model_4_1.pypm'
+path_model_3_1 = example_dir / 'ref_model_3_1.pypm'
+path_model_3_0 = example_dir / 'ref_model_3_0.pypm'
 path_model_2_9 = example_dir / 'ref_model_2_9.pypm'
 path_model_2_8 = example_dir / 'ref_model_2_8.pypm'
 path_model_2_7 = example_dir / 'ref_model_2_7.pypm'
@@ -50,8 +53,8 @@ def test_Model_copy_values_from():
 
 def test_Model_properties():
     """tests to ensure the properties of Model"""
-    ref_model_2 = Model.open_file(path_model_2)
-    ref_model_1 = Model.open_file(path_model_1)
+    ref_model_1 = Model.open_file(path_model_3_0)
+    ref_model_2 = Model.open_file(path_model_3_0)
 
     for test_model in [ref_model_1, ref_model_2]:
         # check simple scaling of initial contagious population
@@ -892,3 +895,135 @@ def test_mixing_evolve_data():
     ref_2_9.generate_data(100,from_step=0,data_start=50)
     reported = ref_2_9.populations['reported'].history
     i=1
+
+def test_model_az_3_0():
+    az_2_9 = Model.open_file('az_2_9_1121.pypm')
+    az_3_0 = Model.open_file(path_model_3_0)
+
+    az_3_0.copy_values_from(az_2_9)
+    az_3_0.name = 'az_3_0_1121'
+
+    #v_hesitant = 0.14
+    #N0 = az_2_9.parameters['N_0'].get_value()
+    #az_2_9.populations['vacc cand'].set_initial_value(int(N0 * (1. - v_hesitant)))
+    #az_2_9.populations['sus vacc cand'].set_initial_value(int(N0 * (1. - v_hesitant)))
+
+    #az_2_9.parameters['vacc_time_1'].set_value(290)
+    #az_3_0.parameters['vacc_time_1'].set_value(290)
+
+    az_3_0.reset()
+    az_2_9.evolve_expectations(289)
+    az_2_9.evolve_expectations(640-289, from_step=289)
+
+    az_3_0.parameters['vac_waned_delay_mean'].set_value(10000.)
+    az_3_0.parameters['nat_waned_delay_mean'].set_value(10000.)
+    az_3_0.parameters['vac_waned_frac'].set_value(0.)
+
+    #v_hesitant = 0.14
+    #N0 = az_3_0.parameters['N_0'].get_value()
+    #az_3_0.populations['vacc cand'].set_initial_value(int(N0 * (1. - v_hesitant)))
+    #az_3_0.populations['sus vacc cand'].set_initial_value(int(N0 * (1. - v_hesitant)))
+
+    az_3_0.reset()
+    #az_3_0.evolve_expectations(500)
+    az_3_0.evolve_expectations(289)
+    az_3_0.evolve_expectations(640-289, from_step=289)
+
+    reps = []
+    rep_vs = []
+    wanned = []
+
+    pops = ['susceptible','immunized','usefully vaccinated','daily vaccinated','vacc cand','sus vacc cand']
+    compares = {}
+    for pop in pops:
+        compares[pop] = []
+
+    for day in [288,289,290,291,292,293,500]:
+        reps_m = []
+        rep_vs_m = []
+
+        for model in [az_2_9, az_3_0]:
+            rep = model.populations['reported'].history[day] - model.populations['reported'].history[day - 1]
+            reps_m.append(rep)
+            rep_v = model.populations['reported_v'].history[day]-model.populations['reported_v'].history[day-1]
+            rep_vs_m.append(rep_v)
+
+        for pop in pops:
+            compares[pop].append([az_2_9.populations[pop].history[day],az_3_0.populations[pop].history[day]])
+
+        wanned.append(az_3_0.populations['waned nat immunity'].history[day])
+        reps.append(reps_m)
+        rep_vs.append(rep_vs_m)
+
+    i=1
+
+def test_model_az_3_1():
+    az_2_9 = Model.open_file('az_2_9_1121.pypm')
+    az_3_1 = Model.open_file(path_model_3_1)
+
+    result = az_3_1.copy_values_from(az_2_9)
+    az_3_1.name = 'az_3_1_1121'
+
+    az_3_1.save_file('az_3_1.pypm')
+
+    #v_hesitant = 0.14
+    #N0 = az_2_9.parameters['N_0'].get_value()
+    #az_2_9.populations['vacc cand'].set_initial_value(int(N0 * (1. - v_hesitant)))
+    #az_2_9.populations['sus vacc cand'].set_initial_value(int(N0 * (1. - v_hesitant)))
+
+    #az_2_9.parameters['vacc_time_1'].set_value(290)
+    #az_3_1.parameters['vacc_time_1'].set_value(290)
+
+    az_2_9.reset()
+    az_2_9.evolve_expectations(289)
+    az_2_9.evolve_expectations(640-289, from_step=289)
+
+    az_3_1.parameters['vac_waned_delay_mean'].set_value(10000.)
+    az_3_1.parameters['nat_waned_delay_mean'].set_value(10000.)
+    az_3_1.parameters['vac_waned_frac'].set_value(0.)
+
+    #v_hesitant = 0.14
+    #N0 = az_3_1.parameters['N_0'].get_value()
+    #az_3_1.populations['vacc cand'].set_initial_value(int(N0 * (1. - v_hesitant)))
+    #az_3_1.populations['sus vacc cand'].set_initial_value(int(N0 * (1. - v_hesitant)))
+
+    az_3_1.reset()
+    #az_3_1.evolve_expectations(500)
+    az_3_1.evolve_expectations(289)
+    az_3_1.evolve_expectations(640-289, from_step=289)
+
+    reps = []
+    rep_vs = []
+    wanned = []
+
+    pops = ['susceptible','immunized','usefully vaccinated','daily vaccinated','vacc cand','sus vacc cand']
+    compares = {}
+    for pop in pops:
+        compares[pop] = []
+
+    for day in [288,289,290,291,292,293,500]:
+        reps_m = []
+        rep_vs_m = []
+
+        for model in [az_2_9, az_3_1]:
+            rep = model.populations['reported'].history[day] - model.populations['reported'].history[day - 1]
+            reps_m.append(rep)
+            rep_v = model.populations['reported_v'].history[day]-model.populations['reported_v'].history[day-1]
+            rep_vs_m.append(rep_v)
+
+        for pop in pops:
+            compares[pop].append([az_2_9.populations[pop].history[day],az_3_1.populations[pop].history[day]])
+
+        reps.append(reps_m)
+        rep_vs.append(rep_vs_m)
+
+    i=1
+
+def test_model_az_4_1():
+    az_2_9 = Model.open_file('az_2_9_1121.pypm')
+    az_4_1 = Model.open_file(path_model_4_1)
+
+    result = az_4_1.copy_values_from(az_2_9)
+    az_4_1.name = 'az_4_1_1121'
+
+    az_4_1.save_file('az_4_1.pypm')
