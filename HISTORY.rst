@@ -121,7 +121,7 @@ History
  * add method to convert population future expectations to Poisson variates
  * add option for optimizer to skip zeros (no report days) for fit to cumulative
 
-* 0.2.24 (2021-12-09)
+* 0.3.0 (2021-12-09)
 
  * add new connector: Collector
  * add new class: Operator
