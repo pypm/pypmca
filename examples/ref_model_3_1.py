@@ -168,10 +168,8 @@ def rotated_color(i_rot, c):
 version = 4
 subversion = 1
 
-# no_bt turns off the breakthrough
-no_bt = False
-if version == 4:
-    no_bt = True
+# no_bt turns off the breakthrough. Turned off in version 4.
+no_bt = version == 4
 
 bc_model = Model('ref_model_' + str(version) + '_' + str(subversion))
 bc_model.set_t0(2020, 3, 1)
@@ -193,8 +191,9 @@ initial_contagious_par = Parameter('cont_0', 10., 0., 5000.,
 # THE SUM OF THE INITIAL VALUES OF THE POPULATIONS ****
 # ==============================================================
 
-cycles = {'os': 'original susceptible', 'bt': 'breakthrough', 've': 'vaccine escape', 'ne': 'natural escape'}
-if no_bt:
+if not no_bt:
+    cycles = {'os': 'original susceptible', 'bt': 'breakthrough', 've': 'vaccine escape', 'ne': 'natural escape'}
+else:
     # removes the breakthrough cycle
     cycles = {'os': 'original susceptible', 've': 'vaccine escape', 'ne': 'natural escape'}
 
@@ -342,8 +341,9 @@ collector_populations[nat_immunized_pop] = nat_immunized_pops
 
 nat_escape_fraction = Parameter('ne_frac', 0.5, 0., 1.,
                                 'fraction of natural immunizations that can escape')
-cycle_list = ['os', 'bt']
-if no_bt:
+if not no_bt:
+    cycle_list = ['os', 'bt']
+else:
     cycle_list = ['os']
 
 for cycle in cycle_list:
@@ -650,7 +650,7 @@ for variant, color in zip(variants, colors):
     else:
         deaths_pops[variant] = Population('deaths ' + variant, 0,
                                           'all those who have died from ' + variant, hidden=True,
-                                          color=rotated_color(irc[cycle], color), show_sim=True,
+                                          color=rotated_color(0, color), show_sim=True,
                                           report_noise=True, report_noise_par=death_noise_par,
                                           report_backlog_par=death_backlog_par, report_days=death_report_days,
                                           report_noise_weekly=True)
@@ -825,7 +825,7 @@ for variant, color in zip(variants, colors):
     reported_pops[variant] = reported_pops_variant
 
     reported_pop_variant = Population('reported_' + variant, 0,
-                                      cycles[cycle] + ' cases',
+                                      variants[variant] + ' cases',
                                       hidden=True, color=color, show_sim=True,
                                       report_noise=True, report_noise_par=report_noise_par,
                                       report_backlog_par=report_backlog_par, report_days=report_days)
@@ -869,7 +869,7 @@ reported_pop = Population('reported', 0,
                           report_noise=True, report_noise_par=report_noise_par,
                           report_backlog_par=report_backlog_par, report_days=report_days)
 
-#collector_populations[reported_pop] = all_reported_pops
+# collector_populations[reported_pop] = all_reported_pops
 # The reported population is subsequently used to adjust the vaccine candidates
 # So, the collection has to be done now, rather than at the end
 
@@ -1065,7 +1065,7 @@ for variant in variants:
                                                variants[variant] + ' scale factor for fraction of symptomatic who ' +
                                                'are admitted to icu', hidden=True)
 
-icu_released_pop = Population('icu_rel', 0, cycles[cycle] +
+icu_released_pop = Population('icu_rel', 0,
                               'admitted to ICU and released:',
                               hidden=True, color='lightgrey', show_sim=False)
 
