@@ -1027,3 +1027,56 @@ def test_model_az_4_1():
     az_4_1.name = 'az_4_1_1121'
 
     az_4_1.save_file('az_4_1.pypm')
+
+    #v_hesitant = 0.14
+    #N0 = az_2_9.parameters['N_0'].get_value()
+    #az_2_9.populations['vacc cand'].set_initial_value(int(N0 * (1. - v_hesitant)))
+    #az_2_9.populations['sus vacc cand'].set_initial_value(int(N0 * (1. - v_hesitant)))
+
+    #az_2_9.parameters['vacc_time_1'].set_value(290)
+    #az_4_1.parameters['vacc_time_1'].set_value(290)
+
+    az_2_9.reset()
+    az_2_9.evolve_expectations(289)
+    az_2_9.evolve_expectations(640-289, from_step=289)
+
+    az_4_1.parameters['vac_waned_delay_mean'].set_value(10000.)
+    az_4_1.parameters['nat_waned_delay_mean'].set_value(10000.)
+    az_4_1.parameters['vac_waned_frac'].set_value(0.)
+
+    #v_hesitant = 0.14
+    #N0 = az_4_1.parameters['N_0'].get_value()
+    #az_4_1.populations['vacc cand'].set_initial_value(int(N0 * (1. - v_hesitant)))
+    #az_4_1.populations['sus vacc cand'].set_initial_value(int(N0 * (1. - v_hesitant)))
+
+    az_4_1.reset()
+    #az_4_1.evolve_expectations(500)
+    az_4_1.evolve_expectations(289)
+    az_4_1.evolve_expectations(640-289, from_step=289)
+
+    reps = []
+    rep_vs = []
+    wanned = []
+
+    pops = ['susceptible','immunized','usefully vaccinated','daily vaccinated','vacc cand','sus vacc cand']
+    compares = {}
+    for pop in pops:
+        compares[pop] = []
+
+    for day in [288,289,290,291,292,400,500]:
+        reps_m = []
+        rep_vs_m = []
+
+        for model in [az_2_9, az_4_1]:
+            rep = model.populations['reported'].history[day] - model.populations['reported'].history[day - 1]
+            reps_m.append(rep)
+            rep_v = model.populations['reported_v'].history[day]-model.populations['reported_v'].history[day-1]
+            rep_vs_m.append(rep_v)
+
+        for pop in pops:
+            compares[pop].append([az_2_9.populations[pop].history[day],az_4_1.populations[pop].history[day]])
+
+        reps.append(reps_m)
+        rep_vs.append(rep_vs_m)
+
+    i=1

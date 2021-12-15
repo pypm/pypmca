@@ -165,7 +165,7 @@ def rotated_color(i_rot, c):
 
 # Reference model for BC
 
-version = 3
+version = 4
 subversion = 1
 
 # no_bt turns off the breakthrough
@@ -829,14 +829,21 @@ for variant, color in zip(variants, colors):
                                       hidden=True, color=color, show_sim=True,
                                       report_noise=True, report_noise_par=report_noise_par,
                                       report_backlog_par=report_backlog_par, report_days=report_days)
-    collector_populations[reported_pop_variant] = reported_pops_variant
+
+    # do this collection now so it is in sync with all_reported
+    populations = []
+    for key in reported_pops_variant:
+        populations.append(reported_pops_variant[key])
+
+    bc_model.add_connector(
+        Collector(reported_pop_variant.name, populations, reported_pop_variant))
 
 # setup collectors for reported by cycle and all reports
 
 color = 'forestgreen'
-reported_pops_cycle = {}
 all_reported_pops = {}
 for cycle in cycles:
+    reported_pops_cycle = {}
     for variant in variants:
         if variant in variants_in_cycle[cycle]:
             reported_pops_cycle[variant] = reported_pops[variant][cycle]
@@ -847,7 +854,14 @@ for cycle in cycles:
                                     hidden=True, color=rotated_color(irc[cycle], color), show_sim=True,
                                     report_noise=True, report_noise_par=report_noise_par,
                                     report_backlog_par=report_backlog_par, report_days=report_days)
-    collector_populations[reported_pop_cycle] = reported_pops_cycle
+
+    # do this collection now so it is in sync with all_reported
+    populations = []
+    for key in reported_pops_cycle:
+        populations.append(reported_pops_cycle[key])
+
+    bc_model.add_connector(
+        Collector(reported_pop_cycle.name, populations, reported_pop_cycle))
 
 reported_pop = Population('reported', 0,
                           'Positives and reporting anomalies',
@@ -855,7 +869,16 @@ reported_pop = Population('reported', 0,
                           report_noise=True, report_noise_par=report_noise_par,
                           report_backlog_par=report_backlog_par, report_days=report_days)
 
-collector_populations[reported_pop] = all_reported_pops
+#collector_populations[reported_pop] = all_reported_pops
+# The reported population is subsequently used to adjust the vaccine candidates
+# So, the collection has to be done now, rather than at the end
+
+populations = []
+for key in all_reported_pops:
+    populations.append(all_reported_pops[key])
+
+bc_model.add_connector(
+    Collector(reported_pop.name, populations, reported_pop))
 
 # include reporting anomalies (in overall reports only)
 # ---------------------------
