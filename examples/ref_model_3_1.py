@@ -960,6 +960,14 @@ non_icu_delay_pars = {
 }
 non_icu_delay = Delay('non_icu_rel_delay', 'gamma', non_icu_delay_pars, bc_model)
 
+non_icu_delay_pars_x = {
+    'mean': Parameter('non_icu_rel_delay_mean_x', 10., 0., 50.,
+                      'mean time from non_icu hospital to release: xariant', hidden=False),
+    'sigma': Parameter('non_icu_rel_delay_sigma_x', 3., 0.01, 20.,
+                       'standard deviation of times from non_icu hospital to release: xariant')
+}
+non_icu_delay_x = Delay('non_icu_rel_delay_x', 'gamma', non_icu_delay_pars_x, bc_model)
+
 release_fraction = Parameter('release_frac', 1., 1., 1.,
                              'fraction for all released == 1', hidden=True)
 
@@ -1015,11 +1023,17 @@ for variant, color in zip(variants, colors):
                       non_icu_hospitalized_pops[cycle + variant], hospitalized_pop))
 
             # Those with non_icu hospitalization get released eventually
-
-            bc_model.add_connector(
-                Propagator(cycle + ' non_icu hospital to released ' + variant,
-                           non_icu_hospitalized_pops[cycle + variant],
-                           non_icu_released_pop, release_fraction, non_icu_delay))
+            # Data from SA suggests this is shorter for omicron
+            if variant !='x':
+                bc_model.add_connector(
+                    Propagator(cycle + ' non_icu hospital to released ' + variant,
+                               non_icu_hospitalized_pops[cycle + variant],
+                               non_icu_released_pop, release_fraction, non_icu_delay))
+            else:
+                bc_model.add_connector(
+                    Propagator(cycle + ' non_icu hospital to released: ' + variant,
+                               non_icu_hospitalized_pops[cycle + variant],
+                               non_icu_released_pop, release_fraction, non_icu_delay_x))
 
 non_icu_hospitalized_pop = Population('non_icu_hospitalized', 0,
                                       'Total non_icu hospitalization cases', color='dimgrey', show_sim=False)
@@ -1045,6 +1059,14 @@ non_vent_icu_delay_pars = {
                        'standard deviation of times from non-vent icu admission to release')
 }
 non_vent_icu_delay = Delay('in_icu_delay', 'gamma', non_vent_icu_delay_pars, bc_model)
+
+non_vent_icu_delay_pars_x = {
+    'mean': Parameter('non_vent_icu_delay_mean_x', 14., 0., 50.,
+                      'mean time from non-vent icu admission to release: xariant', hidden=False),
+    'sigma': Parameter('non_vent_icu_delay_sigma_x', 5., 0.01, 20.,
+                       'standard deviation of times from non-vent icu admission to release: xariant')
+}
+non_vent_icu_delay_x = Delay('in_icu_delay_x', 'gamma', non_vent_icu_delay_pars_x, bc_model)
 
 # nominal icu fraction ('os' and 'o)
 icu_fraction = Parameter('icu_frac', 0., 0., 1.,
@@ -1101,11 +1123,17 @@ for variant, color in zip(variants, colors):
                 Adder('include this in total icu ' + cycle + '_' + variant, icu_pops[cycle + variant], icu_pop))
 
             # Those admitted to icu get released eventually
-
-            bc_model.add_connector(
-                Propagator(cycle + ' icu to released ' + variant,
-                           icu_pops[cycle + variant],
-                           icu_released_pop, release_fraction, non_vent_icu_delay))
+            # data from SA suggest reduced times
+            if variant != 'x':
+                bc_model.add_connector(
+                    Propagator(cycle + ' icu to released ' + variant,
+                               icu_pops[cycle + variant],
+                               icu_released_pop, release_fraction, non_vent_icu_delay))
+            else:
+                bc_model.add_connector(
+                    Propagator(cycle + ' icu to released ' + variant,
+                               icu_pops[cycle + variant],
+                               icu_released_pop, release_fraction, non_vent_icu_delay_x))
 
 # make a copy of hospital admissions to keep track of how many remain in hospital
 # oooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooo
