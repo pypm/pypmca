@@ -258,7 +258,7 @@ for variant, color in zip(variants, colors):
 
     contagious_pop = Population('contagious_' + variant, 0,
                                 'contagious with type: ' + variants[variant], hidden=True, color=color)
-    collector_populations[contagious_pop] = contagious_pops_variant
+    # done below: collector_populations[contagious_pop] = contagious_pops_variant
     contagious_by_variant[variant] = contagious_pop
 
 contagious_by_variant['o'].set_initial_value(initial_contagious_par)
@@ -585,6 +585,17 @@ if not no_bt:
 # Interest in health outcomes for naive and immunized treated separately
 # Track deaths (and hosp) likewise.
 # oooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooo
+
+# The contagious_by_variant populations need to be collected before the propagation to deaths
+
+for variant in variants:
+    contagious_pop_variant = contagious_by_variant[variant]
+    populations = []
+    for key in contagious_pops[variant]:
+        populations.append(contagious_pops[variant][key])
+
+    bc_model.add_connector(
+        Collector(contagious_pop_variant.name, populations, contagious_pop_variant))
 
 # add death reporting noise that is reported out weekly
 # to increase weekly death reporting variance, set death_backlog near 0, and set death_noise below 1.
