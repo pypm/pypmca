@@ -1397,6 +1397,7 @@ for i in range(4):
 # ooooooooooooooooooooooo
 
 bc_model.boot_setup(original_contagious_pop, 0.1,
-                    exclusion_populations=[total_pop, susceptible_pops['os'], susvaccan_pop, vaccan_pop])
+                    exclusion_populations=[total_pop, susceptible_pop, susceptible_pops['os'],
+                                           susvaccan_pop, vaccan_pop])
 
 bc_model.save_file('ref_model_' + str(version) + '_' + str(subversion) + '.pypm')
