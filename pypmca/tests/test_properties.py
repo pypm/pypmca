@@ -1080,3 +1080,9 @@ def test_model_az_4_1():
         rep_vs.append(rep_vs_m)
 
     i=1
+
+def test_model_bc_4_1():
+    bc_4_1 = Model.open_file('bc_4_1_1231x.pypm')
+    bc_4_1.reset()
+    bc_4_1.evolve_expectations(700)
+    i = 1

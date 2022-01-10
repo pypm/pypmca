@@ -32,6 +32,14 @@ class Collector(Connector):
             raise TypeError('Collector(' + self.name +
                             ') from_population must be a list')
 
+        # Identify the to_population as one not to derive daily numbers if any of the from_populations
+        # have a subtraction
+        monotonic = True
+        for from_pop in from_population:
+            if not from_pop.monotonic:
+                monotonic = False
+        self.to_population.monotonic = monotonic
+
     def update_expectation(self):
         """
         add all immediate futures
@@ -40,7 +48,13 @@ class Collector(Connector):
 
         for from_pop in self.from_population:
             if len(from_pop.future) > 0:
-                newcomers += from_pop.future[0]
+                # all populations are forced to remain positive
+                # do not decrease by more than existing population size
+                incoming = from_pop.future[0]
+                if incoming < 0:
+                    if incoming < -1*from_pop.history[-1]:
+                        incoming = -1*from_pop.history[-1]
+                newcomers += incoming
 
         self.to_population.update_future_fast(newcomers)
 
