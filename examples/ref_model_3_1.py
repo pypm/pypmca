@@ -167,11 +167,14 @@ def rotated_color(i_rot, c):
 
 version = 4
 subversion = 1
+dated = 'Jan 1, 2022 b'
 
 # no_bt turns off the breakthrough. Turned off in version 4.
 no_bt = version == 4
 
 bc_model = Model('ref_model_' + str(version) + '_' + str(subversion))
+bc_model.description = dated
+
 bc_model.set_t0(2020, 3, 1)
 
 fast_delay = Delay('fast', 'fast', model=bc_model)
@@ -507,52 +510,68 @@ bc_model.add_connector(
 # Include boosters:
 #####################
 # Grow the population of booster candidates (delay following first dose)
-# This requires the breakthrough process to be activated
+# There are two functions of boosting:
+# - removing people from bt-susceptible (requires bt process (model 3.1 instead of 4.1)
+# - removing people from ve-susceptible (included for both models)
+
+boostcan_pop = Population('boost cand', 0,
+                          'booster candidates', color=rotated_color(1, 'brown'))
+
+boosting_delay_pars = {
+    'mean': Parameter('boosting_delay_mean', 200., 120., 300., 'mean time from vaccination to booster eligibility'),
+    'sigma': Parameter('boosting_delay_sigma', 20., 1., 200.,
+                       'standard deviation of times from vaccination to booster eligibility')
+}
+boosting_delay = Delay('boosting_delay', 'gamma', boosting_delay_pars, bc_model)
+
+boost_fraction = Parameter('boost_frac', 1., 0., 1.,
+                           'fraction of boosters included == 1')
+
+bc_model.add_connector(
+    Propagator('boosting eligibility', vaccinated_pop, boostcan_pop, boost_fraction, boosting_delay))
+
+# A multiplier is used. Once the booster candidate population goes below zero, it stops.
+
+daily_boosted_pop = Population('daily boosted', 0, 'number of people boosted each day')
+
+boosted_pop = Population('boosted', 0, 'people boosted', color=rotated_color(1, 'skyblue'))
+
+bc_model.add_connector(
+    Multiplier('boosting', [boostcan_pop, daily_boosted_pop, boostcan_pop],
+               boosted_pop, boost_fraction, fast_delay, bc_model))
+
+boosted_delay_pars = {
+    'mean': Parameter('boosted_delay_mean', 10., 5., 100., 'mean time from booster to immunity'),
+    'sigma': Parameter('boosted_delay_sigma', 5., 1., 50.,
+                       'standard deviation of times from booster to immunity')
+}
+boosted_delay = Delay('boosted_delay', 'gamma', boosted_delay_pars, bc_model)
+
 
 if not no_bt:
-    boostcan_pop = Population('boost cand', 0,
-                              'booster candidates', color=rotated_color(1, 'brown'))
+    # Only a fraction of those were bt susceptible (designate those as usefully bt boosted)
 
-    boosting_delay_pars = {
-        'mean': Parameter('boosting_delay_mean', 200., 120., 300., 'mean time from vaccination to booster eligibility'),
-        'sigma': Parameter('boosting_delay_sigma', 20., 1., 200.,
-                           'standard deviation of times from vaccination to booster eligibility')
-    }
-    boosting_delay = Delay('boosting_delay', 'gamma', boosting_delay_pars, bc_model)
-
-    boost_fraction = Parameter('boost_frac', 1., 0., 1.,
-                               'fraction of boosters included == 1')
+    usefully_bt_boosted_pop = Population('usefully bt boosted', 0,
+                                      'people who were boosted when bt susceptible', color=rotated_color(1, 'navy'))
 
     bc_model.add_connector(
-        Propagator('boosting eligibility', vaccinated_pop, boostcan_pop, boost_fraction, boosting_delay))
-
-    # A multiplier is used. Once the booster candidate population goes below zero, it stops.
-
-    daily_boosted_pop = Population('daily boosted', 0, 'number of people boosted each day')
-
-    boosted_pop = Population('boosted', 0, 'people boosted', color=rotated_color(1, 'skyblue'))
-
-    bc_model.add_connector(
-        Multiplier('boosting', [boostcan_pop, daily_boosted_pop, boostcan_pop],
-                   boosted_pop, boost_fraction, fast_delay, bc_model))
-
-    # Only a fraction of those were susceptible (designate those as usefully boosted)
-
-    usefully_boosted_pop = Population('usefully boosted', 0,
-                                      'people who were boosted when susceptible', color=rotated_color(1, 'navy'))
-
-    bc_model.add_connector(
-        Adder('boosting bt susceptibles', boosted_pop, usefully_boosted_pop,
+        Adder('boosting bt susceptibles', boosted_pop, usefully_bt_boosted_pop,
               ratio_populations=[susceptible_pops['bt'], boostcan_pop]))
 
     # Now re-immunize some of those susceptible people who were boosted
 
     reimmunized_pop = Population('reimmunized', 0, 'number of bt susceptible people who were immunized by booster')
-    booster_effectiveness = Parameter('booster_eff', 0.8, 0., 1.,
+    bt_booster_effectiveness = Parameter('bt_booster_eff', 0.8, 0., 1.,
                                       'probability that a bt susceptible person gains immunity when boosted')
 
     bc_model.add_connector(
-        Propagator('reimmunization', usefully_boosted_pop, reimmunized_pop, booster_effectiveness, immunized_delay))
+        Propagator('reimmunization', usefully_bt_boosted_pop, reimmunized_pop,
+                   bt_booster_effectiveness, boosted_delay))
+
+    # reimmunizations reduce the breakthrough susceptible
+
+    bc_model.add_connector(
+        Subtractor('subtract re-immunized from bt susceptible', susceptible_pops['bt'], reimmunized_pop))
 
     # a fraction of re-immunizations will be susceptible to vaccine escape
 
@@ -578,6 +597,45 @@ if not no_bt:
     bc_model.add_connector(
         Subtractor('booster waned reduces ve susceptible', susceptible_pops['ve'], waned_boost_immunity_pop,
                    scale_factor=vac_escape_fraction))
+
+# Boosting also removes population from the ve-susceptible population
+# The fraction usefully removed is approximated by the parameter ve_frac
+
+usefully_ve_boosted_pop = Population('usefully ve boosted', 0,
+                                     'people who were boosted when ve susceptible', color=rotated_color(2, 'navy'))
+
+bc_model.add_connector(
+    Adder('boosting ve susceptibles', boosted_pop, usefully_ve_boosted_pop,
+          scale_factor=vac_escape_fraction))
+
+# Now remove some of those ve susceptible people who were boosted
+
+ve_removed_pop = Population('ve_removed', 0, 'number ve susceptible people who were immunized by booster')
+ve_booster_effectiveness = Parameter('ve_booster_eff', 0.8, 0., 1.,
+                                  'probability that a ve susceptible person gains immunity when boosted')
+
+bc_model.add_connector(
+    Propagator('ve removal', usefully_ve_boosted_pop, ve_removed_pop, ve_booster_effectiveness, boosted_delay))
+
+# ve removal reduce ve susceptible
+
+bc_model.add_connector(
+    Subtractor('subtract ve removal from ve susceptible', susceptible_pops['ve'], ve_removed_pop))
+
+# Waning booster ve removal
+
+waned_boost_ve_removed_pop = Population('waned booster ve removal', 0,
+                                      'people who lost immunity some time after gaining ve immunity through a booster',
+                                      hidden=True, color=rotated_color(2, 'mediumpurple'))
+
+bc_model.add_connector(
+    Propagator('ve boost waned immunity', ve_removed_pop, waned_boost_ve_removed_pop, vac_waned_fraction,
+               vac_waned_delay))
+
+# Once waned, the ve susceptible population increases
+
+bc_model.add_connector(
+    Adder('ve booster waned to ve susceptible', waned_boost_ve_removed_pop, susceptible_pops['ve']))
 
 # The contagious either recover or die
 # This split is only used to track the deaths.
@@ -1190,9 +1248,8 @@ frac_report_novacc_par = Parameter('frac_report_novacc', 1.0, 0., 1.,
 bc_model.add_connector(
     Subtractor('subtract vaccinated from vacc cand', vaccan_pop, vaccinated_pop))
 
-if not no_bt:
-    bc_model.add_connector(
-        Subtractor('subtract boosted from booster cand', boostcan_pop, boosted_pop))
+bc_model.add_connector(
+    Subtractor('subtract boosted from booster cand', boostcan_pop, boosted_pop))
 
 bc_model.add_connector(
     Subtractor('subtract usefully vaccinated from the sus vacc cand', susvaccan_pop, usefully_vaccinated_pop))
@@ -1271,21 +1328,19 @@ for i in range(n_vacc_periods):
         Injector('vaccination_' + str(j), 'rel_days', vaccination_time, daily_vaccinated_pop,
                  vaccination_number, enabled=False, model=bc_model))
 
-# booster scheduls
+# booster schedule
+n_boost_periods = 4
 
-if not no_bt:
-    n_boost_periods = 4
-
-    for i in range(n_boost_periods):
-        j = i + 1
-        boost_time = Parameter('boost_time_' + str(j), 75 + i, 0, 600,
-                               'first day of booster period ' + str(j),
-                               parameter_type='int')
-        boost_number = Parameter('boost_number_' + str(j), 10., 0., 5000000.,
-                                 'change in number boosted each day for period ' + str(j))
-        bc_model.add_transition(
-            Injector('booster_' + str(j), 'rel_days', boost_time, daily_boosted_pop,
-                     boost_number, enabled=False, model=bc_model))
+for i in range(n_boost_periods):
+    j = i + 1
+    boost_time = Parameter('boost_time_' + str(j), 675 + i, 0, 900,
+                           'first day of booster period ' + str(j),
+                           parameter_type='int')
+    boost_number = Parameter('boost_number_' + str(j), 10., 0., 5000000.,
+                             'change in number boosted each day for period ' + str(j))
+    bc_model.add_transition(
+        Injector('booster_' + str(j), 'rel_days', boost_time, daily_boosted_pop,
+                 boost_number, enabled=False, model=bc_model))
 
 # outbreaks (in the 'os' susceptible population)
 
