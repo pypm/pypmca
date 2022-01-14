@@ -126,3 +126,9 @@ History
  * add new connector: Collector
  * add new class: Operator
  * produce model 3.1 (4.1) for omicron with escape
+
+* 0.3.1 (2022-01-14)
+
+ * fix issue with Collector
+ * updates to reference models
+ * add option to optimizer to specify start day for iterations
