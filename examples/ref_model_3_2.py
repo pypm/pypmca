@@ -172,7 +172,7 @@ def rotated_color(i_rot, c):
 
 version = 4
 subversion = 2
-dated = 'Jan 10, 2022'
+dated = 'Jan 14, 2022'
 
 # no_bt turns off the breakthrough. Turned off in version 4.
 no_bt = version == 4
@@ -1378,21 +1378,25 @@ for variant in variants:
 
     for i in range(n_outbreaks[variant]):
         vid = ''
-        if i > 0:
-            vid = str(i)
-        if variant != 'o':
-            vid = variant + vid
+        if i == 0:
+            if variant != 'o':
+                vid = '_' + variant
+        else:
+            if variant == 'o':
+                vid = '_' + str(i)
+            else:
+                vid = '_' + variant + str(i)
 
-        outbreak_time = Parameter('outbreak_' + vid + '_time', 14, 0, 800,
-                                  'number of days since t0 when outbreak_' + vid + ' established',
+        outbreak_time = Parameter('outbreak' + vid + '_time', 14, 0, 800,
+                                  'number of days since t0 when outbreak' + vid + ' established',
                                   parameter_type='int', hidden=False)
 
-        outbreak_number = Parameter('outbreak_' + vid + '_number', 10., 0., 50000.,
-                                    'number of infections in outbreak_' + vid,
+        outbreak_number = Parameter('outbreak' + vid + '_number', 10., 0., 50000.,
+                                    'number of infections in outbreak' + vid,
                                     hidden=False)
 
         bc_model.add_transition(
-            Injector('outbreak_' + vid, 'rel_days', outbreak_time, outbreak_pop,
+            Injector('outbreak' + vid, 'rel_days', outbreak_time, outbreak_pop,
                      outbreak_number, enabled=False, model=bc_model))
 
     bc_model.add_connector(
