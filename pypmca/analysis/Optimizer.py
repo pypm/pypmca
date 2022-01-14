@@ -91,7 +91,7 @@ class Optimizer:
     """
 
     def __init__(self, model, full_population_name, data, data_range, cumul_reset=False, skip_data=None,
-                 skip_zeros=False):
+                 skip_zeros=False, local_start=None):
         self.model = model
         self.full_population_name = full_population_name
         self.population_name = full_population_name[6:]
@@ -100,6 +100,9 @@ class Optimizer:
         self.data_range = data_range
         self.cumul_reset = cumul_reset  # if True, use the cumulative starting at data_range[0] (a "local" fit)
         self.start_step = 0 # if local fit, this specifies the step to start each iteration (automatic, speeding up fit)
+        if local_start is not None:  # Use local_start to move forward the start of each iteration (delayed observable)
+            if isinstance(local_start, int) and local_start >= 0:
+                self.start_step = local_start
         self.model_ref = None # if local fit, this is the reference model that is copied
         self.variable_names = []  # float type variable parameters
         self.variable_initial_values = None
@@ -153,10 +156,13 @@ class Optimizer:
             return x_rem,y_rem
 
     def func_setup(self):
-        # if a local fit, setup the start_step
+        # if a local fit, setup the start_step (either from local_start or data_range[0]
         transition_variable_steps = {}
         if self.cumul_reset:
-            self.start_step = self.data_range[0]
+            if self.start_step == 0:
+                self.start_step = self.data_range[0]
+            elif self.data_range[0] < self.start_step:
+                self.start_step = self.data_range[0]
             # get list of transitioning parameters and their dates
             for trans_name in self.model.transitions:
                 transition = self.model.transitions[trans_name]
