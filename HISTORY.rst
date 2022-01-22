@@ -132,3 +132,7 @@ History
  * fix issue with Collector
  * updates to reference models
  * add option to optimizer to specify start day for iterations
+
+* 0.3.2 (2022-01-22)
+
+ * fix issue with Adder and Subtractor: prevent pop ratios from exceeding 1.
