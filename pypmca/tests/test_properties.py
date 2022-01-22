@@ -15,6 +15,8 @@ from pathlib import Path
 import datetime
 
 example_dir = Path('../../examples/').resolve()
+path_model_4_2 = example_dir / 'ref_model_4_2.pypm'
+path_model_3_2 = example_dir / 'ref_model_3_2.pypm'
 path_model_4_1 = example_dir / 'ref_model_4_1.pypm'
 path_model_3_1 = example_dir / 'ref_model_3_1.pypm'
 path_model_3_0 = example_dir / 'ref_model_3_0.pypm'
@@ -53,8 +55,8 @@ def test_Model_copy_values_from():
 
 def test_Model_properties():
     """tests to ensure the properties of Model"""
-    ref_model_1 = Model.open_file(path_model_3_0)
-    ref_model_2 = Model.open_file(path_model_3_0)
+    ref_model_1 = Model.open_file(path_model_4_1)
+    ref_model_2 = Model.open_file(path_model_4_1)
 
     for test_model in [ref_model_1, ref_model_2]:
         # check simple scaling of initial contagious population
@@ -64,7 +66,7 @@ def test_Model_properties():
         test_model.reset()
         test_model.evolve_expectations(200)
         n_reported1 = test_model.populations['reported'].history[-1]
-        assert test_model.populations['contagious'].history[-1] < 10.
+        assert test_model.populations['contagious_o'].history[-1] < 10.
 
         test_model.parameters['cont_0'].set_value(2 * cont_0)
         test_model.reset()
@@ -1086,3 +1088,57 @@ def test_model_bc_4_1():
     bc_4_1.reset()
     bc_4_1.evolve_expectations(700)
     i = 1
+
+def test_model_ny_4_2():
+    ny_4_2 = Model.open_file('/Users/karlen/pypm-local/models/covid19/USA/ny_4_2_0109.pypm')
+    ny_4_2.reset()
+    ny_4_2.evolve_expectations(40)
+    num = ny_4_2.populations['reported'].history[-1]
+    cont_0 = ny_4_2.parameters['cont_0'].get_value()
+    ny_4_2.parameters['cont_0'].set_value(2.*cont_0)
+    ny_4_2.reset()
+    ny_4_2.evolve_expectations(40)
+    num2 = ny_4_2.populations['reported'].history[-1]
+    if (ny_4_2.populations['contagious_o'].initial_value != ny_4_2.parameters['cont_0']):
+        ny_4_2.populations['contagious_o'].initial_value = ny_4_2.parameters['cont_0']
+        print('changed')
+    ny_4_2.reset()
+    ny_4_2.evolve_expectations(40)
+    num3 = ny_4_2.populations['reported'].history[-1]
+    i = 1
+
+def test_model_ks_4_2():
+    ks_4_2 = Model.open_file('ks_4_2_0116_problem.pypm')
+    ks_4_2.reset()
+    ks_4_2.evolve_expectations(720)
+    recent_oe_ve = [[ks_4_2.populations['os_susceptible'].history[i], ks_4_2.populations['ve_susceptible'].history[i]] \
+                    for i in range(695,700)]
+    ks_4_2.reset()
+    ks_4_2.parameters['ve_frac'].set_value(0.801)
+    ks_4_2.evolve_expectations(720)
+    recent_oe_ve2 = [[ks_4_2.populations['os_susceptible'].history[i], ks_4_2.populations['ve_susceptible'].history[i]] \
+                    for i in range(695,700)]
+    i = 1
+
+def test_point_estimate_local_death():
+    start_day = 80
+    end_day = 100
+    ref_2 = Model.open_file('/Users/karlen/pypm-local/models/covid19/USA/ny_4_2_0109.pypm')
+    sim_2 = Model.open_file('/Users/karlen/pypm-local/models/covid19/USA/ny_4_2_0109.pypm')
+
+    # do fit of recover_frac
+    for par_name in ref_2.parameters:
+        par = ref_2.parameters[par_name]
+        par.set_fixed()
+    for par_name in ['recover_frac']:
+        par = ref_2.parameters[par_name]
+        par.set_variable(None, None)
+
+    sim_2.reset()
+    sim_2.generate_data(end_day)
+    optimizer = Optimizer(ref_2, 'total deaths', sim_2.populations['deaths'].history, [start_day, end_day],cumul_reset=True)
+    optimizer.reset_variables()
+
+    popt, pcov = optimizer.fit()
+
+    iii=1

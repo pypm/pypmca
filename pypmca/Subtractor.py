@@ -29,7 +29,7 @@ class Subtractor(Connector):
         this connector.
         - scale_factor: Parameter or Operator object that multiplies expectation. Data treats fraction as binomial
         - ratio_populations: List of 2 populations, the ratio of those populations is applied as
-        a scale factor
+        a scale factor: maximum ratio is 1.
     """
 
     def __init__(self, connector_name: str, from_population: Population, to_population: Population,
@@ -89,7 +89,7 @@ class Subtractor(Connector):
             if getattr(self, "scale_factor", None) is not None:
                 reduction = self.scale_factor.get_value() * reduction
             if getattr(self, "ratio_populations", None) is not None:
-                if self.ratio_populations[1].history[-1] > 0.:
+                if self.ratio_populations[1].history[-1] > self.ratio_populations[0].history[-1]:
                     ratio = self.ratio_populations[0].history[-1] / self.ratio_populations[1].history[-1]
                     reduction = ratio * reduction
 
@@ -108,7 +108,7 @@ class Subtractor(Connector):
             if getattr(self, "scale_factor", None) is not None:
                 scale = self.scale_factor.get_value() * scale
             if getattr(self, "ratio_populations", None) is not None:
-                if self.ratio_populations[1].history[-1] > 0.:
+                if self.ratio_populations[1].history[-1] > self.ratio_populations[0].history[-1]:
                     ratio = 1. * self.ratio_populations[0].history[-1] / self.ratio_populations[1].history[-1]
                     scale = ratio * scale
 

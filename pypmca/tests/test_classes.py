@@ -146,9 +146,9 @@ def test_class_Delay():
 def test_class_Adder():
     """tests to ensure the behaviour class Adder"""
     for itest in range(6):
-        f_over_t = 2
+        from_init = 5
         to_init = 10
-        from_init = f_over_t * to_init
+        f_over_t = 1.*from_init/to_init
         from_pop = Population('from_pop', from_init)
         from_next = 40
         from_pop.future = [from_next]
@@ -158,34 +158,36 @@ def test_class_Adder():
             test_adder.update_expectation()
             assert to_pop.future[0] == from_next
         elif itest == 1:
-            sf = 2.
+            sf = 0.2
             scale_factor = Parameter('scale_factor', sf, 0., 10.)
             test_adder = Adder('test_add', from_pop, to_pop, scale_factor=scale_factor)
             test_adder.update_expectation()
             assert to_pop.future[0] == from_next * sf
         elif itest == 2:
-            sf = 3.
+            sf = 0.3
             ratio_pops = [from_pop, to_pop]
             scale_factor = Parameter('scale_factor', sf, 0., 10.)
             test_adder = Adder('test_add', from_pop, to_pop, scale_factor=scale_factor, ratio_populations=ratio_pops)
             test_adder.update_expectation()
             assert to_pop.future[0] == from_next * sf * f_over_t
         elif itest == 3:
-            sf = 3
+            sf = 0.3
             ratio_pops = [from_pop, to_pop]
-            scale_factor = Parameter('scale_factor', sf, 0, 10, ' ', 'int')
+            scale_factor = Parameter('scale_factor', sf, 0, 10.)
             test_adder = Adder('test_add', from_pop, to_pop, scale_factor=scale_factor, ratio_populations=ratio_pops)
             test_adder.update_data()
-            assert to_pop.future[0] == from_next * sf * f_over_t
+            prob = sf * f_over_t
+            sigma = np.sqrt(from_next*prob*(1-prob))
+            assert np.abs(to_pop.future[0] - from_next * sf * f_over_t)<3.*sigma
         elif itest == 4:
-            sf = 3.1
+            sf = 0.31
             ratio_pops = [from_pop, to_pop]
             scale_factor = Parameter('scale_factor', sf, 0., 10.)
             test_adder = Adder('test_add', from_pop, to_pop, scale_factor=scale_factor, ratio_populations=ratio_pops)
             test_adder.update_data()
-            assert to_pop.future[0] >= from_next * int(sf) * f_over_t
+            assert np.abs(to_pop.future[0] - from_next * sf * f_over_t)<3.*sigma
         elif itest == 5:
-            sf = 3.1
+            sf = 0.31
             r1 = Parameter('r1', sf/3., parameter_min=1., parameter_max=100.)
             r2 = Parameter('r2', 3., parameter_min=1., parameter_max=100.)
             ratio_pops = [from_pop, to_pop]
