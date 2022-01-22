@@ -323,12 +323,13 @@ class Forecast_hub:
         record.append('{0:0.1f}'.format(value))
         self.buff.append(record)
 
-my_forecast = Forecast_hub('/Users/karlen/pypm-temp/usa', ['_2_9_1003'])
+my_forecast = Forecast_hub('/Users/karlen/pypm-temp/usa', ['_4_2_0116'])
 # Indicate the total US deaths (up to and including Saturday) here:
-us_deaths = 700932
+us_deaths = 850060
 
 # changed to 3 for Feb 28 - all have variant - large correlated uncertainty! - Apr 25: return to 1.5 (single strain)
-my_csv = my_forecast.get_csv(datetime.date(2021, 10, 3), us_deaths, cor_scale=1.5)
+# changed back to 3 for Jan 16 2022 (omicron)
+my_csv = my_forecast.get_csv(datetime.date(2022, 1, 16), us_deaths, cor_scale=3.0)
 pass
 with open('/Users/karlen/pypm-temp/test-forecast.csv','w') as out:
     for line in my_csv:
