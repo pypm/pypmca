@@ -112,6 +112,7 @@ Version 3.2:
 Version 3.3:
   - Include a new strain (labelled y) for Omicron BA.2
   - Add populations to compare to sero_prevalence data: infected (all types) -> sero_positive -> sero_waned
+  - Increase booster periods from 4 to 6
 
 @author: karlen
 """
@@ -176,7 +177,7 @@ def rotated_color(i_rot, c):
 
 version = 4
 subversion = 3
-dated = 'March 9, 2022'
+dated = 'March 27, 2022'
 
 # no_bt turns off the breakthrough. Turned off in version 4.
 no_bt = version == 4
@@ -1379,7 +1380,7 @@ for i in range(n_vacc_periods):
                  vaccination_number, enabled=False, model=bc_model))
 
 # booster schedule
-n_boost_periods = 4
+n_boost_periods = 6
 
 for i in range(n_boost_periods):
     j = i + 1
