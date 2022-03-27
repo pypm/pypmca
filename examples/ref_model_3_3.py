@@ -111,6 +111,7 @@ Version 3.2:
 
 Version 3.3:
   - Include a new strain (labelled y) for Omicron BA.2
+  - Add populations to compare to sero_prevalence data: infected (all types) -> sero_positive -> sero_waned
 
 @author: karlen
 """
@@ -175,7 +176,7 @@ def rotated_color(i_rot, c):
 
 version = 4
 subversion = 3
-dated = 'Feb 4, 2022'
+dated = 'March 9, 2022'
 
 # no_bt turns off the breakthrough. Turned off in version 4.
 no_bt = version == 4
@@ -237,6 +238,7 @@ collector_populations[susceptible_pop] = susceptible_pops
 colors = ['orange', 'darkgoldenrod', 'sienna', 'sandybrown', 'darkkhaki']
 
 infected_pops = {}
+all_infected_pops = {}
 for variant, color in zip(variants, colors):
     infected_pops_variant = {}
     for cycle in cycles:
@@ -244,11 +246,17 @@ for variant, color in zip(variants, colors):
             infected_pops_variant[cycle] = Population(cycle + '_infected_' + variant, 0,
                                                       cycles[cycle] + ' infected by type: ' + variants[variant],
                                                       color=rotated_color(irc[cycle], color))
+            all_infected_pops[variant + cycle] = infected_pops_variant[cycle]
+
     infected_pops[variant] = infected_pops_variant
 
     infected_pop = Population('infected_' + variant, 0, 'infected by type: ' + variants[variant],
                               hidden=True, color=color)
     collector_populations[infected_pop] = infected_pops_variant
+
+all_infected_pop = Population('infected', 0, 'infected',
+                              hidden=True, color='saddlebrown')
+collector_populations[all_infected_pop] = all_infected_pops
 
 # contagious
 colors = ['red', 'rosybrown', 'maroon', 'lightcoral', 'orangered']
@@ -1300,6 +1308,33 @@ for collector_population in collector_populations:
     bc_model.add_connector(
         Collector(collector_population.name, populations, collector_population)
     )
+
+# add the infected (a collector population) to sero_positive, then wane
+
+sero_positive_pop = Population('sero_positive', 0, 'sero_positive',
+                               hidden=True, color='steelblue')
+bc_model.add_connector(
+    Adder('add new infections to sero_positive', all_infected_pop, sero_positive_pop))
+
+sero_waned_pop = Population('sero_waned', 0, 'previously sero_positive', color='lightcyan')
+
+sero_waned_fraction = Parameter('sero_waned_frac', 1., 0., 1.,
+                                'fraction of sero_positive that wane')
+
+sero_waned_delay_pars = {
+    'mean': Parameter('sero_waned_delay_mean', 180., 0., 1000.,
+                      'mean time from injection of anomalies to being reported'),
+    'sigma': Parameter('sero_waned_delay_sigma', 50., 0., 1000.,
+                       'standard deviation of times from injection of anomalies to being reported')
+}
+sero_waned_delay = Delay('sero_waned_delay', 'gamma', sero_waned_delay_pars, bc_model)
+
+bc_model.add_connector(
+    Propagator('waning of sero_positive', sero_positive_pop,
+               sero_waned_pop, sero_waned_fraction, sero_waned_delay))
+
+bc_model.add_connector(
+    Subtractor('subtract sero_waned from sero_positive', sero_positive_pop, sero_waned_pop))
 
 # transitional aspects of the model
 # oooooooooooooooooooooooooooooooooo
