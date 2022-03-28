@@ -15,6 +15,10 @@ import datetime
 from datetime import timedelta
 import copy
 
+# local data - TRIUMF offline!
+import os
+import imp
+
 from pypmca import Model, Population, Delay, Parameter, Multiplier, Propagator, \
     Splitter, Adder, Subtractor, Chain, Modifier, Injector, Ensemble
 
@@ -28,6 +32,8 @@ class Forecast_hub:
         self.model_dir = Path(folder).resolve()
         self.model_names = model_names
         self.pd_dict = self.get_data()
+        # TRIUMF offline:
+        # self.pd_dict = self.get_offline_data()
         self.buff = [['forecast_date', 'target', 'target_end_date', 'location', 'type', 'quantile', 'value']]
 
         # number of daysfor case_normalization
@@ -90,6 +96,9 @@ class Forecast_hub:
             'WY': '56'
         }
 
+        self.state_fips = {v: k for k, v in self.fips_code.items()}
+        self.state_fips['US'] = 'US'
+
     def get_data(self):
         data_folder = 'data/covid19/USA'
 
@@ -122,11 +131,26 @@ class Forecast_hub:
 
         return pd_dict
 
+    def get_offline_data(self):
+        data_folder = 'C:/Users/karlen/pypm-local/data/covid19/USA'
+        data_py = data_folder + '/data.py'
+        module = imp.load_source('module_name', data_py)
+        data_description = module.get_data_description()
+        data_description['folder'] = data_folder
+
+        print(data_description['description'])
+
+        pd_dict = {}
+        for filename in data_description['files']:
+            pd_dict[filename] = pd.read_csv(data_folder + '/' + filename)
+
+        return pd_dict
+
     def test_Model_copy_values_from(self):
         path_model_2 = self.model_dir / 'ref_model_2.pypm'
         ref_model_2 = Model.open_file(path_model_2)
 
-    def get_csv(self,forecast_date,us_deaths,cor_scale=1.):
+    def get_csv(self, forecast_date, us_deaths, cor_scale=1.):
         t0 = datetime.date(2020, 3, 1)
         forecast_date_text = forecast_date.isoformat()
         day_of_week = forecast_date.weekday()
@@ -155,7 +179,7 @@ class Forecast_hub:
         state_deaths = 0
 
         for state in self.fips_code:
-        #for state in ['TX','SC','FL']:
+            # for state in ['TX','SC','FL']:
             abbrev = state.lower()
             location = self.fips_code[state]
             deaths = self.pd_dict['usa-jhu-pypm.csv'][abbrev.upper() + '-dt'].fillna(0).values
@@ -171,7 +195,7 @@ class Forecast_hub:
                 except:
                     pass
             for model_name in self.model_names:
-                for model_suffix in ['_d','_h','']:
+                for model_suffix in ['_d', '_h', '']:
                     try:
                         filename = abbrev + model_name + model_suffix + '.pypm'
                         path_model = self.model_dir / filename
@@ -180,7 +204,7 @@ class Forecast_hub:
                     except:
                         pass
             for model_name in self.model_names:
-                for model_suffix in ['_h','']:
+                for model_suffix in ['_h', '']:
                     try:
                         filename = abbrev + model_name + model_suffix + '.pypm'
                         path_model = self.model_dir / filename
@@ -202,15 +226,15 @@ class Forecast_hub:
                 point_est_dict = hub_dict['point_estimates']
                 quantile_dict = hub_dict['quantiles']
                 inc_periods = hub_dict['inc_periods']
-                cum_periods = [deaths[first_sunday-1]] * len(inc_periods[0])
+                cum_periods = [deaths[first_sunday - 1]] * len(inc_periods[0])
                 for inc_type in inc_types:
                     # for cum record (so far, only deaths needs this)
-                    sum = deaths[first_sunday-1]
+                    sum = deaths[first_sunday - 1]
                     if inc_type == 'cum':
                         state_deaths += sum
                     for i_period in point_est_dict:
                         index = int(i_period) - 1
-                        target = i_period+' '+periods[i]+' ahead '+inc_type+' '+names[i]
+                        target = i_period + ' ' + periods[i] + ' ahead ' + inc_type + ' ' + names[i]
                         days = int(i_period)
                         if periods[i] == 'wk':
                             days *= 7
@@ -229,7 +253,7 @@ class Forecast_hub:
                             else:
                                 us_cum_point_est_dict['death'][i_period] = sum
 
-                        self.add_record(forecast_date_text,target,target_end_date,location,'point','NA',value)
+                        self.add_record(forecast_date_text, target, target_end_date, location, 'point', 'NA', value)
 
                         # quantiles
                         if inc_type == 'inc':
@@ -240,7 +264,8 @@ class Forecast_hub:
 
                             for quant in quantile_dict[i_period]:
                                 value = quantile_dict[i_period][quant]
-                                self.add_record(forecast_date_text, target, target_end_date, location, 'quantile', quant, value)
+                                self.add_record(forecast_date_text, target, target_end_date, location, 'quantile',
+                                                quant, value)
 
                             if i_period in us_inc_periods_dict[dict_names[i]]:
                                 ip_len = len(inc_periods[index])
@@ -254,8 +279,9 @@ class Forecast_hub:
                             for i_rep in range(len(inc_periods[index])):
                                 cum_periods[i_rep] += inc_periods[index][i_rep]
                             for quant in quantile_dict[i_period]:
-                                value = np.percentile(cum_periods, float(quant)*100.)
-                                self.add_record(forecast_date_text, target, target_end_date, location, 'quantile', quant, value)
+                                value = np.percentile(cum_periods, float(quant) * 100.)
+                                self.add_record(forecast_date_text, target, target_end_date, location, 'quantile',
+                                                quant, value)
 
                             if i_period in us_cum_periods_dict[dict_names[i]]:
                                 ip_len = len(cum_periods)
@@ -264,7 +290,8 @@ class Forecast_hub:
                                     ip_index = i_rep % ip_len
                                     us_cum_periods_dict[dict_names[i]][i_period][i_rep] += cum_periods[ip_index]
                             else:
-                                us_cum_periods_dict[dict_names[i]][i_period] = [cum_periods[i_rep] for i_rep in range(len(cum_periods))]
+                                us_cum_periods_dict[dict_names[i]][i_period] = [cum_periods[i_rep] for i_rep in
+                                                                                range(len(cum_periods))]
 
         # return 'US' summary:
         # there are additional regions used to define total US deaths Need to correct by adding the additional deaths here
@@ -298,40 +325,47 @@ class Forecast_hub:
                     if inc_type == 'inc':
                         median = np.percentile(us_inc_periods_dict[dict_names[i]][i_period], 50.)
                         for quant in quants:
-                            value = np.percentile(us_inc_periods_dict[dict_names[i]][i_period], float(quant)*100.)
+                            value = np.percentile(us_inc_periods_dict[dict_names[i]][i_period], float(quant) * 100.)
                             # increase the width of the interval for the US as a whole, to account for correlations between states
-                            scaled_value = max(0., cor_scale*(value-median) + median)
+                            scaled_value = max(0., cor_scale * (value - median) + median)
                             quant_text = '{0:0.3f}'.format(quant)
-                            self.add_record(forecast_date_text, target, target_end_date, location, 'quantile', quant_text,
+                            self.add_record(forecast_date_text, target, target_end_date, location, 'quantile',
+                                            quant_text,
                                             scaled_value)
 
                     elif inc_type == 'cum':
                         median = np.percentile(us_cum_periods_dict[dict_names[i]][i_period], 50.) + additional_deaths
                         for quant in quants:
-                            value = np.percentile(us_cum_periods_dict[dict_names[i]][i_period], float(quant) * 100.) + additional_deaths
+                            value = np.percentile(us_cum_periods_dict[dict_names[i]][i_period],
+                                                  float(quant) * 100.) + additional_deaths
                             scaled_value = max(0., cor_scale * (value - median) + median)
                             quant_text = '{0:0.3f}'.format(quant)
-                            self.add_record(forecast_date_text, target, target_end_date, location, 'quantile', quant_text,
+                            self.add_record(forecast_date_text, target, target_end_date, location, 'quantile',
+                                            quant_text,
                                             scaled_value)
 
         return self.buff
 
-
-
     def add_record(self, forecast_date, target, target_end_date, location, record_type, quantile_text, value):
-        record = [forecast_date, target, target_end_date, location, record_type, quantile_text]
-        record.append('{0:0.1f}'.format(value))
-        self.buff.append(record)
+        # filter case projections that do not track cases
+        filter_case = True
+        # the following are not filtered
+        no_filter_case = ['AK', 'AZ', 'CA', 'KS', 'MD', 'MS']
+        if not filter_case or 'case' not in target or self.state_fips[location] in no_filter_case:
+            record = [forecast_date, target, target_end_date, location, record_type, quantile_text]
+            record.append('{0:0.1f}'.format(value))
+            self.buff.append(record)
 
-my_forecast = Forecast_hub('/Users/karlen/pypm-temp/usa', ['_4_2_0116'])
+
+my_forecast = Forecast_hub('/Users/karlen/pypm-temp/usa', ['_4_2_0320'])
 # Indicate the total US deaths (up to and including Saturday) here:
-us_deaths = 850060
+us_deaths = 971087
 
 # changed to 3 for Feb 28 - all have variant - large correlated uncertainty! - Apr 25: return to 1.5 (single strain)
-# changed back to 3 for Jan 16 2022 (omicron)
-my_csv = my_forecast.get_csv(datetime.date(2022, 1, 16), us_deaths, cor_scale=3.0)
+# changed back to 3 for Jan 16 2022 (omicron), Feb 13: return to 1.5
+my_csv = my_forecast.get_csv(datetime.date(2022, 3, 20), us_deaths, cor_scale=3.0)
 pass
-with open('/Users/karlen/pypm-temp/test-forecast.csv','w') as out:
+with open('/Users/karlen/pypm-temp/test-forecast.csv', 'w') as out:
     for line in my_csv:
         record = ','.join(line)
         out.write(record + '\n')
