@@ -2,7 +2,7 @@
 """
 Produce .csv file suitable for submission to covid19-forecast-hub (https://github.com/reichlab/covid19-forecast-hub)
 
-
+include offline data
 
 @author: karlen
 """
