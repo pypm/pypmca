@@ -64,7 +64,10 @@ class Forecast_hub:
         'United Kingdom': 'GB'
         }
 
-        self.hospitalization_states = ['BE','HR','DK','EE','FR','NL','NO','SI','ES','GB','IE']
+        #self.hospitalization_states = ['BE','HR','DK','EE','FR','NL','NO','SI','ES','GB','IE']
+        # Starting Nov 7, 2021 (CH and PT added on Nov 14) (IT and PT removed on Nov 28) (NL removed Dec 5)
+        self.hospitalization_states = ['BE', 'HR', 'DK', 'EE', 'FR', 'NO', 'SI', 'GB',
+                                       'IE', 'CZ', 'LV', 'CY', 'CH', 'GR']
 
     def get_data(self):
         data_folder = 'data/covid19/EU'
@@ -196,9 +199,9 @@ class Forecast_hub:
         record.append('{0:0.0f}'.format(value))
         self.buff.append(record)
 
-my_forecast = Forecast_hub('/Users/karlen/pypm-temp/eu', ['_2_9_1003'])
+my_forecast = Forecast_hub('/Users/karlen/pypm-temp/eu', ['_2_9_1205'])
 
-my_csv = my_forecast.get_csv(datetime.date(2021, 10, 3))
+my_csv = my_forecast.get_csv(datetime.date(2021, 12, 5))
 pass
 with open('/Users/karlen/pypm-temp/test-eu-forecast.csv','w') as out:
     for line in my_csv:

@@ -350,20 +350,20 @@ class Forecast_hub:
         # filter case projections that do not track cases
         filter_case = True
         # the following are not filtered
-        no_filter_case = ['AK', 'AZ', 'CA', 'KS', 'MD', 'MS']
+        no_filter_case = []
         if not filter_case or 'case' not in target or self.state_fips[location] in no_filter_case:
             record = [forecast_date, target, target_end_date, location, record_type, quantile_text]
             record.append('{0:0.1f}'.format(value))
             self.buff.append(record)
 
 
-my_forecast = Forecast_hub('/Users/karlen/pypm-temp/usa', ['_4_2_0320'])
+my_forecast = Forecast_hub('/Users/karlen/pypm-temp/usa', ['_4_3_0424'])
 # Indicate the total US deaths (up to and including Saturday) here:
-us_deaths = 971087
+us_deaths = 991231
 
 # changed to 3 for Feb 28 - all have variant - large correlated uncertainty! - Apr 25: return to 1.5 (single strain)
 # changed back to 3 for Jan 16 2022 (omicron), Feb 13: return to 1.5
-my_csv = my_forecast.get_csv(datetime.date(2022, 3, 20), us_deaths, cor_scale=3.0)
+my_csv = my_forecast.get_csv(datetime.date(2022, 4, 24), us_deaths, cor_scale=3.0)
 pass
 with open('/Users/karlen/pypm-temp/test-forecast.csv', 'w') as out:
     for line in my_csv:
