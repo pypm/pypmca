@@ -29,7 +29,7 @@ class Forecast_hub:
         self.pd_dict = self.get_data()
         self.buff = [['forecast_date', 'target', 'target_end_date', 'location', 'type', 'quantile', 'value']]
 
-        self.regional_abbreviations = {
+        self.regional_abbreviations_all = {
         'Austria': 'AT',
         'Belgium': 'BE',
         'Bulgaria': 'BG',
@@ -64,9 +64,19 @@ class Forecast_hub:
         'United Kingdom': 'GB'
         }
 
+        self.regional_abbreviations = {
+        'Belgium': 'BE',
+        'France': 'FR',
+        'Ireland': 'IE',
+        'Norway': 'NO',
+        'Switzerland': 'CH',
+        'United Kingdom': 'GB'
+        }
+
         #self.hospitalization_states = ['BE','HR','DK','EE','FR','NL','NO','SI','ES','GB','IE']
         # Starting Nov 7, 2021 (CH and PT added on Nov 14) (IT and PT removed on Nov 28) (NL removed Dec 5)
-        self.hospitalization_states = ['BE', 'HR', 'DK', 'EE', 'FR', 'NO', 'SI', 'GB',
+        # 2022-07-20: Removed GB, since that generates a github submission error
+        self.hospitalization_states = ['BE', 'HR', 'DK', 'EE', 'FR', 'NO', 'SI',
                                        'IE', 'CZ', 'LV', 'CY', 'CH', 'GR']
 
     def get_data(self):
@@ -199,9 +209,9 @@ class Forecast_hub:
         record.append('{0:0.0f}'.format(value))
         self.buff.append(record)
 
-my_forecast = Forecast_hub('/Users/karlen/pypm-temp/eu', ['_2_9_1205'])
+my_forecast = Forecast_hub('/Users/karlen/pypm-temp/eu', ['_4_4_0821'])
 
-my_csv = my_forecast.get_csv(datetime.date(2021, 12, 5))
+my_csv = my_forecast.get_csv(datetime.date(2022, 8, 21))
 pass
 with open('/Users/karlen/pypm-temp/test-eu-forecast.csv','w') as out:
     for line in my_csv:
