@@ -136,3 +136,7 @@ History
 * 0.3.2 (2022-01-22)
 
  * fix issue with Adder and Subtractor: prevent pop ratios from exceeding 1.
+
+* 0.3.3 (2022-08-30)
+
+ * fix issue with Population and Propagator: add checks against negative expectation or probability

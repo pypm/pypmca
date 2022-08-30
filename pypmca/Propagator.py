@@ -140,23 +140,38 @@ class Propagator(Connector):
                     if isinstance(self.delay, list):
                         for i in range(len(self.to_population)):
                             to_pop = self.to_population[i]
-                            scale = stats.binom.rvs(incoming, self.fraction[i].get_value())
+                            # protect against negative values
+                            scale = 0
+                            if incoming > 0 and self.fraction[i].get_value() > 0.:
+                                scale = stats.binom.rvs(incoming, self.fraction[i].get_value())
                             to_pop.update_future_data(scale, self.delay[i])
                     else:
                         for i in range(len(self.to_population)):
                             to_pop = self.to_population[i]
-                            scale = stats.binom.rvs(incoming, self.fraction[i].get_value())
+                            # protect against negative values
+                            scale = 0
+                            if incoming > 0 and self.fraction[i].get_value() > 0.:
+                                scale = stats.binom.rvs(incoming, self.fraction[i].get_value())
                             to_pop.update_future_data(scale, self.delay)
                 else:
                     if isinstance(self.delay, list):
                         for i in range(len(self.to_population)):
                             to_pop = self.to_population[i]
-                            scale = stats.binom.rvs(incoming, self.fraction.get_value())
+                            # protect against negative values
+                            scale = 0
+                            if incoming > 0 and self.fraction.get_value() > 0.:
+                                scale = stats.binom.rvs(incoming, self.fraction.get_value())
                             to_pop.update_future_data(scale, self.delay[i])
                     else:
                         for to_pop in self.to_population:
-                            scale = stats.binom.rvs(incoming, self.fraction.get_value())
+                            # protect against negative values
+                            scale = 0
+                            if incoming > 0 and self.fraction.get_value() > 0.:
+                                scale = stats.binom.rvs(incoming, self.fraction.get_value())
                             to_pop.update_future_data(scale, self.delay)
             else:
-                scale = stats.binom.rvs(incoming, self.fraction.get_value())
+                # protect against negative values
+                scale = 0
+                if incoming > 0 and self.fraction.get_value() > 0.:
+                    scale = stats.binom.rvs(incoming, self.fraction.get_value())
                 self.to_population.update_future_data(scale, self.delay)

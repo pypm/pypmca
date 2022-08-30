@@ -309,7 +309,10 @@ class Population:
         if len(self.future) > 0:
             for i in range(len(self.future)):
                 nu = self.future[i]
-                variate = stats.poisson.rvs(nu)
+                variate = 0
+                # protect against negative expectation (typically close to zero)
+                if nu > 0.:
+                    variate = stats.poisson.rvs(nu)
                 self.future[i] = variate
 
     def update_future_expectation(self, scale, delay):
