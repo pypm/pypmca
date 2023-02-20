@@ -178,6 +178,7 @@ class Forecast_hub:
         us_cum_periods_dict['death'] = {}
         state_deaths = 0
 
+        missing_last_saturday = False
         for state in self.fips_code:
             # for state in ['TX','SC','FL']:
             abbrev = state.lower()
@@ -218,7 +219,8 @@ class Forecast_hub:
             models = [case_model, death_model, hosp_model]
             print(models[0].name, models[1].name, models[2].name)
 
-            for i in range(3):
+            # starting 2023/2/19 - skip cases
+            for i in range(1,3):
                 model = models[i]
                 inc_types = inc_types_list[i]
 
@@ -226,10 +228,17 @@ class Forecast_hub:
                 point_est_dict = hub_dict['point_estimates']
                 quantile_dict = hub_dict['quantiles']
                 inc_periods = hub_dict['inc_periods']
-                cum_periods = [deaths[first_sunday - 1]] * len(inc_periods[0])
+                try:
+                    cum_periods = [deaths[first_sunday - 1]] * len(inc_periods[0])
+                except:
+                    cum_periods = [deaths[first_sunday - 2]] * len(inc_periods[0])
+                    missing_last_saturday = True
                 for inc_type in inc_types:
                     # for cum record (so far, only deaths needs this)
-                    sum = deaths[first_sunday - 1]
+                    try:
+                        sum = deaths[first_sunday - 1]
+                    except:
+                        sum = deaths[first_sunday - 2]
                     if inc_type == 'cum':
                         state_deaths += sum
                     for i_period in point_est_dict:
@@ -293,6 +302,9 @@ class Forecast_hub:
                                 us_cum_periods_dict[dict_names[i]][i_period] = [cum_periods[i_rep] for i_rep in
                                                                                 range(len(cum_periods))]
 
+        if missing_last_saturday:
+            print('*** Last Saturday cumulative deaths missing ***')
+
         # return 'US' summary:
         # there are additional regions used to define total US deaths Need to correct by adding the additional deaths here
         additional_deaths = us_deaths - state_deaths
@@ -348,6 +360,7 @@ class Forecast_hub:
 
     def add_record(self, forecast_date, target, target_end_date, location, record_type, quantile_text, value):
         # filter case projections that do not track cases
+        # 2023/2/19 - stop case projections
         filter_case = True
         # the following are not filtered
         no_filter_case = []
@@ -357,13 +370,14 @@ class Forecast_hub:
             self.buff.append(record)
 
 
-my_forecast = Forecast_hub('/Users/karlen/pypm-temp/usa', ['_4_4_0821'])
+my_forecast = Forecast_hub('/Users/karlen/pypm-temp/usa', ['_4_4_0219'])
 # Indicate the total US deaths (up to and including Saturday) here:
-us_deaths = 1041141
+us_deaths = 1117497
+
 
 # changed to 3 for Feb 28 - all have variant - large correlated uncertainty! - Apr 25: return to 1.5 (single strain)
 # changed back to 3 for Jan 16 2022 (omicron), Feb 13: return to 1.5
-my_csv = my_forecast.get_csv(datetime.date(2022, 8, 21), us_deaths, cor_scale=3.0)
+my_csv = my_forecast.get_csv(datetime.date(2023, 2, 19), us_deaths, cor_scale=3.0)
 pass
 with open('/Users/karlen/pypm-temp/test-forecast.csv', 'w') as out:
     for line in my_csv:

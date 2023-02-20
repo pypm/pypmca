@@ -68,7 +68,6 @@ class Forecast_hub:
         'Belgium': 'BE',
         'France': 'FR',
         'Ireland': 'IE',
-        'Norway': 'NO',
         'Switzerland': 'CH',
         'United Kingdom': 'GB'
         }
@@ -209,9 +208,9 @@ class Forecast_hub:
         record.append('{0:0.0f}'.format(value))
         self.buff.append(record)
 
-my_forecast = Forecast_hub('/Users/karlen/pypm-temp/eu', ['_4_4_0821'])
+my_forecast = Forecast_hub('/Users/karlen/pypm-temp/eu', ['_4_4_0129'])
 
-my_csv = my_forecast.get_csv(datetime.date(2022, 8, 21))
+my_csv = my_forecast.get_csv(datetime.date(2023, 1, 29))
 pass
 with open('/Users/karlen/pypm-temp/test-eu-forecast.csv','w') as out:
     for line in my_csv:
